@@ -11,7 +11,7 @@
 LIB=../lib
 
 # Converter function. We are using Bigloo at present
-CONV=bigloo -i -s -eval "(module html (include \"$(LIB)/myenv-bigloo.scm\") (include \"$(LIB)/util.scm\") (include \"$(LIB)/SXML-tree-trans.scm\") (include \"$(LIB)/SXML-to-HTML.scm\") (include \"$(LIB)/SXML-to-HTML-ext.scm\"))"
+CONV=bigloo -i -s -eval "(module html (include \"$(LIB)/myenv-bigloo.scm\") (include \"$(LIB)/srfi-13-local.scm\") (include \"$(LIB)/util.scm\") (include \"$(LIB)/SXML-tree-trans.scm\") (include \"$(LIB)/SXML-to-HTML.scm\") (include \"$(LIB)/SXML-to-HTML-ext.scm\"))"
 
 # Convert SXML to HTML
 %.html: %.scm
