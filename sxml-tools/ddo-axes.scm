@@ -465,7 +465,7 @@
                          (((add-res new-src)
                            (reordering
                             (all-following-siblings (car src))
-                            (sxml:context->content (car src))
+                            (sxml:context->ancestors (car src))
                             (cdr src))))
                          (if
                           (null? new-src)
