@@ -16,7 +16,7 @@ clean:
 	rm -f *_.c *.o core a.out \
 	vmyenv-bigloo \
 	vinput-parse-bigloo \
-	vsrfi-12-bigloo
+	vsrfi-12-bigloo vSXML
 
 
 # Bigloo-specific  part
@@ -30,6 +30,8 @@ test-under-bigloo-i:
 	$(BIGLOO) $(BFLAGS) -i vinput-parse-bigloo.scm
 	$(BIGLOO) $(BFLAGS) -i vsrfi-12-bigloo.scm
 	echo '(module test (include "myenv-bigloo.scm") (include "srfi-12.scm") (include "vland.scm"))' | $(BIGLOO) $(BFLAGS) -i --
+	echo '(module test (include "myenv-bigloo.scm") (include "util.scm") (include "SXML-tree-trans.scm") (include "vSXML-tree-trans.scm"))' | $(BIGLOO) $(BFLAGS) -i --
+	echo '(module test (include "myenv-bigloo.scm") (include "util.scm") (include "SXML-tree-trans.scm") (include "SXML-to-HTML.scm") (include "vSXML-to-HTML.scm"))' | $(BIGLOO) $(BFLAGS) -i --
 
 
 # Bigloo compiler
@@ -40,6 +42,7 @@ test-under-bigloo-c:
 	./vinput-parse-bigloo
 	$(BIGLOO) $(BFLAGS) vsrfi-12-bigloo.scm -o vsrfi-12-bigloo
 	./vsrfi-12-bigloo
+	echo '(module test (include "myenv-bigloo.scm") (include "util.scm") (include "SXML-tree-trans.scm") (include "SXML-to-HTML.scm") (include "vSXML-to-HTML.scm"))' | $(BIGLOO) $(BFLAGS) -o vSXML --
 
 
 # Other interpreters
@@ -61,6 +64,9 @@ test-under-mit:
 	util.scm input-parse.scm look-for-str.scm  $$thisd/vinput-parse.scm
 	thisd=`pwd` && cd $(LIBDIR) && echo "" | scheme  -load myenv-mit.scm \
 	util.scm input-parse.scm look-for-str.scm  SSAX.scm
+	thisd=`pwd` && cd $(LIBDIR) && echo "" | scheme  -load myenv-mit.scm \
+	util.scm SXML-tree-trans.scm SXML-to-HTML.scm \
+	$$thisd/vSXML-to-HTML.scm
 
 test-under-gambit-i:
 	thisd=`pwd` && cd $(LIBDIR) && gsi myenv.scm util.scm \
@@ -73,5 +79,11 @@ test-under-gambit-i:
 	srfi-12.scm $$thisd/vsrfi-12.scm
 	thisd=`pwd` && cd $(LIBDIR) && gsi -e '(include "myenv.scm")' \
 	srfi-12.scm $$thisd/vland.scm
+	thisd=`pwd` && cd $(LIBDIR) && gsi -e '(include "myenv.scm")' \
+	util.scm SXML-tree-trans.scm $$thisd/vSXML-tree-trans.scm
+	thisd=`pwd` && cd $(LIBDIR) && gsi -e '(include "myenv.scm")' \
+	util.scm SXML-tree-trans.scm SXML-to-HTML.scm \
+	$$thisd/vSXML-to-HTML.scm 
+
 
 
