@@ -22,7 +22,7 @@
 	(include "look-for-str.scm")
 	(include "input-parse.scm")
 	(include "read-NCName-ss.scm")
-	(include "SSAX-code1.scm")
+	(include "SSAX-code1.scm") ; the same as SSAX-code.scm save read-NCName
 	(extern
 	 (rusage-start::void () "rusage_start")
 	 (rusage-report::void (string) "rusage_report")

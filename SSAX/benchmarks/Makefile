@@ -64,7 +64,8 @@ string-value-ssax: string-value-ssax.scm rusage.o
 	$(BIGLOO) $(BFLAGS) string-value-ssax.scm rusage.o -o $@
 
 
-string-value-ssax-ss: string-value-ssax-ss.scm rusage.o substring-symbol.c
+string-value-ssax-ss: string-value-ssax-ss.scm read-NCName-ss.scm \
+	substring-symbol.c rusage.o 
 	$(BIGLOO) $(BFLAGS) string-value-ssax-ss.scm rusage.o -o $@
 
 clean:
@@ -73,4 +74,5 @@ clean:
 	bench1-file16.xml \
 	string-value \
 	string-value-by-one \
-	string-value-ssax
+	string-value-ssax \
+	string-value-ssax-ss

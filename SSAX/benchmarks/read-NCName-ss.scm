@@ -8,7 +8,7 @@
 (directives
 	; Adding substring->symbol implemented in substring-symbol.c
 	(extern
-	 (macro substring->symbol::symbol (::string ::int ::int)    
+	 (macro substring->symbol::symbol (::bstring ::int ::int)    
 				    "substring_to_symbol")
 	 (include "substring-symbol.c"))
 	(pragma
