@@ -28,6 +28,9 @@
 ; description of the error. Other arguments supply more details about
 ; the problem.
 ; myenv.scm, myenv-bigloo.scm or a similar prelude is assumed.
+; From SRFI-13, string-concatenate-reverse
+; If a particular implementation lacks SRFI-13 support, please
+; include the file srfi-13-local.scm
 ;
 ; $Id$
 
@@ -136,43 +139,6 @@
    (gambitize (eof-object? port))
    )
  (else #t))
-
-
-; Versions of string-concatenate-reverse and string-xcopy!
-; of SRFI-13 if the latter SRFI is not available
-(cond-expand
-  (srfi-13 #f)				; Nothing else to be defined
-  (else
-    ; Implementations of string-xcopy! of SRFI-13, using
-    ; whatever native facilities are available
-    (cond-expand
-      (bigloo
-	(define (string-xcopy! target tstart s sfrom sto)
-	  (blit-string! s sfrom target tstart (- sto sfrom))))
-      (else
-	(define (string-xcopy! target tstart s sfrom sto)
-	  (do ((i sfrom (++ i)) (j tstart (++ j)))
-	      ((>= i sto))
-	    (string-set! target j (string-ref s i))))))
-
-    ; procedure string-concatenate-reverse STRINGS FINAL END
-    (define (string-concatenate-reverse strs final end)
-      (if (null? strs) (substring final 0 end)
-	(let*
-	  ((total-len
-	     (let loop ((len end) (lst strs))
-	       (if (null? lst) len
-		 (loop (+ len (string-length (car lst))) (cdr lst)))))
-	    (result (make-string total-len)))
-	  (let loop ((len end) (j total-len) (str final) (lst strs))
-	    (string-xcopy! result (- j len) str 0 len)
-	    (if (null? lst) result
-	      (loop (string-length (car lst)) (- j len)
-		    (car lst) (cdr lst)))))))
-))
-
-
-
 
 
 
