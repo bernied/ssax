@@ -171,3 +171,18 @@ with a few occasional lines of code.
 
 	$ make run-sxslt-advanced-bigloo-i
 	$ make run-sxslt-advanced-scm
+
+
+Parent pointers in SXML trees
+-----------------------------
+
+This is the source code for an article 'On parent pointers in SXML
+trees' posted on the SSAX-SXML mailing list. The code implements and
+tests four different techniques of determining the parent of an SXML
+node. The code includes two custom instantiations of the SSAX
+framework, to add various kinds of parent "pointer" annotations to
+SXML nodes as we parse an XML document.
+
+
+	$ make run-parent-pointers-bigloo-i
+	$ make run-parent-pointers-scm

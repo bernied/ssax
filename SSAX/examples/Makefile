@@ -9,7 +9,8 @@ all-bigloo-i: run-html-parse-sample-bigloo-i \
 	run-pull-punct-bigloo-i \
 	run-apply-templates-bigloo-i \
 	run-sxml-db-conv-i \
-	run-daml-parse-unparse-i
+	run-daml-parse-unparse-i \
+	run-parent-pointers-bigloo-i
 
 clean:
 	rm -f *_.c *.o core a.out \
@@ -60,6 +61,9 @@ run-daml-parse-unparse-i: daml-parse-unparse.scm \
 run-sxslt-advanced-bigloo-i: sxslt-advanced.scm
 	$(BIGLOO) $(BFLAGS) -i -eval '(module sxslt-advanced (include "myenv-bigloo.scm") (include "util.scm") (include "SXML-tree-trans.scm") (include "SXML-to-HTML.scm") (include "SXML-to-HTML-ext.scm"))' sxslt-advanced.scm
 
+run-parent-pointers-bigloo-i: parent-pointers.scm
+	$(BIGLOO) $(BFLAGS) -i -eval '(module parent-pointers (include "myenv-bigloo.scm") (include "util.scm") (include "look-for-str.scm") (include "input-parse.scm") (include "SSAX-code.scm") (include "SXML-tree-trans.scm") (include "SXPath-old.scm"))' parent-pointers.scm
+
 
 # SCM-specific part
 
@@ -89,3 +93,11 @@ run-sxslt-advanced-scm: sxslt-advanced.scm
 	-l $(LIBDIR)/SXML-tree-trans.scm \
 	-l $(LIBDIR)/SXML-to-HTML.scm -l $(LIBDIR)/SXML-to-HTML-ext.scm \
 	-l sxslt-advanced.scm
+
+run-parent-pointers-scm: parent-pointers.scm
+	scm -b -l $(LIBDIR)/myenv-scm.scm  -l $(LIBDIR)/util.scm \
+	-l $(LIBDIR)/look-for-str.scm -l $(LIBDIR)/input-parse.scm \
+	-l $(LIBDIR)/SSAX-code.scm \
+	-l $(LIBDIR)/SXML-tree-trans.scm \
+	-l $(LIBDIR)/SXPath-old.scm \
+	-l parent-pointers.scm
