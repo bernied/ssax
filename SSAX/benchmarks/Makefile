@@ -14,8 +14,12 @@
 LIBDIR=../lib
 
 BPLATFORM_SPECIFIC=-copt "-fomit-frame-pointer -mcpu=i686"
-BFLAGS=-I $(LIBDIR) -Obench -farithmetic -unsafe $(BPLATFORM_SPECIFIC)
+BFLAGS=-I $(LIBDIR) -rm -Obench -farithmetic -unsafe $(BPLATFORM_SPECIFIC)
 BIGLOO=bigloo
+
+# The following flags are used to compile substring-symbol.c
+# BIGLOOINC must point to a directory that contains bigloo.h
+BIGLOOINC=`$(BIGLOO) -s -i -eval '(display *default-lib-dir*)(exit)'`
 
 # C flags, location for the Expat library
 CC = gcc
@@ -63,6 +67,13 @@ run-string-value-ssax: string-value-ssax \
 string-value-ssax: string-value-ssax.scm rusage.o
 	$(BIGLOO) $(BFLAGS) string-value-ssax.scm rusage.o -o $@
 
+
+string-value-ssax-ss: string-value-ssax-ss.scm rusage.o substring-symbol.o
+	$(BIGLOO) $(BFLAGS) string-value-ssax-ss.scm rusage.o \
+	substring-symbol.o -o $@
+
+substring-symbol.o: substring-symbol.c
+	$(CC) -O2 -fomit-frame-pointer -I $(BIGLOOINC) -c substring-symbol.c
 
 clean:
 	rm -f *.o core \
