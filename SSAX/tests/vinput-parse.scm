@@ -406,9 +406,15 @@
 )
 
 (cerr nl "Verifying tokenizing of the input stream, big tokens ..." nl)
-(let ((eof (with-input-from-string "" read))
-      (big-token (make-string 512 #\!))
-      (big-token1 (make-string 2047 #\?))
+(let* ((eof (with-input-from-string "" read))
+	(big-token 
+	  (call-with-output-string
+	    (lambda (port)
+	      (do ((i 0 (++ i))) ((>= i 512))
+		(display (modulo i 10) port)))))
+	(big-token1 (string-append 
+		      big-token big-token big-token
+		      (substring big-token 0 511)))
       (term-list '(#\space #\newline *eof*)))
 
   (call-with-input-string big-token
@@ -442,7 +448,7 @@
 
   (call-with-input-string (string-append big-token1 (string #\newline))
     (lambda (port)
-      (let ((token (next-token-of '(#\a #\! #\?) port)))
+      (let ((token (next-token-of (string->list "a0123456789") port)))
 	(assert (equal? token big-token1) 
 	  (memv (peek-char port) term-list)))))
 )
