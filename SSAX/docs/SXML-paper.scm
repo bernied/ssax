@@ -113,7 +113,13 @@ Army Research Office under contracts 38690-MA and 40473-MA-SP.")))
 	    "\\makeatletter" nl
 	    "\\makeatother" nl
 	    "\\sloppy" nl
-	    "\\newcommand{\\minitab}[2][l]{\\begin{tabular}{#1}#2\\end{tabular}}"
+	    "\\newcommand{\\minitab}[2][l]{\\begin{tabular}{#1}#2\\end{tabular}}" nl
+	    "% The standard article.cls leaves out too big margins" nl
+	    "\\setlength\\topmargin{-10pt}" nl
+	    "\\setlength\\textwidth{504pt}" nl
+	    "\\setlength\\textheight{53\\baselineskip}" nl
+	    "\\setlength\\oddsidemargin{-0.3in}" nl
+	    "\\setlength\\evensidemargin{-0.3in}" nl
 	    nl
 	    elems
 	    )))
@@ -429,7 +435,8 @@ Army Research Office under contracts 38690-MA and 40473-MA-SP.")))
 	     )
 	    (list
 	     (in-tex-env "table" "[ht]"
-	      (in-tex-env "tabular" (list "{" tex-cols "}")
+	      (in-tex-env "tabular" (list "{" "@{\\extracolsep{-25pt}}" 
+					  tex-cols "}")
 	       (list (and border? "\\hline\n")
 	       (map
 		(lambda (row)
