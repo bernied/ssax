@@ -249,18 +249,25 @@
       (newline))))
 
 
+; This silly functions makes symbols case-sensitive
+(define (symbolize exp)
+  (cond
+    ((string? exp) (string->symbol exp))
+    ((pair? exp) (cons (symbolize (car exp)) (symbolize (cdr exp))))
+    (else exp)))
+
 ; Simple test, no validation
 (test '("<BR></BR>") #f
-  '(*TOP* (BR)))
+  (symbolize '("*TOP*" ("BR"))))
 
 (test 
   `("<FLAGS>"
       "<FLAG>T</FLAG><FLAG>n</FLAG>" ,nl
     "</FLAGS>")
   ; The doctype
-  '((FLAGS ANY ()) (FLAG bool ()))
+  (symbolize '(("FLAGS" "ANY" ()) ("FLAG" "bool" ())))
   ; The result
-  '(*TOP* (FLAGS (FLAG #t) (FLAG #f))))
+  (symbolize '("*TOP*" ("FLAGS" ("FLAG" #t) ("FLAG" #f)))))
 
 ; The content of an element FLAG is of a wrong type
 (assert 
@@ -270,7 +277,7 @@
 	  ; we see bad content: xxx is not a boolean
 	  "<FLAG>T</FLAG><FLAG>xxx</FLAG>" ,nl
 	"</FLAGS>")
-      '((FLAGS ANY ()) (FLAG bool ()))
+      (symbolize '(("FLAGS" "ANY" ()) ("FLAG" "bool" ())))
       '())))
 
 
@@ -283,9 +290,9 @@
       "<AMOUNT>10</AMOUNT>" ,nl
     "</T>")
   ; The doctype
-  '((T ANY ()) (FLAG bool ()) (AMOUNT int ()))
+  (symbolize '(("T" "ANY" ()) ("FLAG" "bool" ()) ("AMOUNT" "int" ())))
   ; The result
-  '(*TOP* (T (FLAG #t) (AMOUNT 10))))
+  (symbolize '("*TOP*" ("T" ("FLAG" #t) ("AMOUNT" 10)))))
 
 
 ; check that the error is generated given an improper content for AMOUNT
@@ -296,7 +303,7 @@
 	  "<FLAG>y</FLAG>"
 	  "<AMOUNT>10xx</AMOUNT>" ,nl
 	"</T>")
-     '((T ANY ()) (FLAG bool ()) (AMOUNT int ()))
+     (symbolize '(("T" "ANY" ()) ("FLAG" "bool" ()) ("AMOUNT" "int" ())))
      '())))
 
 ; Test for the proper sequence. Doctype specifies that element T must
@@ -309,7 +316,8 @@
 	  "<FLAG>T</FLAG>"
 	  "<AMOUNT>10</AMOUNT>" ,nl
 	"</T>")
-      '((T (seq AMOUNT FLAG) ()) (FLAG bool ()) (AMOUNT int ()))
+      (symbolize '(("T" ("seq" "AMOUNT" "FLAG") ())
+		   ("FLAG" "bool" ()) ("AMOUNT" "int" ())))
       '())))
 
 ; Test for the an undeclared element: the doctype below does not
@@ -322,7 +330,7 @@
 	  "<AMOUNT>10</AMOUNT>" ,nl
 	"</T>")
       ; The doctype
-      '((T (seq AMOUNT FLAG) ()) (AMOUNT int ()))
+      (symbolize '(("T" ("seq" "AMOUNT" "FLAG") ()) ("AMOUNT" "int" ())))
       '())))
 
 ; The successful test: validation of both structural and datatype
@@ -333,9 +341,10 @@
        "<AMOUNT>10</AMOUNT>" ,nl
     "</T>")
   ; The doctype
-  '((T (seq FLAG AMOUNT) ()) (FLAG bool ()) (AMOUNT int ()))
+  (symbolize '(("T" ("seq" "FLAG" "AMOUNT") ())
+	       ("FLAG" "bool" ()) ("AMOUNT" "int" ())))
   ; The result
-  '(*TOP* (T (FLAG #t) (AMOUNT 10))))
+  (symbolize '("*TOP*" ("T" ("FLAG" #t) ("AMOUNT" 10)))))
 
 (cout nl "All tests passed" nl)
 

@@ -55,76 +55,6 @@
 (define (pattern-var? x)
   (and (symbol? x) (char=? #\_ (string-ref (symbol->string x) 0))))
 
-; The following macro runs built-in test cases -- or does not run,
-; depending on which of the two lines below you commented out
-; (define-macro (run-test . body) `(begin (display "\n-->Test\n") ,@body))
-;(define-macro (run-test . body) '(begin #f))
-
-(define-syntax run-test
- (syntax-rules (define)
-   ((run-test "scan-exp" (define vars body))
-    (define vars (run-test "scan-exp" body)))
-   ((run-test "scan-exp" ?body)
-    (letrec-syntax
-      ((scan-exp			; (scan-exp body k)
-	 (syntax-rules (quote quasiquote !)
-	   ((scan-exp '() (k-head ! . args))
-	     (k-head '() . args))
-	   ((scan-exp (quote (hd . tl)) k)
-	     (scan-lit-lst (hd . tl) (do-wrap ! quasiquote k)))
-	   ((scan-exp (quasiquote (hd . tl)) k)
-	     (scan-lit-lst (hd . tl) (do-wrap ! quasiquote k)))
-	   ((scan-exp (quote x) (k-head ! . args))
-	     (k-head 
-	       (if (string? (quote x)) (string->symbol (quote x)) (quote x))
-	       . args))
-	   ((scan-exp (hd . tl) k)
-	     (scan-exp hd (do-tl ! scan-exp tl k)))
-	   ((scan-exp x (k-head ! . args))
-	     (k-head x . args))))
-	(do-tl
-	  (syntax-rules (!)
-	    ((do-tl processed-hd fn () (k-head ! . args))
-	      (k-head (processed-hd) . args))
-	    ((do-tl processed-hd fn old-tl k)
-	      (fn old-tl (do-cons ! processed-hd k)))))
-	(do-cons
-	  (syntax-rules (!)
-	    ((do-cons processed-tl processed-hd (k-head ! . args))
-	      (k-head (processed-hd . processed-tl) . args))))
-	(do-wrap
-	  (syntax-rules (!)
-	    ((do-wrap val fn (k-head ! . args))
-	      (k-head (fn val) . args))))
-	(do-finish
-	  (syntax-rules ()
-	    ((do-finish new-body) new-body)))
-
-	(scan-lit-lst			; scan literal list
-	  (syntax-rules (quote unquote unquote-splicing !)
-	   ((scan-lit-lst '() (k-head ! . args))
-	     (k-head '() . args))
-	   ((scan-lit-lst (quote (hd . tl)) k)
-	     (do-tl quote scan-lit-lst ((hd . tl)) k))
-	   ((scan-lit-lst (unquote x) k)
-	     (scan-exp x (do-wrap ! unquote k)))
-	   ((scan-lit-lst (unquote-splicing x) k)
-	     (scan-exp x (do-wrap ! unquote-splicing k)))
-	   ((scan-lit-lst (quote x) (k-head ! . args))
-	     (k-head 
-	       ,(if (string? (quote x)) (string->symbol (quote x)) (quote x))
-	       . args))
-	    ((scan-lit-lst (hd . tl) k)
-	      (scan-lit-lst hd (do-tl ! scan-lit-lst tl k)))
-	    ((scan-lit-lst x (k-head ! . args))
-	      (k-head x . args))))
-	)
-      (scan-exp ?body (do-finish !))))
-  ((run-test body ...)
-   (begin
-     (run-test "scan-exp" body) ...))
-))
-
 ; A dumb match of two ordered trees, one of which may contain variables
 ;
 ; Match two trees. tree1 may contain variables 
@@ -158,7 +88,7 @@
    (else
     (and (equal? tree1 tree2) env))))
 
-(run-test
+;(run-test
  (let ((test 
 	(lambda (tree1 tree2 expected)
 	(assert (equal? expected (match-tree tree1 tree2 '()))))))
@@ -173,7 +103,8 @@
    (test '(seq _x (seq _x _z)) '(seq 1 (seq 2 (seq-empty))) #f)
    (test '(seq _x (seq _x _z)) '(seq 1 (seq 1 (seq-empty)))
 	 '((_z seq-empty) (_x . 1)))
-))
+)
+;)
 ; end of the non-linear pattern matcher
 ;--
 
