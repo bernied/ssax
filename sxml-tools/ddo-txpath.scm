@@ -486,7 +486,9 @@
             (cond
               ((assq (sxml:context->node (car nodeset))
                      (cdr binding))
-               => cdr)
+               => (lambda (pair) (force (cdr pair)))
+               ; => cdr   ; DL: was
+               )
               (else
                (sxml:xpointer-runtime-error
                 "internal DDO SXPath error - predicate value not found: "
@@ -530,7 +532,9 @@
                             (cond
                               ((assq (car position+size)  ; context position
                                      (cdr position-alist))
-                               => cdr  ; predicate value at last
+                               => (lambda (pair)  ; predicate value at last
+                                    (force (cdr pair)))
+                               ; => cdr   ; DL: was
                                )
                               (else
                                (sxml:xpointer-runtime-error
@@ -568,10 +572,11 @@
    (map
     (lambda (context)
       (cons (sxml:context->node context)
-            (sxml:boolean  ; since return type cannot be number
-             (pred-impl (list context)
-                        (cons 1 1)  ; dummy context position and size
-                        var-binding))))
+            (delay
+              (sxml:boolean  ; since return type cannot be number
+               (pred-impl (list context)
+                          (cons 1 1)  ; dummy context position and size
+                          var-binding)))))
     context-set)))
          
 ; Construct alist of values for a predicate that requires position
@@ -589,12 +594,14 @@
            (> position size)  ; iteration is over
            '()
            (cons
-            (cons position
-                  (let ((pred-value
-                         (pred-impl context (cons position size) var-binding)))
-                    (if (number? pred-value)
-                        (= pred-value position)
-                        (sxml:boolean pred-value))))
+            (cons
+             position
+             (delay
+               (let ((pred-value
+                      (pred-impl context (cons position size) var-binding)))
+                 (if (number? pred-value)
+                     (= pred-value position)
+                     (sxml:boolean pred-value)))))
             (construct-positions-alist context (+ position 1) size)))))
        (construct-size-alist
         (lambda (context size)
