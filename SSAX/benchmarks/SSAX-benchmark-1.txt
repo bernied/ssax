@@ -1,0 +1,125 @@
+From posting-system@google.com Thu Nov  1 16:41:32 2001
+Date: Thu, 1 Nov 2001 13:41:22 -0800
+Reply-To: oleg@pobox.com
+From: oleg@pobox.com (oleg@pobox.com)
+Newsgroups: comp.lang.scheme
+Subject: Expat vs. SSAX, C vs. Scheme (Bigloo)
+Message-ID: <7eb8ac3e.0111011341.4b14fb8d@posting.google.com>
+Status: OR
+
+This article presents the results of a benchmark that compares the
+performance of C and Scheme XML parsers. The benchmarks give an
+insight in the performance of Scheme too, compared to the best C code.
+	
+The benchmark is "untagging" of an XML document realizing a full
+binary tree, such as
+	
+ <node><node><node><node><leaf>0</leaf><leaf>1</leaf></node>
+                   <node><leaf>2</leaf><leaf>3</leaf></node></node>
+             <node><node><leaf>4</leaf><leaf>5</leaf></node>
+                   <node><leaf>6</leaf><leaf>7</leaf></node></node></node>
+       <node><node><node><leaf>8</leaf><leaf>9</leaf></node>
+ 	           <node><leaf>0</leaf><leaf>1</leaf></node></node>
+ 	     <node><node><leaf>2</leaf><leaf>3</leaf></node>
+ 	           <node><leaf>4</leaf><leaf>5</leaf></node></node>
+ </node></node>
+	
+The content of leaf nodes is a single-digit string. In loftier terms,
+we compute a string-value of the document root.
+	
+To make the comparison meaningful, we need to discuss input models of
+Expat and SSAX.
+	
+Expat is _the_ fastest XML parser. It is written in C by James
+Clark. It is a SAX parser. An application that uses Expat must open an
+XML file or stream and read its blocks into memory. The application
+should pass these blocks to Expat, indicating the block size and if it
+is the last block of the document. An application can potentially load
+the whole document into memory and pass this single block to
+Expat. The parser is specifically optimized for such scenario, because
+Expat uses shared substrings as much as possible. The first benchmark
+application, 'string-value.c', reads the whole document into memory,
+passes it to Expat and asks the parser to compute the string value. It
+takes 0.105 sec user time for string-value to handle an XML document
+that represents a full binary tree of depth 15 (32768 leaf nodes,
+total size 884,723 bytes). This is indeed fast.
+	
+The Expat input mode assumes that a calling application must know when
+the document ends. Otherwise, an application can't read the document
+from a stream, in whole or in blocks. When the document to parse is
+read from a regular file, it's trivial to find out when we are
+finished reading. The OS will tell us. However, if we take a document
+from a (tcp) pipe, it may be impossible to tell offhand when to stop
+reading. Furthermore, if we unwittingly try to read one extra
+character, we become blocked and possibly deadlocked.
+	
+SSAX is also a SAX parser, written completely in Scheme. SSAX uses a
+different input model. Rather than relying on an application to feed
+data to it, SSAX reads characters from a given input port itself.
+SSAX reads ahead by no more than one character, and only when the
+parser is positive the character to read ahead is available. SSAX does
+not need to be told when the document is ended. On the contrary, SSAX
+will tell you when it has finished parsing a root (or other)
+element. SSAX therefore is safe to be used on pipes, to process
+several documents in a file, or to handle selected parts of a
+document.
+	
+Therefore, to meaningfully compare SSAX with Expat, we need to modify
+the Expat application. string-value-by-one.c is such a modified
+benchmark.  It loads an XML document into memory first. It then passes
+the content of that buffer one character at a time to Expat. This
+simulates the work of the SSAX parser. It takes 0.747 user seconds for
+string-value-by-one.c to handle the same XML document as above (full
+binary tree of depth 15).
+	
+A SSAX benchmark string-value-ssax.scm likewise loads an XML document
+first, opens the memory buffer as a string port and passes the port to
+SSAX. It takes 1.092 user seconds to handle the same
+document. string-value-ssax.scm was compiled by Bigloo 2.4a.
+	
+Let's summarize the performance.
+	
+string-value.c:        XML-tree-depth-15       XML-tree-depth-16
+user time, s              0.105                     0.213
+system time, s            0.016                     0.022
+page reclaims               241                       483
+	
+string-value-by-one.c: XML-tree-depth-15       XML-tree-depth-16
+user time, s              0.747                     1.494
+system time, s            0.014                     0.012
+page reclaims                25                        49
+	
+string-value-ssax.scm: XML-tree-depth-15       XML-tree-depth-16
+user time, s              1.092                     2.170
+system time, s            0.024                     0.095
+page reclaims               842                      2353
+	
+File size, bytes	 884,723                   1,769,459
+	
+	
+You can trust the precision of the timings: they were reported by
+getrusage(), using a microseconds virtual clock. All benchmarks were
+run on a FreeBSD 4.0-RELEASE system, Pentium III Xeon 500 MHz. The
+numbers above reflect activities that occur entirely in memory. There
+is no i/o whatsoever -- neither application i/o nor VM-related
+i/o. There were no page faults.
+	
+The most striking result is that a Scheme application is only 1.4
+times slower than a comparable well-written C application. ONLY 1.4
+times!  Note Java applications are generally far slower than
+comparable C applications. Some XML performance benchmarks I've seen
+show that even the fastest Java XML parser (XP) is slower than Expat
+by an order of magnitude; Perl and Python parsers that are based on
+Expat [sic!] are slower than Expat by a factor of 20-25 (for large
+files). Thus the SSAX parser seems quite competitive in
+performance. Again, many thanks to Manuel for his excellent optimizing
+compiler.
+	
+The benchmark code will be committed to the SSAX project CVS
+repository, ssax.sourceforge.net, by the end of this week.
+	
+BTW, did I mention that SSAX is a pure functional parser? The whole
+parser and all of its handlers are completely referentially
+transparent.
+
+
