@@ -289,6 +289,70 @@
 	    cmd-or-defs*)
 	   (else (loop (cdr clauses))))))))
 
+; define-opt: A concise definition allowing optional arguments.
+; Example:
+;
+; (define-opt (foo arg1 arg2 (optional arg3 (arg4 init4))) body)
+;
+; The form define-opt is designed to be as compatible with DSSSL's
+; extended define as possible -- while avoiding the non-standard
+; lexical token #!optional. On systems that do support DSSSL (e.g.,
+; Gambit, Bigloo, Kawa) our define-opt expands into DSSSL's extended
+; define, which is implemented efficiently on these systems.
+;
+; Here's the relevant part of the DSSSL specification, lifted
+; from Gambit's online documentation:
+
+;   define-formals = formal-argument-list | r4rs-define-formals
+;   formal-argument-list = reqs opts rest keys
+;   reqs = required-formal-argument*
+;   required-formal-argument = variable
+;   opts = #!optional optional-formal-argument* | empty
+;   optional-formal-argument = variable | ( variable initializer )
+;   rest = #!rest rest-formal-argument | empty
+;   rest-formal-argument = variable
+;   keys = #!key keyword-formal-argument* | empty
+;   keyword-formal-argument = variable | ( variable initializer )
+;   initializer = expression
+;   r4rs-lambda-formals = ( variable* ) | ( variable+ . variable ) | variable
+;   r4rs-define-formals = variable* | variable* . variable
+;
+;   1. Variables in required-formal-arguments are bound to successive actual
+;      arguments starting with the first actual argument. It shall be an error
+;      if there are fewer actual arguments than required-formal-arguments.
+;   2. Next variables in optional-formal-arguments are bound to remaining
+;      actual arguments. If there are fewer remaining actual arguments than
+;      optional-formal-arguments, then the variables are bound to the result
+;      of evaluating initializer, if one was specified, and otherwise to #f.
+;      The initializer is evaluated in an environment in which all previous
+;      formal arguments have been bound.
+;   It shall be an error for a variable to appear more than once in a
+;   formal-argument-list.
+;   It is unspecified whether variables receive their value by binding or by
+;   assignment.
+;
+; Our define-opt does not currently support rest and keys arguments.
+; Also, instead of #optional optional-formal-argument ...
+; we write (optional optional-formal-argument ...)
+; 
+; Our define-opt is similar to PLT Scheme's opt-lambda. However, 
+; the syntax of define-opt guarantees that optional arguments are 
+; really at the very end of the arg list.
+
+
+; Gambit supports DSSSL extended defines and lambdas, Therefore
+; define-opt expands to that.
+
+(define-macro (define-opt bindings body . body-rest)
+  (let loop ((curr bindings) (reqd '()))
+    (cond
+      ((not (pair? curr))			; No optional bindings,
+	`(define ,bindings ,body ,@body-rest))  ; regular define
+      ((and (pair? (car curr)) (eq? 'optional (caar curr)))
+	`(define ,(append (reverse (cons #!optional reqd))
+		    (cdar curr) (cdr curr))
+	   ,body ,@body-rest))
+      (else (loop (cdr curr) (cons (car curr) reqd))))))
 
 
 ; Implementation of HANDLE-EXCEPTIONS of SRFI-12.
