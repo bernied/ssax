@@ -568,9 +568,10 @@
    (map
     (lambda (context)
       (cons (sxml:context->node context)
-            (pred-impl (list context)
-                       (cons 1 1)  ; dummy context position and size
-                       var-binding)))
+            (sxml:boolean  ; since return type cannot be number
+             (pred-impl (list context)
+                        (cons 1 1)  ; dummy context position and size
+                        var-binding))))
     context-set)))
          
 ; Construct alist of values for a predicate that requires position
@@ -589,7 +590,11 @@
            '()
            (cons
             (cons position
-                  (pred-impl context (cons position size) var-binding))
+                  (let ((pred-value
+                         (pred-impl context (cons position size) var-binding)))
+                    (if (number? pred-value)
+                        (= pred-value position)
+                        (sxml:boolean pred-value))))
             (construct-positions-alist context (+ position 1) size)))))
        (construct-size-alist
         (lambda (context size)
@@ -894,7 +899,8 @@
    (not (eq? (car op) 'relative-location-path))
    (draft:signal-semantic-error "not a RelativeLocationPath - " op)
    (and-let*
-    ((steps-res (ddo:ast-step-list (cdr op) num-anc single-level? pred-nesting)))
+    ((steps-res
+      (ddo:ast-step-list (cdr op) num-anc single-level? pred-nesting)))
     (cons
      (if
       (null? (cdar steps-res))  ; only a single step
@@ -977,7 +983,7 @@
             ((list-ref axis-lst 3)  ; pos-result?
              (ddo:location-step-pos axis pred-impl-lst))
             (else  ; non-intersect
-             (ddo:location-step-non-intersect axis pred-impl-lst)))                         
+             (ddo:location-step-non-intersect axis pred-impl-lst)))
           (cadr axis-lst)  ; num-ancestors
           (caddr axis-lst)  ; single-level? after this step
           #f  ; position-required?
@@ -1061,7 +1067,7 @@
    (and-let*
     ((expr-res (ddo:ast-expr (cadr op) 0 #t pred-nesting)))
     (let ((requires-position?
-           (or (cadddr expr-res)  ; predicate expression requires position               
+           (or (cadddr expr-res)  ; predicate expression requires position
                (memq (list-ref expr-res 4)  ; involves position implicitly
                      '(ddo:type-number ddo:type-any)))))      
       (let-values*
@@ -1385,9 +1391,9 @@
 
 ; {17} <PathExpr> ::= (path-expr  <FilterExpr> <Step>+ )
 ; TECHNICAL NOTE: To calculate 'single-level?', we need to process components
-; in straight orger. To calculate 'num-anc', we need to process steps in reverse
-; order. It is too expensive to make the 2 passes, that's why we consider
-; single-level?=#f for steps
+; in straight orger. To calculate 'num-anc', we need to process steps in
+; reverse order. It is too expensive to make the 2 passes, that's why we
+; consider single-level?=#f for steps
 (define (ddo:ast-path-expr op num-anc single-level? pred-nesting)
   (and-let*
     ((steps-res (ddo:ast-step-list
