@@ -125,11 +125,18 @@ examples in this directory:
 	pull-punct-sxml.scm
 		A Context-sensitive recursive transformation
 		and breadth-first-like traversals of a SXML document
+	sxml-nesting-depth-label.scm
+		Labeling nested sections of an SXML document by
+		their nesting depth. This is another example of traversing
+		an SXML document with a stylesheet that differs from
+		node to node.
 
 	$ make run-apply-templates-bigloo-i
 	$ make run-pull-punct-bigloo-i
 	$ make run-sxml-db-conv-i
-
+	$ make sxml-nesting-depth-label-bi
+	$ make sxml-nesting-depth-label-scm
+	$ make sxml-nesting-depth-label-petite
 
 Parsing and Unparsing of a Namespace-rich XML document
 ------------------------------------------------------
