@@ -1,0 +1,52 @@
+       Examples and the sample code of SSAX parsing and SXML transformations
+
+Remove-tags example 
+-------------------
+
+Given an XML document, remove all the markup and print the resulting document.
+This is a simple in-out application.
+
+    $ make run-remove-markup-bigloo
+    $ ./run-remove-markup-bigloo xml/ddn.rdf
+
+See the files remove-markup.scm and remove-markup.scm.
+
+The Makefile includes targets that run the above example under a few other
+Scheme compilers/interpreters.
+
+
+Outline example
+--------------- 
+
+Pretty-print the structure of an XML document (disregarding the
+character data)
+This example corresponds to outline.c of the Expat distribution.
+The example demonstrates how to transform an XML document on the
+fly, as we parse it.
+
+    $ make run-outline-bigloo
+    $ ./run-outline-bigloo xml/total_weather.xsl
+
+Note that the tags of elements with no XML namespace are printed as
+they are. Tags of elements within an XML namespace are printed as a
+pair (Namespace-URI . Local-name)
+
+See the files outline.scm and run-outline.scm.
+
+The Makefile includes targets that run the above example under a few other
+Scheme compilers/interpreters.
+
+
+SXML example
+------------
+Transform an XML document into SXML. See ../docs/SXML.html for
+the description.
+
+    $ make run-sxml-bigloo
+    $ ./run-sxml-bigloo xml/OMF-sample.xml
+
+See the file run-sxml.scm.
+
+The Makefile includes targets that run the above example under a few other
+Scheme compilers/interpreters.
+
