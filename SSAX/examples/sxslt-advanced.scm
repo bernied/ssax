@@ -343,7 +343,7 @@
        ((*text* . ,(lambda (tag str)
 		     (if (string? str)
 		       ((make-char-quotator '((#\space . "%20"))) str) str))))
-       . ,(lambda (attr-key . value) ((enattr attr-key) value)))
+       . ,(lambda (attr-key . value) (enattr attr-key value)))
      ; see Note [1]
      ,@universal-conversion-rules))
 

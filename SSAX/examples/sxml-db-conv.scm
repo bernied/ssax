@@ -134,9 +134,9 @@
   (define this-ss
     `((@
       ((*default*       ; local override for attributes
-        . ,(lambda (attr-key . value) ((enattr attr-key) value))))
-      . ,(lambda (trigger . value) (list '@ value)))
-     (*default* . ,(lambda (tag . elems) (apply (entag tag) elems)))
+        . ,(lambda (attr-key . value) (enattr attr-key value))))
+      . ,(lambda (trigger . value) (cons '@ value)))
+     (*default* . ,(lambda (tag . elems) (entag tag elems)))
      (*text* . ,(lambda (trigger str) 
 		  (if (string? str) (string->goodXML str) str)))
      (*TOP*       ; check for the namespaces and add xmlns:xxx attributes
@@ -163,21 +163,19 @@
   (pre-post-order sxml this-ss)
   ))
 
-(define (entag tag)
-  (lambda elems
-    (match-case elems
-     (((@ . ?attrs) . ?children)
+(define (entag tag elems)
+  (match-case elems
+    (((@ . ?attrs) . ?children)
       (list #\< tag attrs 
-	    (if (null? children) "/>"
-		(list #\> children "</" tag #\>))))
-     (() (list #\< tag "/>"))
-     (else
-      (list #\< tag #\> elems "</" tag #\>)))))
+	(if (null? children) "/>"
+	  (list #\> children "</" tag #\>))))
+    (() (list #\< tag "/>"))
+    (else
+      (list #\< tag #\> elems "</" tag #\>))))
 
-(define (enattr attr-key)
-  (lambda (value)
-    (if (null? value) (list #\space attr-key "='" attr-key "'")
-        (list #\space attr-key "=\'" value #\'))))
+(define (enattr attr-key value)
+  (if (null? value) (list #\space attr-key "='" attr-key "'")
+    (list #\space attr-key "=\'" value #\')))
 
 
 ; Given a string, check to make sure it does not contain characters
