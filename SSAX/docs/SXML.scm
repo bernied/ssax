@@ -7,7 +7,7 @@
     (title "SXML")
     (description "Definition of SXML: an instance of XML Infoset as
 S-expressions, an Abstract Syntax Tree of an XML document.")
-    (Date-Revision-yyyymmdd "20020809")
+    (Date-Revision-yyyymmdd "20030601")
     (Date-Creation-yyyymmdd "20010207")
     (keywords "XML, XML parsing, XML Infoset, XML Namespaces, AST, SXML, Scheme")
     (AuthorAddress "oleg-at-pobox.com")
@@ -20,6 +20,26 @@ S-expressions, an Abstract Syntax Tree of an XML document.")
      (next "web.html")
      (top "index.html")
      (home "http://pobox.com/~oleg/ftp/")))
+
+; > > In a similar vein, I wonder why aux-lists are not possible in a *PI*
+; > > node. For example, I might use this to record the source location of
+; > > that "PI".
+; > 
+; > It's a good question. There doesn't seem to be a reason why
+; > not. Should it be added?
+
+; In PLT Scheme's XML structures, the source location (precise begining/ending) 
+; of a PI is recorded. I have created a version of a source location-recording 
+; SSAX parser- which creates a pseudo-SXML. In part it is "fake", in that it 
+; uses an aux-list for PI nodes to record source location. The more serious 
+; deviation is that character data is "wrapped" as a *pcdata* node, with an 
+; aux-list recording source location information.
+; Jim Bender's message
+
+; Would "annotation-list" be a better name than "aux-list", or, just 
+; "annotations"?
+; In the same vein, I'd prefer "attributes" over "attributes-list".
+; Matthias Radestock
 
   (body
    (navbar)
@@ -302,6 +322,22 @@ is an ordered sequence of element's children -- character data,
 processing instructions, and other elements. Every child is unique;
 items never share their children even if the latter have the identical
 content.")
+    (p
+      "A " (code "parent") " property of an Infoset information item
+might seem troublesome. The Infoset Recommendation " (cite "XML
+Infoset") " specifies that element, attribute and other kinds of
+information items have a property " (code "parent") ", whose value is
+an information item that contains the given item in its " (code
+"children") " property. The property parent thus is an upward link
+from a child to its parent. At first sight, S-expressions seem lacking
+in that respect: S-expressions represent directed trees and trees
+cannot have upward links. An article " (cite "Parent-pointers") "
+discusses and compares five different methods of determining the
+parent of an SXML node. The existence of these methods is a crucial
+step in a constructive proof that SXML is a complete model of the XML
+Information set and the SXML query language (SXPath) can fully
+implement the XPath Recommendation.")
+
    (p
     "Just as XPath does and the Infoset specification explicitly allows,
 we group character information items into maximal text strings.  The
@@ -473,7 +509,7 @@ is fully spelled only once, in the symbol table. All other occurrences
 of the symbol are short references to the corresponding slot in
 the symbol table."))
 
-   (p "We must note there is a 1-to-1 correspondence between " (code (term-id "user-ns-shortcut"))
+   (p "We must note a 1-to-1 correspondence between " (code (term-id "user-ns-shortcut"))
 "s and the corresponding namespace URIs. This is generally not true
 for XML namespace prefixes and namespace URIs. A " (code (term-id
 "user-ns-shortcut")) " uniquely represents the corresponding namespace
@@ -762,7 +798,7 @@ and Their Computation by Machine, Part I. Comm. ACM, 3(4):184-195, April 1960."
        "Oleg Kiselyov. Functional XML parsing framework: SAX/DOM and
 SXML parsers with support for XML Namespaces and validation. September
 5, 2001."
-       (URL "http://pobox.com/~oleg/ftp/Scheme/SSAX.scm"))
+       (URL "http://pobox.com/~oleg/ftp/Scheme/xml.html#XML-parser"))
 
     (bibitem "SXML-short-paper" "SXML-short-paper"
        "Oleg Kiselyov. XML and Scheme. An introduction to SXML and SXPath;
@@ -770,14 +806,18 @@ illustration of SXPath expressiveness and comparison with
 XPath. September 17, 2000."
        (URL "http://pobox.com/~oleg/ftp/Scheme/SXML-short-paper.html"))
 
+    (bibitem "Parent-pointers" "Parent-pointers"
+       "Oleg Kiselyov. On parent pointers in SXML trees. February 12, 2003."
+       (URL "http://pobox.com/~oleg/ftp/Scheme/xml.html#parent-ptr"))
+
     (bibitem "Lisovsky" "Scheme-case-sensitivity"
        "Kirill Lisovsky. Case sensitivity of Scheme systems."
        (URL "http://pair.com/lisovsky/scheme/case-sensitivity.html"))
 
     (bibitem "SXML-NS" "SXML-NS"
        "Namespaces in SXML and (S)XPath. Discussion thread on the SSAX-SXML mailing list. May 28, 2002 and June 7, 2002."
-       (URL "http://www.geocrawler.com/archives/3/15235/2002/5/0/8785305/")
-       (URL "http://www.geocrawler.com/archives/3/15235/2002/6/0/8877115/"))
+      (URL "http://sourceforge.net/mailarchive/forum.php?thread_id=759249&forum_id=599")
+      (URL "http://sourceforge.net/mailarchive/forum.php?thread_id=789156&forum_id=599"))
 
     (bibitem "DOM" "DOM"
        "World Wide Web Consortium. Document Object Model (DOM) Level 1
@@ -825,26 +865,42 @@ Version 1.0. W3C Recommendation. November 16, 1999."
    ((universal-conversion-rules
      `((@
 	((*default*       ; local override for attributes
-	  . ,(lambda (attr-key . value) ((enattr attr-key) value))))
-	. ,(lambda (trigger . value) (list '@ value)))
-       (*default* . ,(lambda (tag . elems) (apply (entag tag) elems)))
+	  . ,(lambda (attr-key . value) (enattr attr-key value))))
+	. ,(lambda (trigger . value) (cons '@ value)))
+       (*default* . 
+	 ,(let ((with-nl	; Block-level HTML elements:
+				; We insert a NL before them.
+				; No NL is inserted before or after an
+				; inline element.
+		  '(br 			; BR is technically inline, but we
+					; treat it as block
+		     p div hr
+		     h1 h2 h3 h3 h5 h6
+		     dl ul ol li dt dd pre
+		     table tr th td
+		     center blockquote form
+		     address body thead tfoot tbody col colgroup)))
+	    (lambda (tag . elems)
+	       (let ((nl? (and (memq tag with-nl) #\newline)))
+		 (if (and (pair? elems) (pair? (car elems))
+		       (eq? '@ (caar elems)))
+		   (list nl? #\< tag (cdar elems) #\>
+		     (and (pair? (cdr elems))
+		       (list (cdr elems) "</" tag #\> nl?)))
+		   (list nl? #\< tag #\> 
+		     (and (pair? elems) (list elems "</" tag #\> nl?))
+		     ))))))
        (*text* . ,(lambda (trigger str) 
 		    (if (string? str) (string->goodHTML str) str)))
        (n_		; a non-breaking space
 	. ,(lambda (tag . elems)
 	     (list "&nbsp;" elems)))))
 
-
-		; Do the identical transformation for an alist
-    (alist-conv-rules
-     `((*default* . ,(lambda (tag . elems) (cons tag elems)))
-       (*text* . ,(lambda (trigger str) str))))
-
 		; Transformation rules to drop out everything but the
 		; 'Header' node
     (search-Header-rules
      `((Header
-	,alist-conv-rules
+	*preorder*
 	. ,(lambda (tag . elems) (cons tag elems)))
        (*default*
 	. ,(lambda (attr-key . elems)
@@ -858,11 +914,11 @@ Version 1.0. W3C Recommendation. November 16, 1999."
     )
 
  (SRV:send-reply
-  (post-order Content
+  (pre-post-order Content
    `(
      ,@universal-conversion-rules
 
-     (html:begin 
+     (html:begin
       . ,(lambda (tag . elems)
 	   (list
 	     "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0 Transitional//EN\""
@@ -872,10 +928,9 @@ Version 1.0. W3C Recommendation. November 16, 1999."
 	     "</html>" nl)))
 
      (Header
-      ,alist-conv-rules
+      *macro*
       . ,(lambda (tag . headers)
-	   (post-order (make-header headers) universal-conversion-rules)
-	   ))
+	   (make-header headers)))
 
      (body
       . ,(lambda (tag . elems)
@@ -901,15 +956,15 @@ Version 1.0. W3C Recommendation. November 16, 1999."
 	     (post-order (make-footer header-parms)
 			 universal-conversion-rules))))
      
-     (page-title		; Find the Header in the Content
+     (page-title *macro*	; Find the Header in the Content
       . ,(lambda (tag)		; and create the page title rule
 	   (let ((header-parms
 		  (lookup-def 'Header
 			      (list (post-order Content
 						search-Header-rules))
 			      #f)))
-	     (list "<h1 align=center>" 
-		   (lookup-def 'long-title header-parms #f) "</h1>" nl))))
+	     `(h1 (@ align "center")
+		,(lookup-def 'long-title header-parms #f)))))
 
 
      (abstract			; The abstract of the document
@@ -925,13 +980,14 @@ Version 1.0. W3C Recommendation. November 16, 1999."
 		   (lookup-def 'Revision header-parms #f)
 		   "</strong> of SXML. "))))
        (prod-note
+	 *macro*
 	. ,(lambda (tag . master-url)
-	     (list
-	      "<blockquote><font size=\"-1\">The master SXML specification
-file is written in SXML itself. The present web page is the result of
-translating that SXML code with the appropriate \"stylesheet\". The
-master file, its renditions in HTML and other formats, and the
-corresponding stylesheets are available at " master-url ".</font></blockquote>")))
+	     `(blockquote (font (@ (size "-1"))
+	         "The master SXML specification file is written in
+SXML itself. The present web page is the result of translating that
+SXML code with the appropriate \"stylesheet\". The master file, its
+renditions in HTML and other formats, and the corresponding
+stylesheets are available at " ,master-url "."))))
        (keywords . ,(lambda (tag) '()))
        )
       . ,(lambda (tag . abstract-body)
@@ -939,24 +995,22 @@ corresponding stylesheets are available at " master-url ".</font></blockquote>")
       )
 		 
      (Section	; (Section level "content ...")
+      *macro*
       . ,(lambda (tag level head-word . elems)
-	   (list "<br>&nbsp;<a name=\"" head-word "\">&nbsp;</a>" nl
-		 "<h" level ">"  head-word elems "</h" level ">" nl)))
+	   `((br) (n_) (a (@ (name ,head-word)) (n_))
+	      (,(string->symbol (string-append "h" (number->string level)))
+		,head-word ,elems))))
 
      (References	; (References bibitem ...)
+      *macro*
       . ,(lambda (tag . bib-items)
-	   (let ((level 2) (head-word "References"))
-	     (list "<br>&nbsp;<a name=\"" head-word "\">&nbsp;</a>" nl
-		   "<h" level ">"  head-word "</h" level ">" nl
-		   bib-items))))
-
-
+	   `((Section 2 "References") ,@bib-items)))
      
 
      (TOC	; Re-scan the Content for "Section" tags and generate
       . ,(lambda (tag)	; the Table of contents
 	   (let ((sections
-		  (post-order Content
+		  (pre-post-order Content
 		    `((Section	; (Section level "content ...")
 		       ((*text* . ,(lambda (tag str) str)))
 		       . ,(lambda (tag level head-word . elems)
@@ -968,25 +1022,28 @@ corresponding stylesheets are available at " master-url ".</font></blockquote>")
 			      (list "<li><a href=\"#" head-word
 				    "\">" head-word "</a>" nl ))))
 		      (*default*
-		       . ,(lambda (attr-key . elems) elems))
+		       . ,(lambda (tag . elems) elems))
 		      (*text* . ,(lambda (trigger str) '()))))))
 					;(write sections ##stderr)
 	     (list "<div><ol>" sections "</ol></div>" nl))))
 
 
      (verbatim	; set off pieces of code: one or several lines
+      *macro*
       . ,(lambda (tag . lines)
-	   (list "<pre>"
-		 (map (lambda (line) (list "     " line nl))
-		      lines)
-		 "</pre>")))
-     (URL 
+	   (cons 'pre
+	     (map (lambda (line) (list "     " line nl))
+	       lines))))
+
+     (URL
+      *macro*
       . ,(lambda (tag url)
-	   (list "<br>&lt;<a href=\"" url "\">" url "</a>&gt;")))
+	   `((br) "<" (a (@ (href ,url)) ,url) ">")))
 
      (bibitem
+      *macro*
       . ,(lambda (tag label key . text)
-	   (list nl "<p><a name=\"" key "\">[" label "]</a> " text)))
+	   `(p (a (@ (name ,key)) "[" ,label "] ") ,text)))
 
      (cite		; ought to locate the label and use the label!
       . ,(lambda (tag key)
@@ -994,20 +1051,24 @@ corresponding stylesheets are available at " master-url ".</font></blockquote>")
 
      ; Grammatical terms
      (nonterm		; Non-terminal of a grammar
+      *macro*
       . ,(lambda (tag term)
-	   (list "&lt;" term "&gt;")))
+	   (list "<" term ">")))
 
      (term-id		; terminal that is a Scheme id
+      *macro*
       . ,(lambda (tag term)
-	   (list term )))
+	   term))
 
      (term-str		; terminal that is a Scheme string
+      *macro*
       . ,(lambda (tag term)
 	   (list "\"" term "\"")))
 
      (term-lit		; a literal Scheme symbol
+      *macro*
       . ,(lambda (tag term)
-	   (list "<em>" term "</em>")))
+	   `(em ,term)))
 
      (ebnf-opt		; An optional term
       . ,(lambda (tag term)
@@ -1026,37 +1087,43 @@ corresponding stylesheets are available at " master-url ".</font></blockquote>")
 	   (list-intersperse terms " | ")))
 
      (sexp		; S-expression constructor
+      *macro*
       . ,(lambda (tag . terms)
-	   (list "<strong>(</strong> " (list-intersperse terms " ") 
-		 " <strong>)</strong>")))
+	   `((strong "(") " " ,(list-intersperse terms " ") " "
+	     (strong ")"))))
 
      (sexp-cons		; S-expression constructor, like cons
-      . ,(lambda (tag car cdr)
-	   (list "<strong>(</strong> " car "<strong> . </strong>" cdr  
-		 " <strong>)</strong>")))
+      *macro*
+      . ,(lambda (tag pcar pcdr)
+	   `((strong "(") " " ,pcar (strong " . ") ,pcdr  " "
+	      (strong ")"))))
 
      (sexp-symb		; Symbol constructor
+      *macro*
       . ,(lambda (tag . terms)
-	   (list "<strong><em>MAKE-SYMBOL</em>(</strong>" 
-		 terms "<strong>)</strong>")))
+	   `((strong (em "MAKE-SYMBOL") "(") ,terms (strong ")"))))
 
      (production
+      *macro*
       . ,(lambda (tag number lhs rhs . comment)
-	   (list "<tr valign=top><td align=right><a name=\"prod-" number
-		 "\">[" number "]</a>&nbsp;</td><td align=right>"
-		 "<code>" lhs "</code></td>"
-		 "<td align=center><code> ::= </code></td>"
-		 "<td align=left><code>" 
-		 (if (pair? rhs)
+	   `(tr (@ (valign top))
+	      (td (@ (align right))
+		(a (@ (name ("prod-" ,number))) "[" ,number "]") (n_))
+	      (td (@ (align right))
+		(code ,lhs))
+	      (td (@ (align center))
+		(code " ::= "))
+	      (td (@ (align left))
+		(code
+		  ,(if (pair? rhs)
 		     (list-intersperse rhs " ")
-		     rhs)
-		 "</code> " comment
-		 "</td></tr>" nl)))
+		     rhs))
+		" " ,comment))))
 
      (productions
+      *macro*
       . ,(lambda (tag . prods)
-	   (list "<table border=0 bgcolor=\"#f5dcb3\">" nl prods
-		 "</table>" nl)))
+	   `(table (@ (border 0) (bgcolor "#f5dcb3")) ,prods)))
 )))))
 
 (generate-HTML Content)
