@@ -130,6 +130,13 @@ examples in this directory:
 		their nesting depth. This is another example of traversing
 		an SXML document with a stylesheet that differs from
 		node to node.
+	sxml-to-sxml.scm
+		Transforming SXML to SXML: Composing SXML transformations.
+		The code introduces and tests a version of pre-post-order
+		that transforms an SXML document into a _strictly conformant_
+		SXML document. That is, the result of a pre-post-order
+		transformation can be queried with SXPath or transformed
+		again with SXSLT.
 
 	$ make run-apply-templates-bigloo-i
 	$ make run-pull-punct-bigloo-i
@@ -137,6 +144,9 @@ examples in this directory:
 	$ make sxml-nesting-depth-label-bi
 	$ make sxml-nesting-depth-label-scm
 	$ make sxml-nesting-depth-label-petite
+	$ make sxml-to-sxml-bi
+	$ make sxml-to-sxml-scm
+	$ make sxml-to-sxml-petite
 
 Parsing and Unparsing of a Namespace-rich XML document
 ------------------------------------------------------
@@ -210,3 +220,5 @@ constraint, the sequence of child elements matching a user-specified
 template.
 
 	$ make run-validate-doctype-simple-bi
+
+

@@ -12,14 +12,16 @@ all-bigloo-i: run-html-parse-sample-bigloo-i \
 	run-daml-parse-unparse-i \
 	run-parent-pointers-bigloo-i \
 	run-validate-doctype-simple-bi \
-	sxml-nesting-depth-label-bi
+	sxml-nesting-depth-label-bi \
+	sxml-to-sxml-bi
 
 all-bigloo-c: run-remove-markup-bigloo run-outline-bigloo run-sxml-bigloo
 
 all-scm: test-remove-markup-scm test-outline-scm test-sxml-scm \
 	run-sxslt-advanced-scm  \
 	run-parent-pointers-scm \
-	sxml-nesting-depth-label-scm
+	sxml-nesting-depth-label-scm \
+	sxml-to-sxml-scm
 
 clean:
 	rm -f *_.c *.o core a.out \
@@ -69,6 +71,9 @@ run-daml-parse-unparse-i: daml-parse-unparse.scm \
 
 sxml-nesting-depth-label-bi: sxml-nesting-depth-label.scm
 	$(BIGLOO) $(BFLAGS) -i -eval '(module sxslt-depth-numbering (include "myenv-bigloo.scm") (include "srfi-13-local.scm") (include "util.scm") (include "SXML-tree-trans.scm"))' sxml-nesting-depth-label.scm
+
+sxml-to-sxml-bi: sxml-to-sxml.scm
+	$(BIGLOO) $(BFLAGS) -i -eval '(module sxslt-depth-numbering (include "myenv-bigloo.scm") (include "srfi-13-local.scm") (include "util.scm"))' sxml-to-sxml.scm
 
 run-sxslt-advanced-bigloo-i: sxslt-advanced.scm
 	$(BIGLOO) $(BFLAGS) -i -eval '(module sxslt-advanced (include "myenv-bigloo.scm") (include "srfi-13-local.scm") (include "util.scm") (include "SXML-tree-trans.scm") (include "SXML-to-HTML.scm") (include "SXML-to-HTML-ext.scm"))' sxslt-advanced.scm
@@ -127,10 +132,22 @@ sxml-nesting-depth-label-scm: sxml-nesting-depth-label.scm
 	-l $(LIBDIR)/SXML-tree-trans.scm \
 	-l sxml-nesting-depth-label.scm
 
+sxml-to-sxml-scm: sxml-to-sxml.scm
+	scm -r5 -b -l $(LIBDIR)/myenv-scm.scm  -l $(LIBDIR)/srfi-13-local.scm \
+	-l $(LIBDIR)/util.scm \
+	-l sxml-to-sxml.scm
+
 # Petite-Chez-specific  part
+
 sxml-nesting-depth-label-petite: sxml-nesting-depth-label.scm
 	echo "(exit 0)" | petite $(LIBDIR)/myenv-chez.scm  \
 	$(LIBDIR)/srfi-13-local.scm \
 	$(LIBDIR)/util.scm \
 	$(LIBDIR)/SXML-tree-trans.scm \
 	sxml-nesting-depth-label.scm
+
+sxml-to-sxml-petite: sxml-to-sxml.scm
+	echo "(exit 0)" | petite $(LIBDIR)/myenv-chez.scm  \
+	$(LIBDIR)/srfi-13-local.scm \
+	$(LIBDIR)/util.scm \
+	sxml-to-sxml.scm
