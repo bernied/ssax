@@ -3,6 +3,10 @@
 ;		(mainly dealing with string and list manipulations)
 ;
 ; myenv.scm, myenv-bigloo.scm or similar prelude is assumed.
+; From SRFI-13, import many functions
+; If a particular implementation lacks SRFI-13 support, please
+; include the file srfi-13-local.scm
+;
 ; $Id$
 
 (declare 			; Gambit-compiler optimization options
@@ -96,25 +100,12 @@
 
 ;------------------------------------------------------------------------
 ;			String utilities
+; See SRFI-13 or srfi-13-local.scm
 
-; Return the index of the first occurence of a-char in str, or #f
-
-(define (string-index str a-char)
-  (let loop ((pos 0))
-    (cond
-      ((>= pos (string-length str)) #f) ; whole string has been searched, in vain
-      ((char=? a-char (string-ref str pos)) pos)
-      (else (loop (+ 1 pos))))))
 
 ; Return the index of the last occurence of a-char in str, or #f
-(define (string-rindex str a-char)
-  (let loop ((pos (-- (string-length str))))
-    (cond
-      ((negative? pos) #f) 	; whole string has been searched, in vain
-      ((char=? a-char (string-ref str pos)) pos)
-      (else (loop (-- pos))))))
-
-
+; See SRFI-13
+(define string-rindex string-index-right)
 
 ; -- procedure+: substring? PATTERN STRING
 ;     Searches STRING to see if it contains the substring PATTERN.
@@ -124,117 +115,9 @@
 ;          (substring? "rat" "pirate")             =>  2
 ;          (substring? "rat" "outrage")            =>  #f
 ;          (substring? "" any-string)              =>  0
-
-(define (substring? pattern str)
-  (let* ((pat-len (string-length pattern))
-         (search-span (- (string-length str) pat-len))
-         (c1 (if (zero? pat-len) #f (string-ref pattern 0)))
-         (c2 (if (<= pat-len 1) #f (string-ref pattern 1))))
-    (cond
-     ((not c1) 0)           ; empty pattern, matches upfront
-     ((not c2) (string-index str c1)) ; one-char pattern
-     (else                  ; matching a pattern of at least two chars
-	(let outer ((pos 0))
-          (cond
-	    ((> pos search-span) #f)	; nothing was found thru the whole str
-            ((not (char=? c1 (string-ref str pos)))
-                (outer (+ 1 pos)))	; keep looking for the right beginning
-            ((not (char=? c2 (string-ref str (+ 1 pos))))
-                (outer (+ 1 pos)))	; could've done pos+2 if c1 == c2....
-            (else                  	; two char matched: high probability
-				   	; the rest will match too
-		(let inner ((i-pat 2) (i-str (+ 2 pos)))
-                   (if (>= i-pat pat-len) pos ; whole pattern matched
-                      (if (char=? (string-ref pattern i-pat)
-                                  (string-ref str i-str))
-                        (inner (+ 1 i-pat) (+ 1 i-str))
-                        (outer (+ 1 pos))))))))))))	; mismatch after partial match
-
-; Here are some specialized substring? functions
-;
-; -- procedure+: string-prefix? PATTERN STRING
-; -- procedure+: string-prefix-ci? PATTERN STRING
-; checks to make sure that PATTERN is a prefix of STRING
-;
-;          (string-prefix? "pir" "pirate")             =>  #t
-;          (string-prefix? "rat" "outrage")            =>  #f
-;          (string-prefix? "" any-string)              =>  #t
-;          (string-prefix? any-string any-string)      =>  #t
-
-(define (string-prefix? pattern str)
-  (let loop ((i 0))
-    (cond
-      ((>= i (string-length pattern)) #t)
-      ((>= i (string-length str)) #f)
-      ((char=? (string-ref pattern i) (string-ref str i))
-        (loop (++ i)))
-      (else #f))))
-
-(define (string-prefix-ci? pattern str)
-  (let loop ((i 0))
-    (cond
-      ((>= i (string-length pattern)) #t)
-      ((>= i (string-length str)) #f)
-      ((char-ci=? (string-ref pattern i) (string-ref str i))
-        (loop (++ i)))
-      (else #f))))
-
-; -- procedure+: string-suffix? PATTERN STRING
-; -- procedure+: string-suffix-ci? PATTERN STRING
-; checks to make sure that PATTERN is a suffix of STRING
-;
-;          (string-suffix? "ate" "pirate")             =>  #t
-;          (string-suffix? "rag" "outrage")            =>  #f
-;          (string-suffix? "" any-string)              =>  #t
-;          (string-suffix? any-string any-string)      =>  #t
-
-(define (string-suffix? pattern str)
-  (let loop ((i (-- (string-length pattern))) (j (-- (string-length str))))
-    (cond
-      ((negative? i) #t)
-      ((negative? j) #f)
-      ((char=? (string-ref pattern i) (string-ref str j))
-        (loop (-- i) (-- j)))
-      (else #f))))
-
-(define (string-suffix-ci? pattern str)
-  (let loop ((i (-- (string-length pattern))) (j (-- (string-length str))))
-    (cond
-      ((negative? i) #t)
-      ((negative? j) #f)
-      ((char-ci=? (string-ref pattern i) (string-ref str j))
-        (loop (-- i) (-- j)))
-      (else #f))))
+(define (substring? pattern str) (string-contains str pattern))
 
 
-; 		String case modification functions
-
-; Return a new string made of characters of the
-; original string in the lower case
-(define (string-downcase str)
-  (do ((target-str (make-string (string-length str))) (i 0 (++ i)))
-      ((>= i (string-length str)) target-str)
-      (string-set! target-str i (char-downcase (string-ref str i)))))
-
-; Return a new string made of characters of the
-; original string in the upper case
-(define (string-upcase str)
-  (do ((target-str (make-string (string-length str))) (i 0 (++ i)))
-      ((>= i (string-length str)) target-str)
-      (string-set! target-str i (char-upcase (string-ref str i)))))
-
-; Lower the case of string's characters inplace
-(define (string-downcase! str)
-  (do ((i 0 (++ i))) ((>= i (string-length str)))
-    (string-set! str i (char-downcase (string-ref str i)))))
-
-; Raise the case of string's characters inplace
-(define (string-upcase! str)
-  (do ((i 0 (++ i))) ((>= i (string-length str)))
-    (string-set! str i (char-upcase (string-ref str i)))))
-
-
-; 
 ; -- procedure+: string->integer STR START END
 ;
 ; Makes sure a substring of the STR from START (inclusive) till END
@@ -413,84 +296,4 @@
 		       (cons quoted-char (loop (++ to) new-to)))
 		      (cons quoted-char (loop (++ to) new-to))))))))))
 ))
-
-
-;------------------------------------------------------------------------
-;			EXEC-PATH facility
-; The EXEC-PATH is the path used to load .scm files or run executable files
-; with.
-; 
-; The path could be specified as an env-variable SCMPATH
-; if this env variable isn't set, the path of the executable file
-; is used
-
-; (define EXEC-PATH:PATH 
-
-;     	; extract the path from argv[0] and make it absolute
-;   (letrec ((extract-argv0-path
-;         (lambda ()
-;           (let ((argv0-rel-path
-;                 (let ((argv0 (vector-ref argv 0)))
-;               	; reverse search for the last PATH-SEPARATOR-CHAR
-;                   (let loop ((i (-- (string-length argv0))))
-;                     (cond
-;                       ((not (positive? i)) #f)
-;                       ((char=? (string-ref argv0 i) PATH-SEPARATOR-CHAR)
-;                         (substring argv0 0 (+ i 1)))
-;                       (else (loop (-- i)))))))
-;               (curr-path (OS:getcwd)))
-;             (cond
-;               ((not argv0-rel-path) curr-path)
-;           		; check if argv0-rel-path was an absolute path
-;               ((char=? PATH-SEPARATOR-CHAR (string-ref argv0-rel-path 0))
-;                 argv0-rel-path)
-;               (else (string-append curr-path (string PATH-SEPARATOR-CHAR)
-;                   argv0-rel-path))))))
-              
-; 		; cached path
-;       (path-itself #f)
-;       		; returned the cached path
-;       (get-path (lambda () path-itself))
-      
-;       		; Compute the cached path, runs only the first time around
-;       (set-path
-;         (lambda ()
-;           (let ((path-being-computed 
-;                 (or (OS:getenv "SCMPATH") (extract-argv0-path))))
-;             (assert path-being-computed)
-;             (set! path-itself
-;               (if (char=? PATH-SEPARATOR-CHAR
-;                   (string-ref path-being-computed
-;                     (-- (string-length path-being-computed))))
-;                 path-being-computed
-;            ; make sure path-being-computed ends in PATH-SEPARATOR-CHAR
-;                 (string-append path-being-computed (string PATH-SEPARATOR-CHAR))))
-;             (cerr nl "EXEC PATH is set to " path-itself nl)
-;             (set! EXEC-PATH:PATH get-path)
-;             (get-path)))))
-    
-;     set-path))
-
-    
-
-; (define (EXEC-PATH:load scm-file-name)
-;   (load (string-append (EXEC-PATH:PATH) scm-file-name)))
-
-; (define (EXEC-PATH:help)
-;   (cerr nl "Environment variable SCMPATH could be set up to point" nl)
-;   (cerr "to a directory containing dynamically loadable dictionaries/conf files" nl)
-;   (cerr "if this variable is not set, the directory where this executable resides" nl)
-;   (cerr "will be used" nl nl)
-;   (cerr "The current path is set to " (EXEC-PATH:PATH) nl nl))
-
-; ; "shell-out" to run a separately compiled executable with given
-; ; arguments, from the current EXEC-PATH
-; ; all 'args' (which must be strings) are "concatenated" together
-; ; to form a command-line for the executable
-; (define (EXEC-PATH:system executable . args)
-;   (let ((command-line 
-;         (apply string-append
-;           (cons (EXEC-PATH:PATH) (cons executable (cons " " args))))))
-;     (cerr "about to execute: " command-line nl)
-;     (OS:system command-line)))
 
