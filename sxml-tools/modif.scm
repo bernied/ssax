@@ -109,6 +109,152 @@
 ;-------------------------------------------------
 ; The core function of document transformation into a new document
 
+; Recursive SXML tree transformation
+; curr-node - the node to be transformed
+; targets-alist ::= (listof  (cons  node-chain  update-target))
+; node-chain ::= (listof node)
+; node-chain - the chain of nodes, starting from the `curr-node' and proceeding
+;  with its decsednants until the update target
+; Returns the transformed node
+(define (sxml:tree-trans curr-node targets-alist)
+  (let-values*
+   (((matched         ; handlers which match this node
+      targets-alist   ; the rest
+      )
+     (sxml:separate-list
+      (lambda (pair) (null? (car pair)))
+      targets-alist)))
+   (and-let*
+    ((after-subnodes  ; curr-node after its subnodes are processed
+      (if
+       (or (not (pair? curr-node))  ; leaf node
+           (null? targets-alist)  ; no more handlers
+           )
+       curr-node
+       (let process-attrs ((targets-alist targets-alist)
+                           (src-attrs (sxml:attr-list curr-node))
+                           (res-attrs '()))
+         (if
+          (null? src-attrs)  ; all attributes processed
+          ; Go to proceed child elements
+          (if
+           (null? targets-alist)  ; children don't need to be processed
+           (cons  ; Constructing the result node
+            (car curr-node)  ; node name
+            ((lambda (kids)
+               (if (null? res-attrs)  ; no attributes
+                   kids
+                   (cons (cons '@ (reverse res-attrs))
+                         kids)))
+             ((if (and (not (null? (cdr curr-node)))
+                       (pair? (cadr curr-node))
+                       (eq? (caadr curr-node) '@))
+                  cddr cdr)
+              curr-node)))
+           (let process-kids ((targets-alist targets-alist)
+                              (src-kids (cdr curr-node))
+                              (res-kids '()))
+             (cond
+               ((null? src-kids)  ; all kids processed
+                (let-values*
+                 (((more-attrs kids)
+                   (sxml:separate-list
+                    (lambda (obj)
+                      (and (pair? obj)
+                           (not (null? obj))
+                           (eq? (car obj) '@)))
+                    res-kids)))
+                 (cons  ; Constructing the result node
+                  (car curr-node)  ; node name
+                  (if
+                   (and (null? res-attrs) (null? more-attrs))
+                   kids
+                   (and-let*
+                    ((overall-attrs
+                      (apply
+                       sxml:unite-annot-attributes-lists
+                       (cons
+                        (cons '@ (reverse res-attrs))
+                        more-attrs))))
+                    (cons overall-attrs kids))))))
+               ((and (pair? (car src-kids))
+                     (eq? (caar src-kids) '@))
+                ; attribute node - already processed
+                (process-kids
+                 targets-alist (cdr src-kids) res-kids))
+               (else
+                (let ((kid-templates
+                       (filter
+                        (lambda (pair)
+                          (eq? (caar pair) (car src-kids)))
+                        targets-alist)))
+                  (if
+                   (null? kid-templates)
+                   ; this child node remains as is
+                   (process-kids
+                    targets-alist
+                    (cdr src-kids)
+                    (append res-kids (list (car src-kids))))
+                   (and-let*
+                    ((new-kid
+                      (sxml:tree-trans
+                       (car src-kids)
+                       (map
+                        (lambda (pair)
+                          (cons (cdar pair) (cdr pair)))
+                        kid-templates))))
+                    (process-kids
+                     (filter
+                      (lambda (pair)
+                        (not (eq? (caar pair) (car src-kids))))
+                      targets-alist)
+                     (cdr src-kids)
+                     (append
+                      res-kids
+                      (if (nodeset? new-kid)
+                          new-kid
+                          (list new-kid)))))))))))
+          (let* ((curr-attr (car src-attrs))
+                 (attr-templates
+                  (filter
+                   (lambda (pair)
+                     (eq? (caar pair) curr-attr))
+                   targets-alist)))
+            (if
+             (null? attr-templates)
+             ; this attribute remains as is
+             (process-attrs targets-alist
+                            (cdr src-attrs)
+                            (cons curr-attr res-attrs))
+             (let ((new-attr  ; cannot produce error for attrs
+                    (sxml:tree-trans
+                     curr-attr
+                     (map
+                      (lambda (pair)
+                        (cons (cdar pair) (cdr pair)))
+                      attr-templates))))
+               (process-attrs
+                (filter
+                 (lambda (pair)
+                   (not (eq? (caar pair) curr-attr)))
+                 targets-alist)
+                (cdr src-attrs)
+                (if (nodeset? new-attr)
+                    (append (reverse new-attr) res-attrs)
+                    (cons new-attr res-attrs)))))))))))
+    (let process-this ((new-curr-node after-subnodes)
+                       (curr-handlers (map cdr matched)))
+      (if
+       (null? curr-handlers)
+       new-curr-node
+       (process-this
+        ((cadar curr-handlers)  ; lambda
+         new-curr-node
+         (caar curr-handlers)  ; context
+         (caddar curr-handlers)  ; base-node
+         )                      
+        (cdr curr-handlers)))))))
+
 ; doc - a source SXML document
 ; update-targets ::= (listof  update-target)
 ; update-target ::= (list  context  handler  base-node)
@@ -120,169 +266,25 @@
 ;  Returns the new document. In case of a transformation that results to a
 ;  non-well-formed document, returns #f and the error message is displayed to
 ;  stderr as a side effect
-(define (sxml:transform-document doc update-targets)  
-  (letrec
-      (; targets-alist ::= (listof  (cons  node-chain  update-target))
-       ; node-chain - the chain of nodes, starting from the current node
-       (tree-trans
-        (lambda (curr-node targets-alist)
-          (let-values*
-           (((matched         ; handlers which match this node
-              targets-alist   ; the rest
-              )
-             (sxml:separate-list
-              (lambda (pair) (null? (car pair)))
-              targets-alist)))
-           (and-let*
-            ((after-subnodes  ; curr-node after its subnodes are processed
+(define (sxml:transform-document doc update-targets)
+  (let ((targets-alist
+         (map-union
+          (lambda (triple)
+            (let ((node-path (reverse (sxml:context->content (car triple)))))
               (if
-               (or (not (pair? curr-node))  ; leaf node
-                   (null? targets-alist)  ; no more handlers
-                   )
-               curr-node
-               (let process-attrs ((targets-alist targets-alist)
-                                   (src-attrs (sxml:attr-list curr-node))
-                                   (res-attrs '()))
-                 (if
-                  (null? src-attrs)  ; all attributes processed
-                  ; Go to proceed child elements
-                  (if
-                   (null? targets-alist)  ; children don't need to be processed
-                   (cons  ; Constructing the result node
-                    (car curr-node)  ; node name
-                    ((lambda (kids)
-                       (if (null? res-attrs)  ; no attributes
-                           kids
-                           (cons (cons '@ (reverse res-attrs))
-                                 kids)))
-                     ((if (and (not (null? (cdr curr-node)))
-                               (pair? (cadr curr-node))
-                               (eq? (caadr curr-node) '@))
-                          cddr cdr)
-                      curr-node)))
-                   (let process-kids ((targets-alist targets-alist)
-                                      (src-kids (cdr curr-node))
-                                      (res-kids '()))
-                     (cond
-                       ((null? src-kids)  ; all kids processed
-                        (let-values*
-                         (((more-attrs kids)
-                           (sxml:separate-list
-                            (lambda (obj)
-                              (and (pair? obj)
-                                   (not (null? obj))
-                                   (eq? (car obj) '@)))
-                            res-kids)))
-                         (cons  ; Constructing the result node
-                          (car curr-node)  ; node name
-                          (if
-                           (and (null? res-attrs)
-                                (null? more-attrs))
-                           kids
-                           (and-let*
-                            ((overall-attrs
-                              (apply
-                               sxml:unite-annot-attributes-lists
-                               (cons
-                                (cons '@ (reverse res-attrs))
-                                more-attrs))))
-                            (cons overall-attrs kids))))))
-                       ((and (pair? (car src-kids))
-                             (eq? (caar src-kids) '@))
-                        ; attribute node - already processed
-                        (process-kids
-                         targets-alist (cdr src-kids) res-kids))
-                       (else
-                        (let ((kid-templates
-                               (filter
-                                (lambda (pair)
-                                  (eq? (caar pair) (car src-kids)))
-                                targets-alist)))
-                          (if
-                           (null? kid-templates)
-                           ; this child node remains as is
-                           (process-kids
-                            targets-alist
-                            (cdr src-kids)
-                            (append res-kids (list (car src-kids))))
-                           (and-let*
-                            ((new-kid
-                              (tree-trans
-                               (car src-kids)
-                               (map
-                                (lambda (pair)
-                                  (cons (cdar pair)
-                                        (cdr pair)))
-                                kid-templates))))
-                            (process-kids
-                             (filter
-                              (lambda (pair)
-                                (not (eq? (caar pair) (car src-kids))))
-                              targets-alist)
-                             (cdr src-kids)
-                             (append
-                              res-kids
-                              (if (nodeset? new-kid)
-                                  new-kid
-                                  (list new-kid)))))))))))
-                  (let* ((curr-attr (car src-attrs))
-                         (attr-templates
-                          (filter
-                           (lambda (pair)
-                             (eq? (caar pair) curr-attr))
-                           targets-alist)))
-                    (if
-                     (null? attr-templates)
-                     ; this attribute remains as is
-                     (process-attrs targets-alist
-                                    (cdr src-attrs)
-                                    (cons curr-attr res-attrs))
-                     (let ((new-attr  ; cannot produce error for attrs
-                            (tree-trans
-                             curr-attr
-                             (map
-                              (lambda (pair)
-                                (cons (cdar pair) (cdr pair)))
-                              attr-templates))))
-                       (process-attrs
-                        (filter
-                         (lambda (pair)
-                           (not (eq? (caar pair) curr-attr)))
-                         targets-alist)
-                        (cdr src-attrs)
-                        (if (nodeset? new-attr)
-                            (append (reverse new-attr) res-attrs)
-                            (cons new-attr res-attrs)))))))))))
-            (let process-this ((new-curr-node after-subnodes)
-                               (curr-handlers (map cdr matched)))
-              (if
-               (null? curr-handlers)
-               new-curr-node
-               (process-this
-                ((cadar curr-handlers)  ; lambda
-                 new-curr-node
-                 (caar curr-handlers)  ; context
-                 (caddar curr-handlers)  ; base-node
-                 )                      
-                (cdr curr-handlers)))))))))
-    (let ((targets-alist
-           (map-union
-            (lambda (triple)
-              (let ((node-path (reverse (sxml:context->content (car triple)))))
-                (if
-                 (eq? (car node-path) doc)
-                 (list (cons (cdr node-path) triple))
-                 '())))
-            update-targets)))
-      (if (null? targets-alist)  ; nothing to do
-          doc
-          (tree-trans doc targets-alist)))))
+               (eq? (car node-path) doc)
+               (list (cons (cdr node-path) triple))
+               '())))
+          update-targets)))
+    (if (null? targets-alist)  ; nothing to do
+        doc
+        (sxml:tree-trans doc targets-alist))))
             
 
 ;==========================================================================
 ; Processing update-specifiers
 
-;  Evaluates lambda-upd-specifiers for the SXML document docþ
+;  Evaluates lambda-upd-specifiers for the SXML document doc
 ;  Returns:
 ; update-targets ::= (listof  update-target)
 ; update-target ::= (list  context  handler  base-node)
@@ -595,3 +597,227 @@
      (sxml:transform-document
       doc
       (sxml:lambdas-upd-specifiers->targets doc lambdas-upd-specifiers)))))
+
+
+;==========================================================================
+; Destructive modifications
+
+;-------------------------------------------------
+; Helper cloning facilities
+; These are required to avoid circular structures and such as the result of
+; destructive modifications
+
+; Clones the given SXML node
+(define (sxml:clone node)
+  (letrec
+      ((clone-nodeset  ; clones nodeset
+        (lambda (nset)
+          (if (null? nset)
+              nset
+              (cons (sxml:clone (car nset)) (cdr nset))))))
+    (cond
+      ((pair? node)
+       (cons (car node) (clone-nodeset (cdr node))))
+      ; Atomic node
+      ((string? node)
+       (string-copy node))
+      ((number? node)
+       (string->number (number->string node)))
+      (else  ; unknown node type - do not clone it
+       node))))
+
+; Clones all members of the `nodeset', except for the `node', which is not
+; cloned
+(define (sxml:clone-nset-except nodeset node)
+  (letrec
+      ((iter-nset
+        ; encountered? - a boolean value: whether `node' already encountered
+        ; in the head of the nodeset being processed
+        (lambda (nset encountered?)
+          (cond
+            ((null? nset) nset)
+            ((eq? (car nset) node)
+             (cons
+              (if encountered?  ; already encountered before
+                  (sxml:clone (car nset))  ; is to be now cloned
+                  (car nset))
+              (iter-nset (cdr nset) #t)))
+            (else
+             (cons (sxml:clone (car nset))
+                   (iter-nset (cdr nset) encountered?)))))))
+    (iter-nset nodeset #f)))
+
+;-------------------------------------------------
+; Facilities for mutation
+
+; Destructively replaces the next list member for `prev' with the new `lst'
+(define (sxml:replace-next-with-lst! prev lst)
+  (let ((next (cddr prev)))
+    (if
+     (null? lst)  ; the member is to be just removed
+     (set-cdr! prev next)     
+     (begin
+       (set-cdr! prev lst)
+       (let loop ((lst lst))  ; the lst is non-null
+         (if
+          (null? (cdr lst))
+          (set-cdr! lst next)
+          (loop (cdr lst))))))))
+
+; Destructively updates the SXML document
+; Returns the modified doc
+;  mutation-lst ::= (listof (cons context new-value)),
+;  new-value - a nodeset: the new value to be set to the node
+(define (sxml:mutate-doc! doc mutation-lst)
+  (letrec
+      ((tree-walk
+        (lambda (curr-node targets-alist)
+          (if
+           (not (pair? curr-node))  ; an atom
+           #t  ; nothing to do
+           ; Otherwise, the `curr-node' is a pair
+           (let loop ((lst curr-node)
+                      (targets targets-alist))
+             (if
+              (null? targets)
+              #t  ; nothing more to do
+              (begin
+                (if ((ntype?? '@) (car lst))  ; attribute node
+                    (tree-walk (car lst) targets-alist)
+                    #t  ; dummy else-branch
+                    )
+                (if
+                 (null? (cdr lst))  ; this is the last member
+                 #t  ; nothing more to be done
+                 (let ((next (cadr lst)))
+                   (let-values*
+                    (((matched   ; handlers which match `next'
+                       targets   ; the rest
+                       )
+                      (sxml:separate-list
+                       (lambda (pair) (eq? (caar pair) next))
+                       targets)))
+                    (if
+                     (null? matched)  ; nothing matched the next node
+                     (loop (cdr lst) targets)
+                     (let ((matched
+                            (map
+                             (lambda (pair) (cons (cdar pair) (cdr pair)))
+                             matched)))
+                       (cond
+                         ((assv '() matched)  ; the `next' is to be mutated
+                          => (lambda (pair)
+                               (let ((k (length (cdr pair))))
+                                 (sxml:replace-next-with-lst! lst (cdr pair))
+                                 (loop (list-tail lst k) targets))))
+                         (else
+                          (tree-walk next matched)
+                          (loop (cdr lst) targets)))))))))))))))
+  (let ((targets-alist
+           (map-union
+            (lambda (pair)
+              (let ((node-path (reverse (sxml:context->content (car pair)))))
+                (if
+                 (eq? (car node-path) doc)
+                 (list (cons (cdr node-path) (cdr pair)))
+                 '())))
+            mutation-lst)))
+    (cond
+      ((null? targets-alist)  ; nothing to do
+       #t)
+      ((assv '() targets-alist)  ; assv is specified for empty lists
+       ; The root of the document itself is to be modified
+       => (lambda (pair)
+            (set! doc (cadr pair))))
+      (else
+       (tree-walk doc targets-alist)))
+    doc)))
+
+;-------------------------------------------------
+
+; Selects the nodes to be mutated (by a subsequent destructive modification)
+; This function is the close analog of `sxml:transform-document'
+;
+; Returns:
+;  mutation-lst ::= (listof (cons context new-value)),
+;  new-value - a nodeset: the new value to be set to the node;
+; or #f in case of semantic error during tree processing (e.g. not a
+; well-formed document after modification)
+;
+; doc - a source SXML document
+; update-targets ::= (listof  update-target)
+; update-target ::= (list  context  handler  base-node)
+; context - context of the node selected by the location path
+; handler ::= (lambda (node context base-node) ...)
+; handler - specifies the required transformation over the node selected
+; base-node - the node with respect to which the location path was evaluated
+(define (sxml:nodes-to-mutate doc update-targets)  
+  (letrec
+      (; targets-alist ::= (listof  (cons  node-chain  update-target))
+       ; node-chain - the chain of nodes, starting from the current node
+       ; anc-upd? - whether an ancestor of the current node us updated
+       (tree-walk
+        (lambda (curr-node targets-alist)
+          (let-values*
+           (((matched  ; handlers which match this node
+              targets  ; the rest
+              )
+             (sxml:separate-list
+              (lambda (pair) (null? (car pair)))
+              targets-alist)))
+           (if
+            ; No updates both on this level and on ancestor's level
+            (null? matched)
+            (let loop ((targets targets-alist)
+                       (subnodes (append (sxml:attr-list curr-node)
+                                         ((sxml:child sxml:node?) curr-node)))
+                       (res '()))
+              (if
+               (or (null? targets) (null? subnodes))
+               res
+               (let-values*
+                (((matched targets)
+                  (sxml:separate-list
+                   (lambda (pair) (eq? (caar pair) (car subnodes)))
+                   targets)))
+                (loop targets
+                      (cdr subnodes)
+                      (if
+                       (null? matched)
+                       res
+                       (append res
+                               (tree-walk
+                                (car subnodes)
+                                (map
+                                 (lambda (pair) (cons (cdar pair) (cdr pair)))
+                                 matched))))))))
+            (list
+             (cons (cadar matched)  ; context
+                   (sxml:clone-nset-except
+                    (as-nodeset
+                     (sxml:tree-trans curr-node targets-alist))
+                    curr-node))))))))
+    (let ((targets-alist
+           (map-union
+            (lambda (triple)
+              (let ((node-path (reverse (sxml:context->content (car triple)))))
+                (if
+                 (eq? (car node-path) doc)
+                 (list (cons (cdr node-path) triple))
+                 '())))
+            update-targets)))
+      (if (null? targets-alist)  ; nothing to do
+          '()
+          (tree-walk doc targets-alist)))))
+
+; A highest-level function
+(define (sxml:modify! . update-specifiers)
+  (and-let*
+   ((lambdas-upd-specifiers
+     (sxml:update-specifiers->lambdas update-specifiers)))
+   (lambda (doc)
+     (sxml:mutate-doc!
+      doc
+      (sxml:nodes-to-mutate
+       doc
+       (sxml:lambdas-upd-specifiers->targets doc lambdas-upd-specifiers))))))
