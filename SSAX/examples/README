@@ -186,3 +186,20 @@ SXML nodes as we parse an XML document.
 
 	$ make run-parent-pointers-bigloo-i
 	$ make run-parent-pointers-scm
+
+
+SSAX parsing with limited XML doctype validation and datatype conversion
+------------------------------------------------------------------------
+
+The present test instantiates the SSAX parser framework to support a
+limited document type validation and datatype conversion. We
+demonstrate atomic content validation and structural validation. To be
+precise, if the content model of an element is declared to be 'bool or
+'int, we make sure the corresponding character data in the source XML
+document indeed represent a boolean or an integer. If the content
+validates, we convert it to a boolean or an integer value for the
+resulting SXML.  We also show validation of a simple structural
+constraint, the sequence of child elements matching a user-specified
+template.
+
+	$ make run-validate-doctype-simple-bi

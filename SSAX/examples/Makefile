@@ -10,13 +10,14 @@ all-bigloo-i: run-html-parse-sample-bigloo-i \
 	run-apply-templates-bigloo-i \
 	run-sxml-db-conv-i \
 	run-daml-parse-unparse-i \
-	run-parent-pointers-bigloo-i
+	run-parent-pointers-bigloo-i \
+	run-validate-doctype-simple-bi
 
 all-bigloo-c: run-remove-markup-bigloo run-outline-bigloo run-sxml-bigloo
 
 all-scm: test-remove-markup-scm test-outline-scm test-sxml-scm \
-	run-sxslt-advanced-scm sxslt-advanced.scm \
-	run-parent-pointers-scm parent-pointers.scm
+	run-sxslt-advanced-scm  \
+	run-parent-pointers-scm
 
 clean:
 	rm -f *_.c *.o core a.out \
@@ -70,6 +71,8 @@ run-sxslt-advanced-bigloo-i: sxslt-advanced.scm
 run-parent-pointers-bigloo-i: parent-pointers.scm
 	$(BIGLOO) $(BFLAGS) -i -eval '(module parent-pointers (include "myenv-bigloo.scm") (include "srfi-13-local.scm") (include "char-encoding.scm") (include "util.scm") (include "look-for-str.scm") (include "input-parse.scm") (include "SSAX-code.scm") (include "SXML-tree-trans.scm") (include "SXPath-old.scm"))' parent-pointers.scm
 
+run-validate-doctype-simple-bi: validate-doctype-simple.scm
+	$(BIGLOO) $(BFLAGS) -i -eval '(module validate-xml (include "myenv-bigloo.scm") (include "srfi-13-local.scm") (include "char-encoding.scm") (include "util.scm") (include "look-for-str.scm") (include "input-parse.scm") (include "SSAX-code.scm") (include "catch-error.scm"))' validate-doctype-simple.scm
 
 # SCM-specific part
 
