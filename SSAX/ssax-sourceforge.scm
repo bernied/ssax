@@ -7,9 +7,9 @@
    (title "XML and Scheme")
    (description "Representing, authoring, querying and transforming
 markup data in Scheme; XML notation for a programming language")
-   (Date-Revision-yyyymmdd "20020125")
+   (Date-Revision-yyyymmdd "20021201")
    (Date-Creation-yyyymmdd "20010706")
-   (keywords "XML, XML parsing, XML Infoset, XPath, SAX, SXML, XSLT, Scheme, HTML composition, HTML authoring")
+   (keywords "XML, XML parsing, XML Infoset, XPath, XSLT, SAX, SXML, SXSLT, Scheme, HTML composition, HTML authoring")
    (AuthorAddress "oleg@okmij.org")
    (long-title "SSAX and SXML at SourceForge")
    )
@@ -48,7 +48,7 @@ of implementing the parsing engine as an enhanced tree fold
 combinator, which fully captures the control pattern of the
 depth-first tree traversal.")
 
-   (p "Related to SSAX are SXPath queries and SXML transformations.")
+   (p "Related to SSAX are SXPath queries and SXML transformations (SXSLT).")
 
    (Section 3 "Availability")
    (p "The current version of SSAX is 4.9. The whole SSAX code is in public domain.")
@@ -62,6 +62,12 @@ Chicken, Guile, SCM 5d2, MIT Scheme 7.5.2, Gauche 0.4.12."
    (Section 3 "Documentation")
    (p "Main SSAX/SXML page:"
       (URL "http://pobox.com/~oleg/ftp/Scheme/xml.html"))
+
+   (p
+    "Detailed introduction, motivation and real-life case-studies of SSAX, SXML, SXPath and SXSLT: the paper and the complementary talk presented at the International Lisp Conference 2002."
+    (URL "http://pobox.com/~oleg/ftp/papers/SXs.pdf")
+    (URL "http://pobox.com/~oleg/ftp/papers/SXs-talk.pdf")
+    )
 
    (p
     "The derivation of the SSAX API and the comparison of SSAX with other
@@ -131,93 +137,15 @@ documentation, validation tests, as well as several sample applications.")
 ;========================================================================
 ;			HTML generation
 
-(include "SXML-to-HTML-ext.scm")
+; IMPORT
+; SXML-to-HTML-ext.scm and all of its imports
 
-
-(let* ((args (argv))
-       (this-script (if (equal? "gsi" (car args)) (cadr args) (car args))))
-  (OS:chdir (##path-directory this-script)))
 
 ; Generating HTML
 
 (define (generate-HTML Content)
  (SRV:send-reply
-  (post-order Content
-   `(
-     ,@generic-web-rules
-
-
-     (verbatim	; set off pieces of code: one or several lines
-      . ,(lambda (tag . lines)
-	   (list "<pre>"
-		 (map (lambda (line) (list "     " line "\n"))
-		      lines)
-		 "</pre>")))
-		; (note . text-strings)
-		; A note (remark), similar to a footnote
-     (note
-      . ,(lambda (tag . text-strings)
-	   (list " <font size=\"-1\">[" text-strings "]</font>\n")))
-
-		; A reference to a file
-     (fileref
-      . ,(lambda (tag pathname . descr-text)
-	   (list "<a href=\"" pathname "\">"
-		 (car (reverse (string-split pathname '(#\/))))
-		 "</a> [" 
-		 (let ((file-size (OS:file-length pathname)))
-		   (if (not (positive? file-size))
-		       (error "File not found: " pathname))
-		   (cond
-		    ((< file-size 1024) "&lt;1K")
-		    (else (list (quotient (+ file-size 1023) 1024) "K"))))
-		 "]<br>"
-		 descr-text)))
-
-		; A reference to a plain-text file (article)
-     (textref
-       . ,(lambda (tag pathname title . descr)
-	    (let ((file-size (OS:file-length pathname)))
-	      (if (not (positive? file-size))
-		  (error "File not found: " pathname))
-	      (list "<a href=\"" pathname "\">" title
-		    "</a> <font size=\"-1\">[plain text file]</font><br>\n"
-		    descr))))
-
-		; Unit of a description for a piece of code
-		; (Description-unit key title . elems)
-		; where elems is one of the following:
-		; headline, body, platforms, version
-     (Description-unit
-      ((headline
-	. ,(lambda (tag . elems)
-	     (list "<dt>" elems "</dt>\n")))
-       (body
-	. ,(lambda (tag . elems)
-	     (list "<dd>" elems "<br>&nbsp;</dd>\n")))
-       (platforms
-	. ,(lambda (tag . elems)
-	     (list "<dt><strong>Platforms</strong><dt><dd>"
-		   elems "</dd>\n")))
-       (version
-	. ,(lambda (tag . elems)
-	     (list "<dt><strong>Version</strong><dt><dd>"
-		   "The current version is " elems ".</dd>\n")))
-       (references
-	. ,(lambda (tag . elems)
-	     (list "<dt><strong>References</strong><dt><dd>"
-		   elems "</dd>\n")))
-       )
-      . ,(lambda (tag key title . elems)
-	   (post-order
-	    `((a (@ (name ,key)) (n_))
-	      (h2 ,title)
-	      (dl (insert-elems))
-	      )
-	    `(,@universal-conversion-rules
-	      (insert-elems
-	       . ,(lambda (tag) elems))))))
-))))
+  (pre-post-order Content
+   (generic-web-rules Content '()))))
 
 (generate-HTML Content)
-
