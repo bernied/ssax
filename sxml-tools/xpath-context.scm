@@ -1067,6 +1067,11 @@
 ;                    | (node-test (pi <String>? ))
 ;                    | (node-test (point))
 ;                    | (node-test (range))
+; + added by sxpath native syntax:
+;                    | (node-test (equal?  <SXML-node> ))
+;                    | (node-test (eq?  <SXML-node> ))
+;                    | (node-test (names  <String>+ ))
+;                    | (node-test (not-names  <String>+ ))s
 (define (draft:ast-node-test op)
   (if
    (not (eq? (car op) 'node-test))
@@ -1105,8 +1110,16 @@
      ((range)
       (draft:signal-semantic-error
        "range() NodeTest is not supported by this implementation"))
+     ((equal?)
+      (node-equal? (cadadr op)))
+     ((eq?)
+      (node-eq? (cadadr op)))
+     ((names)
+      (ntype-names?? (cdadr op)))
+     ((not-names)
+      (sxml:invert (ntype-names?? (cdadr op))))
      (else
-      (draft:signal-semantic-error "unknown NodeTest - " op)))))       
+      (draft:signal-semantic-error "unknown NodeTest - " op)))))
 
 ;-------------------------------------------------
 ; In this section, each function accepts 2 arguments
