@@ -305,10 +305,32 @@
 ; and URL-encodes it. We have just shown a context-sensitive
 ; application of re-writing rules. It still appears clear and
 ; intuitive.
+;
+; Note [6]
+; Joerg-Cyril Hoehle observed that the handler for the 'body' can be
+; written as a *macro*. The macro re-writes (body sections) into
+; (*body toc numbered-sections), where the auxiliary SXML element *body
+; expands into an HTML element 'body'. We need this extra indirection
+; to avoid endless recursion. His submission follows (see his message
+; on the SSAX-SXML mailing list on Aug 1, 2003).
+;      (body *macro*
+;        . ,(lambda (tag . elems)
+;             (let ((numbered-sections
+;                     (number-sections '() elems)))
+;               (display numbered-sections)
+;               (let*
+;                 ((toc
+;                    (make-toc-entries numbered-sections)))
+;                 ; Now the body contain the TOC entries and the
+;                 ; numbered sections. See Note [3] above
+;                 `(*body (ul ,toc) ,numbered-sections))) ))
+;      (*body
+;        ; prevent endless recursion once TOC was generated
+;        . ,(lambda (tag . elems) (entag 'body elems)))
 
 (define main-ss 
   `(
-     ; see Note [2]
+     ; see Notes [2,6]
      (body *preorder*
        . ,(lambda (tag . elems)
 	    (let ((numbered-sections
