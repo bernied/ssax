@@ -57,6 +57,9 @@ run-daml-parse-unparse-i: daml-parse-unparse.scm \
 		$(LIBDIR)/SSAX-code.scm
 	$(BIGLOO) $(BFLAGS) -s -i daml-parse-unparse.scm
 
+run-sxslt-advanced-bigloo-i: sxslt-advanced.scm
+	$(BIGLOO) $(BFLAGS) -i -eval '(module sxslt-advanced (include "myenv-bigloo.scm") (include "util.scm") (include "SXML-tree-trans.scm") (include "SXML-to-HTML.scm") (include "SXML-to-HTML-ext.scm"))' sxslt-advanced.scm
+
 
 # SCM-specific part
 
@@ -80,3 +83,9 @@ test-sxml-scm:
 	-l $(LIBDIR)/SSAX-code.scm \
 	-l run-sxml.scm \
 	-e '(main (list "myself" "xml/OMF-sample.xml"))'
+
+run-sxslt-advanced-scm: sxslt-advanced.scm
+	scm -b -l $(LIBDIR)/myenv-scm.scm  -l $(LIBDIR)/util.scm \
+	-l $(LIBDIR)/SXML-tree-trans.scm \
+	-l $(LIBDIR)/SXML-to-HTML.scm -l $(LIBDIR)/SXML-to-HTML-ext.scm \
+	-l sxslt-advanced.scm

@@ -145,3 +145,29 @@ again. Furthermore, the code tests that the following invariant holds:
         PARSE . UNPARSE . PARSE === PARSE
 
 	$ make run-daml-parse-unparse-i
+
+
+
+An advanced example of SXSLT transformations
+--------------------------------------------
+
+The example transforms an SHTML-like SXML document with nested
+sections into a web page with hierarchically numbered and marked up
+sections and subsections. The example also generates a hierarchical
+table of contents.
+
+This example is due to Jim Bender.
+
+The example is aimed to be illustrative of various SXSLT facilities
+and idioms.  In particular, we demonstrate: higher-order tags,
+pre-order and post-order transformations, re-writing of SXML elements
+in regular and special ways, context-sensitive applications of
+re-writing rules. Finally, we illustrate SXSLT reflection: an ability
+of a rule to query its own stylesheet and to re-apply the stylesheet
+with "modifications".
+
+The file sxslt-advanced.scm should be more properly called a tutorial,
+with a few occasional lines of code.
+
+	$ make run-sxslt-advanced-bigloo-i
+	$ make run-sxslt-advanced-scm
