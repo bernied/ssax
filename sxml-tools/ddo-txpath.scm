@@ -973,6 +973,15 @@
       (and-let*
        ((preds-res (ddo:ast-predicate-list
                     (cdddr op) 0 #t (+ pred-nesting 1)))
+        (preds-res
+         (if (and (list-ref preds-res 3)  ; position required for the predicate
+                  (< pred-nesting 3))  ; level of nesting matters
+             (ddo:ast-predicate-list  ; the second pass
+              (cdddr op) 0 #t
+              (+ pred-nesting 2)  ; called for quadratic number of times
+              )
+             preds-res  ; do not need to change anything
+             ))
         (axis-lst (ddo:ast-axis-specifier
                    (cadr op)
                    (draft:na-max num-anc (cadr preds-res))
