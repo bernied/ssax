@@ -121,6 +121,46 @@
 ;=========================================================================
 ; Comparators for XPath objects 
 
+;-------------------------------------------------
+; Helper merge-sort for speeding up equality comparison of two nodesets
+
+; Similar to R5RS 'list-tail' but returns the new list consisting of the first
+; 'k' members of 'lst'
+(define (sxml:list-head lst k)
+  (if (or (null? lst) (zero? k))
+      '()
+      (cons (car lst) (sxml:list-head (cdr lst) (- k 1)))))
+
+; Implements merge-sort of the given lst
+; Returns the sorted list, the smallest member first
+; less-than?-pred ::= (lambda (obj1 obj2) ...)
+; less-than?-pred returns #t if obj1<obj2 with respect to the given ordering
+(define (sxml:merge-sort less-than?-pred lst)
+  (letrec
+      ((merge-sorted-lists
+        ; Merges 2 sorted lists into one sorted list
+        (lambda (lst1 lst2)
+          (cond
+            ((null? lst1) lst2)
+            ((null? lst2) lst1)
+            ; both lists are non-null here
+            ((less-than?-pred (car lst1) (car lst2))
+             (cons (car lst1)
+                   (merge-sorted-lists (cdr lst1) lst2)))
+            (else
+             (cons (car lst2)
+                   (merge-sorted-lists lst1 (cdr lst2))))))))
+    (if
+     (or (null? lst) (null? (cdr lst)))  ; already sorted
+     lst
+     (let ((middle (round (/ (length lst) 2))))
+       (merge-sorted-lists
+        (sxml:merge-sort less-than?-pred (sxml:list-head lst middle))
+        (sxml:merge-sort less-than?-pred (list-tail lst middle)))))))
+
+;-------------------------------------------------
+; Equality comparison
+
 ; A helper for XPath equality operations: = , !=
 ;  'bool-op', 'number-op' and 'string-op' are comparison operations for 
 ; a pair of booleans,  numbers and strings respectively
@@ -137,18 +177,21 @@
          (else  ; both objects are strings
           (string-op obj1 obj2))))
       ((and (nodeset? obj1) (nodeset? obj2))  ; both objects are nodesets
-       (let first ((str-set1 (map sxml:string-value obj1))
-                   (str-set2 (map sxml:string-value obj2)))
+       (let loop ((str-set1
+                   (sxml:merge-sort string<? (map sxml:string-value obj1)))
+                  (str-set2
+                   (sxml:merge-sort string<? (map sxml:string-value obj2))))
          (cond
-           ((null? str-set1) #f)
-           ((let second ((elem (car str-set1))
-                         (set2 str-set2))
-              (cond
-                ((null? set2) #f)
-                ((string-op elem (car set2)) #t)
-                (else (second elem (cdr set2))))) #t)
-           (else
-            (first (cdr str-set1) str-set2)))))
+           ((or (null? str-set1) (null? str-set2))
+            #f)
+           ((string-op (car str-set1) (car str-set2))
+            ; comparison condition fulfilled for a pair of nodes
+            #t)
+           ((string<? (car str-set1) (car str-set2))
+            ; we can remove (car str-set1) from our further consideration
+            (loop (cdr str-set1) str-set2))
+           (else  ; vice versa
+            (loop str-set1 (cdr str-set2))))))
       (else  ; one of the objects is a nodeset, another is not
        (let-values*
         (((nset elem)
@@ -174,8 +217,7 @@
           (else  ; unknown datatype
            (cerr "Unknown datatype: " elem nl)
            #f)))))))
-                   
-         
+
 (define sxml:equal? (sxml:equality-cmp eq? = string=?))
 
 (define sxml:not-equal?
@@ -183,7 +225,9 @@
    (lambda (bool1 bool2) (not (eq? bool1 bool2)))
    (lambda (num1 num2) (not (= num1 num2)))
    (lambda (str1 str2) (not (string=? str1 str2)))))
-         
+
+;-------------------------------------------------
+; Relational comparison
 
 ; Relational operation ( < , > , <= , >= ) for two XPath objects
 ;  op is comparison procedure: < , > , <= or >=
@@ -229,8 +273,9 @@
           (else  ; 'obj2' is a number
            obj2)))))))
            
+
 ;=========================================================================
-; XPath axises
+; XPath axes
 ; An order in resulting nodeset is preserved
 
 ; Ancestor axis
