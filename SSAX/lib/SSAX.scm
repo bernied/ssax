@@ -133,7 +133,12 @@
 ; user. However, if a run-test macro below is set to include
 ; self-tests, this present code does provide the definitions for these
 ; functions to allow tests to run.
+
+; Misc notes
+; It seems it is highly desirable to separate tests out in a dedicated
+; file.
 ;
+
 ; $Id$
 
 
@@ -682,7 +687,7 @@
     (let loop ()
       (let ((pi-fragment
 	     (next-token '() '(#\?) "reading PI content" port)))
-	(if (eq? #\> (peek-next-char port))
+	(if (eqv? #\> (peek-next-char port))
 	    (begin
 	      (read-char port)
 	      (cons pi-fragment '()))
@@ -766,7 +771,7 @@
                (next-token-of (lambda (c) 
 		 (and (not (eof-object? c)) (char-alphabetic? c) c)) port)))
 	  (cond		; "&gt;" is to be replaced with #\>
-	   ((and (string=? "gt" ent-ref) (eq? (peek-char port) #\;))
+	   ((and (string=? "gt" ent-ref) (eqv? (peek-char port) #\;))
 	    (read-char port)
 	    (loop (str-handler fragment ">" seed)))
 	   (else
@@ -823,7 +828,7 @@
 
 (define (ssax:read-char-ref port)
   (let* ((base
-           (cond ((eq? (peek-char port) #\x) (read-char port) 16)
+           (cond ((eqv? (peek-char port) #\x) (read-char port) 16)
                  (else 10)))
          (name (next-token '() '(#\;) "XML [66]" port))
          (char-code (string->number name base)))
