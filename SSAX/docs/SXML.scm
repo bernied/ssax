@@ -461,7 +461,7 @@ list of " (code "Node") "s: ")
 	(term-str "text string"))))
     (production "N2"
       (nonterm "Nodelist")
-      ((sexp (nonterm "Node") (ebnf-* (nonterm "Node")))
+      ((sexp (ebnf-* (nonterm "Node")))
       ))
     (production "N3"
       (nonterm "name")
