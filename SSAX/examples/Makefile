@@ -12,6 +12,12 @@ all-bigloo-i: run-html-parse-sample-bigloo-i \
 	run-daml-parse-unparse-i \
 	run-parent-pointers-bigloo-i
 
+all-bigloo-c: run-remove-markup-bigloo run-outline-bigloo run-sxml-bigloo
+
+all-scm: test-remove-markup-scm test-outline-scm test-sxml-scm \
+	run-sxslt-advanced-scm sxslt-advanced.scm \
+	run-parent-pointers-scm parent-pointers.scm
+
 clean:
 	rm -f *_.c *.o core a.out \
 	run-remove-markup-bigloo \
