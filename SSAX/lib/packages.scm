@@ -11,7 +11,7 @@
 	  input-parser-error))
 
 (define-interface ssax-warn-interface
-  (export SSAX:warn))
+  (export ssax:warn))
 
 (define-interface run-test-interface
   (export run-test))
@@ -73,16 +73,16 @@
 	  attlist-null?
 	  attlist-remove-top
 	  attlist->alist attlist-fold
-	  SSAX:skip-internal-dtd
-	  SSAX:read-markup-token
-	  SSAX:read-CDATA-body
-	  SSAX:read-char-ref
-	  SSAX:read-attributes
-	  SSAX:complete-start-tag
-	  SSAX:read-external-ID
-	  SSAX:read-char-data
-	  SSAX:make-pi-parser SSAX:make-elem-parser SSAX:make-parser
-	  SSAX:XML->SXML))
+	  ssax:skip-internal-dtd
+	  ssax:read-markup-token
+	  ssax:read-cdata-body
+	  ssax:read-char-ref
+	  ssax:read-attributes
+	  ssax:complete-start-tag
+	  ssax:read-external-id
+	  ssax:read-char-data
+	  ssax:make-pi-parser ssax:make-elem-parser ssax:make-parser
+	  ssax:xml->sxml))
 
 (define-structure define-opt (export (define-opt :syntax))
   (open scheme)
