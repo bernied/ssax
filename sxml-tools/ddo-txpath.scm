@@ -655,7 +655,7 @@
                ((not sl?)  ; #f for the remaining steps
                 (append (map
                          (lambda (step) #f)
-                         step-lst)
+                         steps)   ; DL: was: step-lst
                         res))
                (else  ; evaluate single-level? for the current step
                 (and-let*
@@ -671,6 +671,7 @@
                 (sl?-lst single-level-lst)
                 (res-lst '())
                 (num-anc num-anc))
+       ;(pp (list steps-to-view sl?-lst res-lst num-anc))
        (if
         (null? steps-to-view)  ; everyone processed
         (list res-lst
