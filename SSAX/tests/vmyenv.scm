@@ -160,13 +160,16 @@
 (let
   ()
   (cond-expand
-   (gambit (cout "Expanded in Gambit\n"))
+   (gambit (cout "Expanded in Gambit" nl))
    (else #f))
   (cond-expand
-   (scm (cout "Expanded in SCM\n"))
+   (scm (cout "Expanded in SCM" nl))
    (else #f))
   (cond-expand
-   (mit-scheme (cout "Expanded in MIT Scheme\n"))
+   (mit-scheme (cout "Expanded in MIT Scheme" nl))
+   (else #f))
+  (cond-expand
+   (petite-chez (cout "Expanded in Petite Chez Scheme" nl))
    (else #f))
   (cond-expand
    (bigloo (cout "Expanded in Bigloo" nl))
@@ -178,13 +181,14 @@
   (assert (cond-expand ((and (not xxx) xxx) (/ 1 0)) (else #t)))
 
   (cond-expand
-    ((or gambit scm mit-scheme bigloo)
+    ((or gambit scm mit-scheme bigloo petite-chez)
       (assert (= 1
 		(+
 		  (cond-expand (gambit 1) (else 0))
 		  (cond-expand (scm 1) (else 0))
 		  (cond-expand (mit-scheme 1) (else 0))
-		  (cond-expand (bigloo 1) (else 0)))))
+		  (cond-expand (bigloo 1) (else 0))
+		  (cond-expand (petite-chez 1) (else 0)))))
       (cond-expand
 	(gambit (assert (failed? (cond-expand ((not gambit) #t)))))
 	(else #t))
@@ -194,24 +198,27 @@
 		  (scm 0 2)
 		  (bigloo 0 3)
 		  (mit-scheme 0 4)
+		  (petite-chez 0 5)
 		  (else 0))
-		'(1 2 3 4)))
+		'(1 2 3 4 5)))
       (assert (memv
 		(cond-expand
 		  ((and bigloo srfi-0) 0 3)
 		  ((and gambit srfi-0) 0 1)
 		  ((and scm srfi-0) 0 2)
 		  ((and mit-scheme srfi-0) 0 4)
+		  ((and petite-chez srfi-0) 0 5)
 		  (else 0))
-		'(1 2 3 4)))
+		'(1 2 3 4 5)))
       (assert (memv
 		(cond-expand
 		  ((or xxx gambit zzz) 0 1)
 		  ((or xxx scm zzz) 0 2)
 		  ((or xxx bigloo zzz) 0 3)
 		  ((or xxx mit-scheme zzz) 0 4)
+		  ((or xxx petite-chez zzz) 0 5)
 		  (else 0))
-		'(1 2 3 4)))
+		'(1 2 3 4 5)))
       (assert (memv
 		(cond-expand
 		  ((not gambit) 0 1)
@@ -225,22 +232,24 @@
 		  ((or (not gambit) (and gambit gambit)) 0 1)
 		  ((or (not scm) (and scm scm)) 0 2)
 		  ((or (not mit-scheme) (and mit-scheme mit-scheme)) 0 4)
+		  ((or (not petite-chez) (and petite-chez petite-chez)) 0 5)
 		  ((or (not bigloo) (and bigloo bigloo)) 0 3)
 		  (else 0))
-		'(1 2 3 4)))
-      (assert (cond-expand ((not (and gambit scm mit-scheme)) #t)))
+		'(1 2 3 4 5)))
+      (assert (cond-expand ((not (and gambit scm mit-scheme petite-chez)) #t)))
       (assert
 	(cond-expand
 	  (gambit (positive? +inf.))  ; works only in Gambit
 	  (scm (procedure? try-load)) ; works only in SCM
 	  (bigloo (<fx 1 2))		; works only in Bigloo
 	  (mit-scheme (fix:+ 1 2))	; works only in MIT-Scheme
+	  (petite-chez (procedure? compile))	; works only in Chez-Scheme
 	  (else #f)))
       (assert
 	(cond-expand
 	  ((or gambit scm bigloo mit-scheme) 
 	    (char=? #\newline (string-ref "\n" 0)))
-	  ((or scm mit-scheme) (eq? 'a 'A))
+	  ((or scm mit-scheme petite-chez) (eq? 'a 'A))
 	  (else #f)))
       )
     (else
