@@ -128,7 +128,7 @@ vsrfi-13:
 vinput-parse: 
 	$(call make-$(PLATFORM),\
 	       catch-error.scm srfi-13-local.scm util.scm look-for-str.scm  \
-	       input-parse.scm,\
+	       char-encoding.scm input-parse.scm,\
 	       $@)
 vsrfi-12:
 	$(call make-$(PLATFORM),\
