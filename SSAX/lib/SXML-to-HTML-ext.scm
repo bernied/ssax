@@ -13,21 +13,9 @@
 ; SXML-tree-trans.scm
 ; SXML-to-HTML.scm
 ; OS:file-length, unless it is included into the core system
+;   (see myenv-bigloo.scm for example)
 ;
 ; $Id$
-
-(cond-expand
- (bigloo
-  (define OS:file-length file-size)
-  )
- (gambit
-  ; OS:file-length is built into my version of Gambit
-  )
- (else
-  (define (OS:file-length fname)
-    (error "A procedure for getting the size of a file is not available "
-	   "on this platform, or I don't know its name."))
-))
 
 
 ; Look up a value associated with a symbolic key in alist (key value)
