@@ -7,7 +7,8 @@ LIBDIR=../lib
 
 all-bigloo-i: run-html-parse-sample-bigloo-i \
 	run-pull-punct-bigloo-i \
-	run-apply-templates-bigloo-i
+	run-apply-templates-bigloo-i \
+	run-sxml-db-conv-i
 
 clean:
 	rm -f *_.c *.o core a.out \
@@ -18,7 +19,7 @@ clean:
 
 # Bigloo-specific  part
 
-BFLAGS=-I $(LIBDIR) -Obench -farithmetic -unsafe
+BFLAGS=-s -I $(LIBDIR) -Obench -farithmetic -unsafe
 BIGLOO=bigloo
 
 run-remove-markup-bigloo: run-remove-markup-bigloo.scm \
@@ -46,6 +47,10 @@ run-pull-punct-bigloo-i: pull-punct-sxml.scm \
 run-apply-templates-bigloo-i: apply-templates.scm \
 		$(LIBDIR)/SSAX-code.scm
 	$(BIGLOO) $(BFLAGS) -i apply-templates.scm
+
+run-sxml-db-conv-i: sxml-db-conv.scm \
+		$(LIBDIR)/SSAX-code.scm
+	$(BIGLOO) $(BFLAGS) -i sxml-db-conv.scm
 
 
 # SCM-specific part
