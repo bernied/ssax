@@ -7,11 +7,11 @@
     (title "SXML")
     (description "Definition of SXML: an instance of XML Infoset as
 S-expressions, an Abstract Syntax Tree of an XML document.")
-    (Date-Revision-yyyymmdd "20020301")
+    (Date-Revision-yyyymmdd "20020809")
     (Date-Creation-yyyymmdd "20010207")
     (keywords "XML, XML parsing, XML Infoset, XML Namespaces, AST, SXML, Scheme")
-    (AuthorAddress "oleg@pobox.com")
-    (Revision "2.1")
+    (AuthorAddress "oleg-at-pobox.com")
+    (Revision "2.5")
     (long-title "SXML")
     (Links
      (start "index.html" (title "Scheme Hash"))
@@ -41,23 +41,23 @@ compact library of combinators for querying and transforming SXML."
 tags of the root element enclose the whole content of the document,
 which may include other elements or arbitrary character data.  Text
 with familiar angular brackets is an external representation of an XML
-document. Applications ought to deal with its internalized form:
-XML information set, or its specializations.  This form lets an
+document. Applications ought to deal with an internalized form:
+an XML Information Set, or its specializations.  This form lets an
 application locate specific data or transform an XML tree into another
 tree, which can then be written out as an XML, HTML, PDF, etc.
 document.")
-   (p "XML information set (Infoset) " (cite "XML Infoset") " is an
-abstract data set that describes information available in a
+   (p "XML Information Set (Infoset) " (cite "XML Infoset") " is an
+abstract datatype that describes information available in a
 well-formed XML document.  Infoset is made of \"information items\",
 which denote elements, attributes, character data, processing
 instructions, and other components of the document. Each information
 item has a number of associated properties, e.g., name, namespace
 URI. Some properties -- for example, 'children' and 'attributes' --
-are (ordered) collections of other information items. Infoset describes
+are collections of other information items. Infoset describes
 only the information in an XML document that is relevant to
 applications. The default value of attributes declared in the DTD, parameter
 entities, the order of attributes within a start-tag, and other data used merely for parsing or validation are not included. Although technically 
-Infoset is specified for XML it largely applies to HTML as well.")
+Infoset is specified for XML it largely applies to other semi-structured data formats, in particular, HTML.")
    (p
     "The hierarchy of containers comprised of text strings and other
 containers greatly lends itself to be described by
@@ -71,15 +71,18 @@ compose even by hand.  S-expressions have another advantage: "
    (p
     "SXML is a concrete instance of the XML Infoset. Infoset's goal is
 to present in some form all relevant pieces of data and their " (em
-"abstract") ", container-slot relationships to each other.  SXML gives
-the nest of containers a concrete implementation as S-expressions, and
-provides means of accessing items and their properties. SXML is a
-\"relative\" of XPath " (cite "XPath") " and DOM " (cite "DOM") ", whose data models are two other
-instances of the XML Infoset. SXML is particularly suitable for
-Scheme-based XML/HTML authoring, SXPath queries, and tree
-transformations. In John Hughes' terminology, SXML is a term
-implementation of evaluation of the XML document.")
+"abstract") ", container-slot relationships with each other.  SXML
+gives the nest of containers a concrete realization as S-expressions,
+and provides means of accessing items and their properties. SXML is a
+\"relative\" of XPath " (cite "XPath") " and DOM " (cite "DOM") ",
+whose data models are two other instances of the XML Infoset. SXML is
+particularly suitable for Scheme-based XML/HTML authoring, SXPath
+queries, and tree transformations. In John Hughes' terminology " (cite
+"Hughes-PP") ", SXML is a term implementation of evaluation of the XML
+document.")
 
+
+;--------------------------------------------------
    (Section 2 "Notation")
    (p
     "We will use an Extended BNF Notation (EBNF) employed in the XML
@@ -124,21 +127,22 @@ characters that spell "
     )
 
    
+;--------------------------------------------------
+
    (Section 2 "Grammar")
    (productions
      (production 1
        (nonterm "TOP")
        ((sexp
 	 (term-lit "*TOP*")
-	 (ebnf-opt (nonterm "namespaces"))
-	 ;(ebnf-opt (nonterm "decl-entities"))
+	 (ebnf-opt (nonterm "aux-list"))
 	 (ebnf-* (nonterm "PI"))
 	 (ebnf-* (nonterm "comment"))
 	 (nonterm "Element")))))
    (p
     "This S-expression stands for the root of the SXML tree, a
-document information item of the Infoset. It contains the root element
-of the XML document as its only child element.")
+document information item of the Infoset. Its only child element is
+the root element of the XML document.")
 
    (productions
     (production 2
@@ -146,7 +150,7 @@ of the XML document as its only child element.")
       ((sexp
 	(nonterm "name")
 	(ebnf-opt (nonterm "attributes-list"))
-	(ebnf-opt (nonterm "namespaces"))
+	(ebnf-opt (nonterm "aux-list"))
 	(ebnf-* (nonterm "child-of-element")))))
     (production 3
       (nonterm "attributes-list")
@@ -156,7 +160,8 @@ of the XML document as its only child element.")
     (production 4
       (nonterm "attribute")
       ((sexp (nonterm "name")
-	     (ebnf-opt (term-str "value")))))
+	     (ebnf-opt (term-str "value"))
+	     (ebnf-opt (nonterm "aux-list")))))
     (production 5
       (nonterm "child-of-element")
       ((ebnf-choice 
@@ -190,7 +195,7 @@ therefore represented by nodes of a dedicated type " (code "*PI*")
       ((sexp (term-lit "*ENTITY*")
 	     (term-str "public-id")
 	     (term-str "system-id")))))
-   (p "Comments are mentioned for completeness only. A SSAX XML parser
+   (p "Comments are mentioned for completeness. A SSAX XML parser
 " (cite "SSAX") ", among others, transparently skips the comments.
 The XML Recommendation permits the parser to pass the comments to
 an application or to completely disregard them. The present SXML grammar
@@ -217,7 +222,7 @@ document.")
     (production 12
       (nonterm "namespace-id")
       ((ebnf-choice
-	(term-id "URI") (term-id "user-ns-shortcut"))))
+	(sexp-symb (term-str "URI")) (term-id "user-ns-shortcut"))))
     (production 13
       (nonterm "namespaces")
       ((sexp
@@ -225,46 +230,42 @@ document.")
 	(ebnf-* (nonterm "namespace-assoc")))))
     (production 14
       (nonterm "namespace-assoc")
-      ((sexp (nonterm "namespace-id") (term-str "URI"))))
+      ((sexp (nonterm "namespace-id") (term-str "URI")
+	     (ebnf-opt (term-lit "original-prefix"))
+	     )))
 
     )
-   (p "An SXML " (code (nonterm "name")) " is a single symbol. It is generally an expanded
-name " (cite "XML Namespaces") ", which conceptually consists of a
+
+   (p "An SXML " (code (nonterm "name")) " is a single symbol. It is generally an expanded name " (cite "XML Namespaces") ", which conceptually consists of a
 local name and a namespace URI. The latter part may be empty, in which
 case
 " (code (nonterm "name")) " is a " (code (term-id "NCName")) ": a Scheme
 symbol whose spelling conforms to production [4] of the XML Namespaces
 Recommendation " (cite "XML Namespaces") ". " (code (nonterm
 "ExpName")) " is also a Scheme symbol, whose string representation
-contains an embedded colon that joins a local and a namespace
-parts of the name. A " (code (term-id "URI")) " is a Namespace URI
+contains an embedded colon that joins the local and the namespace
+parts of the name. A " (code (sexp-symb (term-str "URI"))) " is a Namespace URI
 string converted to a Scheme symbol. Universal Resource Identifiers (URI)
 may contain characters (e.g., parentheses) that are prohibited
 in Scheme identifiers. Such characters must be %-quoted during the
-conversion from a URI string to " (code (term-id "URI"))
-". A " (code (term-id "user-ns-shortcut")) " is a Scheme symbol chosen by the user to represent a namespace URI in the application program. The SSAX parser offers a user to define (short and mnemonic) unique shortcuts for Namespace URIs, which are are often long and unwieldy
-strings.")
+conversion from a URI string to " (code (nonterm "namespace-id"))
+". The original XML Namespace prefix of a QName " (cite "XML
+Namespaces") " may be retained as an optional member " (code (term-lit
+"original-prefix")) " of a " (code (nonterm "namespace-assoc")) "
+association. A " (code (term-id "user-ns-shortcut")) " is a Scheme
+symbol chosen by an application programmer to represent a namespace
+URI in the application program. The SSAX parser lets the programmer
+define (short and mnemonic) unique shortcuts for Namespace URIs,
+which are are often long and unwieldy strings.")
 
    (productions
-    (production "2e"
-      (nonterm "Element")
-      ((sexp
-	(nonterm "name")
-	(ebnf-opt (nonterm "attributes-list"))
-	(ebnf-opt (nonterm "aux"))
-	(ebnf-* (nonterm "child-of-element")))))
-    (production "4e"
-      (nonterm "attribute")
-      ((sexp (nonterm "name")
-	     (ebnf-opt (term-str "value"))
-	     (ebnf-opt (nonterm "aux")))))
-    (production "15e"
-      (nonterm "aux")
+    (production 15
+      (nonterm "aux-list")
       ((sexp
 	(term-lit "@@")
 	(ebnf-opt (nonterm "namespaces"))
 	(ebnf-* (nonterm "aux-node")))))
-    (production "16e"
+    (production 16
       (nonterm "aux-node")
       ((n_))
       (em "To be defined in the future"))
@@ -275,13 +276,19 @@ fixed, as the long list of errata and the proposed version 1.1 of XML
 clearly show. Therefore, SXML has to be able to accommodate future
 changes while guaranteeing backwards compatibility. SXML also ought to
 permit applications to store various processing information (e.g.,
-cached resolved IDREFs) in an SXML tree. To allow such extensibility, we
-introduce two new node types, " (code (nonterm "aux")) " and " (code (nonterm "aux-node")) ". The semantics of the latter is to be
-established in future versions of SXML. Other candidates for " (code (nonterm "aux-node")) " are the unique id of an element or the reference to element's parent. The structure and the semantics of the " (code (nonterm
-"aux")) " node is similar to those of the attribute list. Applications that do not specifically look for auxiliary
+cached resolved IDREFs) in an SXML tree. A hash of ID-type attributes
+would, for instance, let us implement efficient lookups in (SOAP-)
+encoded arrays. To allow such extensibility, we introduce two new node
+types, " (code (nonterm
+"aux-list")) " and " (code (nonterm "aux-node")) ". The semantics of
+the latter is to be established in future versions of SXML. Other
+candidates for " (code (nonterm "aux-node")) " are the unique id of an
+element or the reference to element's parent. The structure and the
+semantics of an " (code (nonterm "aux-list")) " node is similar to those of an attribute list. Applications that do not specifically look for auxiliary
 nodes can transparently ignore any present and future extensions."  )
 
 
+;--------------------------------------------------
    (Section 2 "SXML Tree")
    (p
     "Infoset's information item is a sum of its properties. This makes
@@ -290,7 +297,7 @@ item. The head of the list, a Scheme identifier, " (em "names") " the
 item. For many items this is their (expanded) name. For an information
 item that denotes an XML element, the corresponding list starts with
 element's expanded name, optionally followed by collections of
-attributes and effective namespaces. The rest of the element item list
+attributes and of auxiliary data. The rest of the element item list
 is an ordered sequence of element's children -- character data,
 processing instructions, and other elements. Every child is unique;
 items never share their children even if the latter have the identical
@@ -309,10 +316,13 @@ an " (code (nonterm "attributes-list"))
 document renders attributes, processing instructions, namespace
 specifications and other meta-data differently from the element
 markup. In contrast, SXML represents element content and meta-data
-uniformly -- as tagged lists.  SXML takes advantage of the fact that
-every XML name is also a valid Scheme identifier, but not every Scheme
-identifier is a valid XML name. This observation lets us introduce
-administrative names such as " (code "@") ", " (code "*PI*")
+uniformly -- as tagged lists. RELAX-NG also aims to treat attributes
+as uniformly as possible with elements. This uniform treatment, argues James
+Clark " (cite "RNG-Design") ", is a significant factor
+in simplifying the language.  SXML takes advantage of the fact that
+every XML name is also a valid Scheme identifier, but not every
+Scheme identifier is a valid XML name. This observation lets us
+introduce administrative names such as " (code "@") ", " (code "*PI*")
 ", " (code "*NAMESPACES*") " without worrying about potential name
 clashes. The observation also makes the relationship between XML and SXML
 well-defined. An XML document converted to SXML can be reconstructed
@@ -329,25 +339,26 @@ itself is an instance of the Infoset.")
 	(nonterm "Element")
 	(nonterm "attributes-list")
 	(nonterm "attribute")
-	(term-str "character data")
+	(term-str "character data: text string")
 	(nonterm "namespaces")
 	(nonterm "TOP")
 	(nonterm "PI")
 	(nonterm "comment")
 	(nonterm "entity")
-	(nonterm "aux")))))
+	(nonterm "aux-list")
+	(nonterm "aux-node")))))
    (p
     "or as a set of two mutually-recursive datatypes, 
-" (code "Node") " and " (code "Nodeset") ", where the latter is an ordered set of " (code "Node") "s: ")
+" (code "Node") " and " (code "Nodelist") ", where the latter is a list of " (code "Node") "s: ")
 
    (productions
     (production "N1"
       (nonterm "Node")
       ((ebnf-choice
-	(sexp-cons (nonterm "name") (nonterm "Nodeset"))
+	(sexp-cons (nonterm "name") (nonterm "Nodelist"))
 	(term-str "text string"))))
     (production "N2"
-      (nonterm "Nodeset")
+      (nonterm "Nodelist")
       ((sexp (nonterm "Node") (ebnf-* (nonterm "Node")))
       ))
     (production "N3"
@@ -380,6 +391,7 @@ attribute value normalization, processing instructions and CDATA
 sections.")
 
 
+;--------------------------------------------------
    (Section 2 "Namespaces")
    (p
     "The motivation for XML Namespaces is explained in an excellent article by James Clark " (cite "Clark1999") ". He says in part: ")
@@ -431,7 +443,7 @@ SXML, James Clark's example will appear as follows:"
     "or, somewhat redundantly, "
     (verbatim
      "(http://www.cars.com/xml:part (@)"
-     "   (*NAMESPACES* (cars \"http://www.cars.com/xml\")))"))
+     "   (@@ (*NAMESPACES* (cars \"http://www.cars.com/xml\"))))"))
 
    (p
     "Such a representation also agrees with the Namespaces Recommendation "
@@ -440,18 +452,28 @@ functions only as a placeholder for a namespace name. Applications
 should use the namespace name, not the prefix, in constructing names
 whose scope extends beyond the containing document.\"")
 
-   (div "It is clearly unwieldy to deal with identifiers such as "
+   (div "It may be unwieldy to deal with identifiers such as "
 	(code "http://www.cars.com/xml:part") ". Therefore, an application that
 invokes the SSAX parser may tell the parser to map the URI "
 	(code "http://www.cars.com/xml") " to an application-specific namespace shortcut " (code (term-id "user-ns-shortcut")) ", e.g., " (code "c") ". The parser will then produce"
 	(verbatim
-	 "(c:part (*NAMESPACES* (c \"http://www.cars.com/xml\")))")
+	 "(c:part (@@ (*NAMESPACES* (c \"http://www.cars.com/xml\"))))")
+
+; (term-lit "original-prefix")
 	"To be more precise, the parser will return just"
 	(verbatim
 	 "(c:part)")
 	"If an application told the parser how to map " (code "http://www.cars.com/xml") ", the application can keep this mapping in
 its mind and will not need additional reminders."
-	(p "We must note there is a 1-to-1 correspondence between " (code (term-id "user-ns-shortcut"))
+	(p
+	 "On the other hand, we should not be afraid of SXML node
+names such as " (code "http://www.cars.com/xml:part") ". These names
+are Scheme symbols. No matter how long the name of a symbol may be, it
+is fully spelled only once, in the symbol table. All other occurrences
+of the symbol are short references to the corresponding slot in
+the symbol table."))
+
+   (p "We must note there is a 1-to-1 correspondence between " (code (term-id "user-ns-shortcut"))
 "s and the corresponding namespace URIs. This is generally not true
 for XML namespace prefixes and namespace URIs. A " (code (term-id
 "user-ns-shortcut")) " uniquely represents the corresponding namespace
@@ -461,9 +483,23 @@ URI; XML namespace prefixes may be redefined in children elements. The
 other difference between " (code (term-id "user-ns-shortcut")) "s and
 XML namespace prefixes is that the latter are at the whims of the author
 of the document whereas the namespace shortcuts are defined by an
-XML processing application."))
+XML processing application. The shortcuts are syntactic sugar for namespace URIs.")
+
+   (p 
+    "The list of associations between namespace IDs and namespace URIs (and, optionally, original XML Namespace prefixes) is an optional member of an " (code (nonterm "aux-list")) ". For regular elements, " (code (nonterm "namespaces")) " will contain only those namespace declarations that are relevant for that element. Most of the time however " (code (nonterm "namespaces")) " in the " (code (nonterm "aux-list")) " will be absent.")
+
+   (p
+    "The node " (code (nonterm "namespaces")) ", if present in the auxiliary list of the " (code (nonterm "TOP")) " element, must contain " (code (nonterm 
+"namespace-assoc")) " for the whole document. It may happen that one
+namespace URI is associated in the source XML document with several
+namespace prefixes. There will be then several corresponding " (code (nonterm 
+"namespace-assoc")) " differing only in the " (code (term-lit "original-prefix")) " part.")
+ 
+   (p "The topic of namespaces in SXML and (S)XPath is discussed in
+more detail in " (cite "SXML-NS") ".")
 
 
+;--------------------------------------------------
 
    (Section 2 "Case-sensitivity of SXML names")
    (div
@@ -503,29 +539,78 @@ case-sensitive reader, which often has to be activated through a
 compiler option or pragma. A web page " (cite
 "Scheme-case-sensitivity") " discusses case sensitivity of various Scheme systems in detail.")
 
+
+;--------------------------------------------------
+
    (Section 2 "Normalized SXML")
    (p
-    "Normalized SXML is a proper subset of SXML that permits efficient
-processing. An SXML document in the normalized form must satisfy a
-number of additional restrictions. The first restriction makes
-" (code (nonterm "attributes-list")) " mandatory (cf. Section 3,
-production [2]). If an element has no attributes, " (code (nonterm "attributes-list")) " shall be specified as " (code "(@)") ". In normalized SXML,
+    "Normalized SXML is a proper subset of SXML optimized for
+efficient processing. An SXML document in a normalized form must
+satisfy a number of additional restrictions. Most of the restrictions
+concern the order and the appearance of the " (code (nonterm
+"attributes-list")) " and " (code (nonterm "aux-list")) " within an
+" (code (nonterm "Element")) " node, production [2]. In the spirit of the relational database
+model, we introduce a number of increasingly rigorous normal forms for
+SXML expressions. An SXML document in normal form N is also in normal
+form M for any M<N. The higher normal forms impose more constraints on
+the structure of SXML expressions but in return permit faster access.")
+
+   (p
+    "The most permissive 0NF does not mandate the presence or the relative
+order of " (code (nonterm "attributes-list")) " and " (code (nonterm
+"aux-list")) ". These lists, if present, may be inter-mixed
+with " (code (nonterm "child-of-element")) ". SGML provides two equal forms for
+boolean attributes: minimized, e.g., " (code "<OPTION checked>") " and
+full, " (code "<OPTION checked=\"checked\">") ". XML mandates the full
+form only, whereas HTML allows both, favoring the former. 0NF SXML
+supports the minimized form along with the full one: " (code "(OPTION (@ (checked)))") " and " (code "(OPTION (@ (checked \"checked\")))") ".")
+
+   (p
+    "In the 1NF, an optional " (code (nonterm "attributes-list")) " must
+precede an optional " (code (nonterm "aux-list"))
+" in an " (code (nonterm "Element")) " SXML node. This is the order
+reflected in Production [2].  In addition, if " (code (nonterm
+"aux-list")) " is present, then
+" (code (nonterm "attributes-list")) " must also be specified, at least as
+an empty attribute list " (code "(@)") ". This restriction ensures
+that " (code (nonterm "aux-list")) ", if present, is always the third
+element of a list representing the SXML node. Boolean attributes must
+appear in their full form, e.g., " (code "(OPTION (@ (checked \"checked\")))") ". The 1NF is the \"recommended\" normal form.")
+
+   (p
+    "The 2NF makes " (code (nonterm "attributes-list")) " a required component of an SXML element node. If an element has no attributes, " (code (nonterm "attributes-list")) " shall be specified as " (code "(@)") ". An optional " (code (nonterm "aux-list")) ", if present, must immediately follow. In the 2NF,
 " (code (nonterm "comment")) " and " (code (nonterm "entity")) " nodes
-must be absent. Parsed entities should be expanded, even if they are external. 
-A node " (code (nonterm "namespaces"))  " may appear only in
-a " (code "*TOP*") " element.")
+must be absent. Parsed entities should be expanded, even
+if they are external.")
 
-   (div "SGML provides two equal forms for boolean attributes: minimized, e.g., " (code "<OPTION checked>") " and full, " (code "<OPTION checked=\"checked\">") ". XML mandates the full form only, whereas HTML allows both,
-preferring the former. SXML supports the minimized form along with the
-full one: " (code "(OPTION (@ (checked)))") " and " (code "(OPTION (@ (checked \"checked\")))") ". The normalized SXML however accepts only the full form.")
+   (p
+    "The third normal form 3NF makes " (code (nonterm "aux-list")) "
+mandatory as well. This list is always the third member of an SXML
+element node, after " (code (nonterm "name")) 
+" and " (code (nonterm "attributes-list")) ". If an element node has
+no associated auxiliary information, the " (code (nonterm "aux-list")) " must
+be specified as " (code "(@@)") ". In addition, all text strings must be
+joined into maximal text strings: no " (code (nonterm "Nodelist")) " shall
+contain two adjacent text-string nodes.")
+
+;A node " (code (nonterm "namespaces"))  " may appear only in
+;a " (code "*TOP*") " element.")
+
+   (p
+    "The normal forms make it possible to access SXML items in
+efficient ways. If an SXML document is known to be in the 3NF, for
+example, an application never has to check for the existence of
+ " (code (nonterm "attributes-list")) " or " (code (nonterm "aux-list"))
+". Checking for child nodes and retrieving text data are simplified as well.")
 
 
+;--------------------------------------------------
    (Section 2  "Examples")
 
    (div "Simple examples:"
       (verbatim
-       "(some-name)           ; An empty element without attributes"
-       "(some-name (@))       ; The same but in the normalized form"
+       "(some-name)        ; An empty element without attributes (in 0NF and 1NF)"
+       "(some-name (@))    ; The same but in the normalized (2NF) form"
        ))
 
    (p "The figure below shows progressively more complex examples.")
@@ -624,8 +709,8 @@ full one: " (code "(OPTION (@ (checked)))") " and " (code "(OPTION (@ (checked \
 	(td (@ (align "left"))
 	    (verbatim
 	     "(*TOP*"
-	     "  (*NAMESPACES* "
-	     "       (HTML \"http://www.w3.org/TR/REC-html40\"))"
+	     "  (@@ (*NAMESPACES* "
+	     "       (HTML \"http://www.w3.org/TR/REC-html40\")))"
 	     "  (RESERVATION"
 	     "    (NAME (@ (HTML:CLASS \"largeSansSerif\"))"
 	     "      \"Layman, A\")"
@@ -639,7 +724,7 @@ full one: " (code "(OPTION (@ (checked)))") " and " (code "(OPTION (@ (checked \
 
 
    (Section 2 "Acknowledgment")
-   (p "Discussions with Kirill Lisovsky of MISA University are gratefully acknowledged. He shares the credit for this page. The errors are all mine.")
+   (p "I am indebted to Kirill Lisovsky of MISA University for numerous discussions and suggestions. He shares the credit for this page. The errors are all mine.")
 
 
    (References
@@ -652,6 +737,16 @@ and Their Computation by Machine, Part I. Comm. ACM, 3(4):184-195, April 1960."
     (bibitem "Clark1999" "Clark1999"
        "Jim Clark. XML Namespaces. February 4, 1999."
        (URL "http://www.jclark.com/xml/xmlns.htm"))
+
+    (bibitem "Clark2001" "RNG-Design"
+       "James Clark, The Design of RELAX NG. December 6, 2001."
+       (URL "http://www.thaiopensource.com/relaxng/design.html"))
+
+    (bibitem "Hughes1995" "Hughes-PP"
+       "John Hughes, The Design of a Pretty-printing Library. "
+       "Advanced Functional Programming, J. Jeuring and E. Meijer, Eds. "
+       "Springer Verlag, LNCS 925, 1995, pp. 53-96."
+       (URL "http://www.cs.chalmers.se/~rjmh/Papers/pretty.html"))
 
     (bibitem "R5RS" "R5RS"
 	     "R. Kelsey, W. Clinger, J. Rees (eds.), Revised5 Report on
@@ -677,6 +772,11 @@ XPath. September 17, 2000."
        "Kirill Lisovsky. Case sensitivity of Scheme systems."
        (URL "http://pair.com/lisovsky/scheme/case-sensitivity.html"))
 
+    (bibitem "SXML-NS" "SXML-NS"
+       "Namespaces in SXML and (S)XPath. Discussion thread on the SSAX-SXML mailing list. May 28, 2002 and June 7, 2002."
+       (URL "http://www.geocrawler.com/archives/3/15235/2002/5/0/8785305/")
+       (URL "http://www.geocrawler.com/archives/3/15235/2002/6/0/8877115/"))
+
     (bibitem "DOM" "DOM"
        "World Wide Web Consortium. Document Object Model (DOM) Level 1
 Specification. W3C Recommendation."
@@ -700,7 +800,7 @@ Specification. W3C Recommendation."
 Version 1.0. W3C Recommendation. November 16, 1999."
        (URL "http://www.w3.org/TR/xpath"))
     )
-
+   
   (footer)
 
 
@@ -827,7 +927,7 @@ Version 1.0. W3C Recommendation. November 16, 1999."
 	     (list
 	      "<blockquote><font size=\"-1\">The master SXML specification
 file is written in SXML itself. The present web page is the result of
-translating that SXML code using an appropriate \"stylesheet\". The
+translating that SXML code with the appropriate \"stylesheet\". The
 master file, its renditions in HTML and other formats, and the
 corresponding stylesheets are available at " master-url ".</font></blockquote>")))
        (keywords . ,(lambda (tag) '()))
