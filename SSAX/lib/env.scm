@@ -87,15 +87,15 @@
 ; env.any? (lambda (key value) ...)
 ; or similar iterators over containers in Dylan...
 ;
+; myenv.scm, myenv-bigloo.scm or similar prelude is assumed.
+;
 ; $Id$
 
-(declare 
+(declare			; (Gambit) Compiler options
  (block)
  (standard-bindings)
  (fixnum)               ; all arithmetics is FIXED
 )
-
-(include "myenv.scm") ; include target dependent stuff
 
 (define %%env.find #f)
 (define %%env.demand #f)

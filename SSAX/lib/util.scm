@@ -2,6 +2,7 @@
 ;			My Scheme misc utility functions
 ;		(mainly dealing with string and list manipulations)
 ;
+; myenv.scm, myenv-bigloo.scm or similar prelude is assumed.
 ; $Id$
 
 (declare 			; Gambit-compiler optimization options
@@ -9,7 +10,6 @@
  (standard-bindings)
  (fixnum)
 )
-(include "myenv.scm") ; include my standard prelude
 
 
 ;------------------------------------------------------------------------

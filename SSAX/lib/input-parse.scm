@@ -27,6 +27,7 @@
 ; let the user query a PORT for the current position. MESSAGE is the
 ; description of the error. Other arguments supply more details about
 ; the problem.
+; myenv.scm, myenv-bigloo.scm or a similar prelude is assumed.
 ;
 ; $Id$
 
@@ -36,7 +37,6 @@
  (extended-bindings)		; Needed for #!optional arguments, DSSSL-style
  (fixnum)			; optional, keyword and rest arguments
 )
-(include "myenv.scm") ; include target dependent stuff
 
 ;------------------------------------------------------------------------
 ;		     Preparation and tuning section
