@@ -52,8 +52,7 @@
 ; In this case, a default value (usually empty nodeset or 0) is returned by 
 ; a sub-expression which caused an XPath/XPointer runtime error.
 (define (sxml:xpointer-runtime-error . text)
-  (apply cerr (append (list "XPath/XPointer runtime error: ") text (list nl)))
-  (apply error "XPath/XPointer runtime error" text))
+  (apply sxml:error "XPath/XPointer runtime error" text))
 
 
 ;--------------------------------------------------------------------------

@@ -90,14 +90,6 @@
 	((char=? #\: (string-ref name pos)) pos)
 	(else (rpt (- pos 1))))))))
   
-
-; sxml error message
-(define (sxml:error . messages)
-  (cerr nl "SXML ERROR: ")
-  (apply cerr messages)
-  (cerr nl)
-  (apply error "SXML ERROR" messages))
-
 ;==============================================================================
 ; Predicates
 

@@ -1,3 +1,11 @@
+(define-interface sxml-errors-interface
+  (export sxml:error))
+
+(define-structure sxml-errors sxml-errors-interface
+  (open scheme srfi-23)
+  (begin
+    (define sxml:error error)))
+
 (define-interface sxpathlib-interface
   (export nodeset?
 	  as-nodeset
@@ -100,7 +108,7 @@
   (open scheme
 	(subset srfi-1 (filter))
 	(subset srfi-13 (string-index-right))
-	srfi-23 ; ERROR
+	sxml-errors
 	coutputs
 	(subset oleg-utils (make-char-quotator))
 	sxpathlib)
@@ -192,7 +200,7 @@
   (open scheme
 	(subset srfi-13
 		(string-prefix? string-prefix-ci? string-index-right))
-	srfi-23 ; ERROR
+	sxml-errors
 	coutputs
 	(subset oleg-utils (string-split substring?))
 	sxml-tools
