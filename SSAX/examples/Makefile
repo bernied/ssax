@@ -9,12 +9,12 @@ clean:
 	rm -f *_.c *.o core a.out \
 	run-remove-markup-bigloo \
 	run-outline-bigloo \
-	run-sxml-bigloo
-
+	run-sxml-bigloo \
+	run-html-parse-sample-bigloo
 
 # Bigloo-specific  part
 
-BFLAGS=-I $(LIBDIR) -Obench -farithmetic -unsafea -fstack
+BFLAGS=-I $(LIBDIR) -Obench -farithmetic -unsafe
 BIGLOO=bigloo
 
 run-remove-markup-bigloo: run-remove-markup-bigloo.scm \
@@ -30,6 +30,10 @@ run-sxml-bigloo: run-sxml-bigloo.scm run-sxml.scm \
 		$(LIBDIR)/SSAX-code.scm
 	$(BIGLOO) $(BFLAGS) $@.scm -o $@
 
+
+run-html-parse-sample-bigloo-i: html-parser.scm \
+		$(LIBDIR)/SSAX-code.scm
+	$(BIGLOO) $(BFLAGS) -i html-parser.scm
 
 # SCM-specific part
 
