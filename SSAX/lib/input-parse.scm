@@ -164,10 +164,10 @@
 	       (if (null? lst) len
 		 (loop (+ len (string-length (car lst))) (cdr lst)))))
 	    (result (make-string total-len)))
-	  (let loop ((len end) (j 0) (str final) (lst strs))
-	    (string-xcopy! result j str 0 len)
+	  (let loop ((len end) (j total-len) (str final) (lst strs))
+	    (string-xcopy! result (- j len) str 0 len)
 	    (if (null? lst) result
-	      (loop (string-length (car lst)) (+ j len)
+	      (loop (string-length (car lst)) (- j len)
 		    (car lst) (cdr lst)))))))
 ))
 
