@@ -5,6 +5,10 @@
 # Directory where all the "included" modules are located
 LIBDIR=../lib
 
+all-bigloo-i: run-html-parse-sample-bigloo-i \
+	run-pull-punct-bigloo-i \
+	run-apply-templates-bigloo-i
+
 clean:
 	rm -f *_.c *.o core a.out \
 	run-remove-markup-bigloo \
@@ -34,6 +38,15 @@ run-sxml-bigloo: run-sxml-bigloo.scm run-sxml.scm \
 run-html-parse-sample-bigloo-i: html-parser.scm \
 		$(LIBDIR)/SSAX-code.scm
 	$(BIGLOO) $(BFLAGS) -i html-parser.scm
+
+run-pull-punct-bigloo-i: pull-punct-sxml.scm \
+		$(LIBDIR)/SSAX-code.scm
+	$(BIGLOO) $(BFLAGS) -i pull-punct-sxml.scm
+
+run-apply-templates-bigloo-i: apply-templates.scm \
+		$(LIBDIR)/SSAX-code.scm
+	$(BIGLOO) $(BFLAGS) -i apply-templates.scm
+
 
 # SCM-specific part
 
