@@ -134,9 +134,45 @@
    (gambitize (read-char port))
    (gambitize (peek-char port))
    (gambitize (eof-object? port))
-   ;(gambitize (string-append a b))
    )
  (else #t))
+
+
+; Versions of string-concatenate-reverse and string-xcopy!
+; of SRFI-13 if the latter SRFI is not available
+(cond-expand
+  (srfi-13 #f)				; Nothing else to be defined
+  (else
+    ; Implementations of string-xcopy! of SRFI-13, using
+    ; whatever native facilities are available
+    (cond-expand
+      (bigloo
+	(define (string-xcopy! target tstart s sfrom sto)
+	  (blit-string! s sfrom target tstart (- sto sfrom))))
+      (else
+	(define (string-xcopy! target tstart s sfrom sto)
+	  (do ((i sfrom (++ i)) (j tstart (++ j)))
+	      ((>= i sto))
+	    (string-set! target j (string-ref s i))))))
+
+    ; procedure string-concatenate-reverse STRINGS FINAL END
+    (define (string-concatenate-reverse strs final end)
+      (if (null? strs) (substring final 0 end)
+	(let*
+	  ((total-len
+	     (let loop ((len end) (lst strs))
+	       (if (null? lst) len
+		 (loop (+ len (string-length (car lst))) (cdr lst)))))
+	    (result (make-string total-len)))
+	  (let loop ((len end) (j 0) (str final) (lst strs))
+	    (string-xcopy! result j str 0 len)
+	    (if (null? lst) result
+	      (loop (string-length (car lst)) (+ j len)
+		    (car lst) (cdr lst)))))))
+))
+
+
+
 
 
 
@@ -166,7 +202,7 @@
 (define-opt (assert-curr-char expected-chars comment
 			      (optional (port (current-input-port))))
   (let ((c (read-char port)))
-    (if (memq c expected-chars) c
+    (if (memv c expected-chars) c
     (parser-error port "Wrong character " c
     	   " (0x" (if (eof-object? c) "*eof*"
     	   	    (number->string (char->integer c) 16)) ") "
@@ -189,7 +225,7 @@
   (cond
    ((number? arg)		; skip 'arg' characters
       (do ((i arg (-- i)))
-      	  ((<= i 0) #f)
+      	  ((not (positive? i)) #f)
       	  (if (eof-object? (read-char port))
       	    (parser-error port "Unexpected EOF while skipping "
 			 arg " characters"))))
@@ -198,7 +234,7 @@
        (cond
          ((memv c arg) c)
          ((eof-object? c)
-           (if (memv '*eof* arg) c
+           (if (memq '*eof* arg) c
              (parser-error port "Unexpected EOF while skipping until " arg)))
          (else (loop (read-char port))))))))
 
@@ -243,7 +279,7 @@
 ; a Fibonacci-type extension, which has been proven optimal.
 ; Note, explicit port specification in read-char, peek-char helps.
 
-; Procedure input-parse:init-buffer
+; Procedure: input-parse:init-buffer
 ; returns an initial buffer for next-token* procedures.
 ; The input-parse:init-buffer may allocate a new buffer per each invocation:
 ;	(define (input-parse:init-buffer) (make-string 32))
@@ -253,22 +289,26 @@
 ; In all the other cases, it's better for input-parse:init-buffer to
 ; return the same static buffer. next-token* functions return a copy
 ; (a substring) of accumulated data, so the same buffer can be reused.
-; We shouldn't worry about new token being too large: next-token will use
-; a larger buffer automatically. Still, the best size for the static buffer
-; is to allow most of the tokens to fit in.
+; We shouldn't worry about an incoming token being too large:
+; next-token will use another chunk automatically. Still, 
+; the best size for the static buffer is to allow most of the tokens to fit in.
 ; Using a static buffer _dramatically_ reduces the amount of produced garbage
 ; (e.g., during XML parsing).
+
 (define input-parse:init-buffer
   (let ((buffer (make-string 512)))
     (lambda () buffer)))
+  
 
-(define-opt (next-token prefix-skipped-chars break-chars
+		; See a better version below
+(define-opt (next-token-old prefix-skipped-chars break-chars
 			(optional (comment "") (port (current-input-port))) )
   (let* ((buffer (input-parse:init-buffer))
-	 (curr-buf-len (string-length buffer)) (quantum 16))
+	 (curr-buf-len (string-length buffer))
+	 (quantum curr-buf-len))
     (let loop ((i 0) (c (skip-while prefix-skipped-chars port)))
       (cond
-        ((memq c break-chars) (substring buffer 0 i))
+        ((memv c break-chars) (substring buffer 0 i))
     	((eof-object? c)
     	  (if (memq '*eof* break-chars)
     	    (substring buffer 0 i)		; was EOF expected?
@@ -283,39 +323,41 @@
     	  (read-char port)			; move to the next char
     	  (loop (++ i) (peek-char port))
     	  )))))
-    	
 
-; Another version of next-token, accumulating characters in a list rather
-; than in a string buffer. I heard that it tends to work faster.
-; In reality, it works just as fast as the string buffer version above,
-; but it allocates 50% more memory and thus has to run garbage collection
-; 50% as many times. See next-token-comp.scm
 
-(define-opt (next-token-list-based prefix-skipped-chars break-chars
+; A better version of next-token, which accumulates the characters
+; in chunks, and later on reverse-concatenates them, using
+; SRFI-13 if available.
+; The overhead of copying characters is only 100% (or even smaller: bulk
+; string copying might be well-optimised), compared to the (hypothetical)
+; circumstance if we had known the size of the token beforehand.
+; For small tokens, the code performs just as above. For large
+; tokens, we expect an improvement. Note, the code also has no
+; assignments. 
+; See next-token-comp.scm
+
+(define-opt (next-token prefix-skipped-chars break-chars
 		  (optional (comment "") (port (current-input-port))) )
-  (let* ((first-char (skip-while prefix-skipped-chars port))
-         (accum-chars (cons first-char '())))
-    (cond 
-      ((eof-object? first-char)
-        (if (memq '*eof* break-chars) ""
-          (parser-error port "EOF while skipping before reading token "
-		       comment)))
-      ((memq first-char break-chars) "")
-      (else
-        (read-char port)		; consume the first-char
-        (let loop ((tail accum-chars) (c (peek-char port)))
-          (cond
-            ((memq c break-chars) (list->string accum-chars))
-            ((eof-object? c)
-              (if (memq '*eof* break-chars)
-                (list->string accum-chars)		; was EOF expected?
-                (parser-error port "EOF while reading a token " comment)))
-            (else
-              (read-char port)		; move to the next char
-              (set-cdr! tail (cons c '()))
-              (loop (cdr tail) (peek-char port))
-        )))))))
-
+  (let outer ((buffer (input-parse:init-buffer)) (filled-buffer-l '())
+	      (c (skip-while prefix-skipped-chars port)))
+    (let ((curr-buf-len (string-length buffer)))
+      (let loop ((i 0) (c c))
+	(cond
+	  ((memv c break-chars)
+	    (if (null? filled-buffer-l) (substring buffer 0 i)
+	      (string-concatenate-reverse filled-buffer-l buffer i)))
+	  ((eof-object? c)
+	    (if (memq '*eof* break-chars)	; was EOF expected?
+	      (if (null? filled-buffer-l) (substring buffer 0 i)
+		(string-concatenate-reverse filled-buffer-l buffer i))
+	      (parser-error port "EOF while reading a token " comment)))
+	  ((>= i curr-buf-len)
+	    (outer (make-string curr-buf-len)
+	      (cons buffer filled-buffer-l) c))
+	  (else
+	    (string-set! buffer i c)
+	    (read-char port)			; move to the next char
+	    (loop (++ i) (peek-char port))))))))
 
 ; -- procedure+: next-token-of INC-CHARSET [PORT]
 ;	Reads characters from the PORT that belong to the list of characters
@@ -343,47 +385,43 @@
 ; 
 ;	The optional argument PORT defaults to the current input port.
 ;
-; Note: since we can't tell offhand how large the token being read is
-; going to be, we make a guess, pre-allocate a string, and grow it by
-; quanta if necessary. The quantum is always the length of the string
-; before it was extended the last time. Thus the algorithm does
-; a Fibonacci-type extension, which has been proven optimal.
-;
 ; This procedure is similar to next-token but only it implements
 ; an inclusion rather than delimiting semantics.
 
 (define-opt (next-token-of incl-list/pred
 			   (optional (port (current-input-port))) )
   (let* ((buffer (input-parse:init-buffer))
-	 (curr-buf-len (string-length buffer)) (quantum 16))
+	 (curr-buf-len (string-length buffer)))
   (if (procedure? incl-list/pred)
-    (let loop ((i 0) (c (peek-char port)))
-      (cond
-        ((incl-list/pred c) =>
-          (lambda (c)
-            (if (>= i curr-buf-len)	; make space for i-th char in buffer
-              (begin			; -> grow the buffer by the quantum
-                (set! buffer (string-append buffer (make-string quantum)))
-                (set! quantum curr-buf-len)
-                (set! curr-buf-len (string-length buffer))))
-            (string-set! buffer i c)
-            (read-char port)			; move to the next char
-            (loop (++ i) (peek-char port))))
-        (else (substring buffer 0 i))))
-			; incl-list/pred is a list of allowed characters
-    (let loop ((i 0) (c (peek-char port)))
-      (cond
-        ((not (memq c incl-list/pred)) (substring buffer 0 i))
-    	(else
-    	  (if (>= i curr-buf-len)	; make space for i-th char in buffer
-    	    (begin			; -> grow the buffer by the quantum
-    	      (set! buffer (string-append buffer (make-string quantum)))
-    	      (set! quantum curr-buf-len)
-    	      (set! curr-buf-len (string-length buffer))))
-    	  (string-set! buffer i c)
-    	  (read-char port)			; move to the next char
-    	  (loop (++ i) (peek-char port))
-    	  ))))))
+    (let outer ((buffer buffer) (filled-buffer-l '()))
+      (let loop ((i 0))
+	(if (>= i curr-buf-len)		; make sure we have space
+	  (outer (make-string curr-buf-len) (cons buffer filled-buffer-l))
+	  (let ((c (incl-list/pred (peek-char port))))
+	    (if c
+	      (begin
+		(string-set! buffer i c)
+		(read-char port)			; move to the next char
+		(loop (++ i)))
+	      ; incl-list/pred decided it had had enough
+	      (if (null? filled-buffer-l) (substring buffer 0 i)
+		(string-concatenate-reverse filled-buffer-l buffer i)))))))
+
+    ; incl-list/pred is a list of allowed characters
+    (let outer ((buffer buffer) (filled-buffer-l '()))
+      (let loop ((i 0))
+	(if (>= i curr-buf-len)		; make sure we have space
+	  (outer (make-string curr-buf-len) (cons buffer filled-buffer-l))
+	  (let ((c (peek-char port)))
+	    (cond
+	      ((not (memv c incl-list/pred))
+		(if (null? filled-buffer-l) (substring buffer 0 i)
+		  (string-concatenate-reverse filled-buffer-l buffer i)))
+	      (else
+		(string-set! buffer i c)
+		(read-char port)			; move to the next char
+		(loop (++ i))))))))
+    )))
 
 
 ; -- procedure+: read-line [PORT]
@@ -404,7 +442,7 @@
              (next-token '() '(#\newline #\return *eof*)
 			 "reading a line" port))
            (c (read-char port)))	; must be either \n or \r or EOF
-       (and (eq? c #\return) (eq? (peek-char port) #\newline)
+       (and (eqv? c #\return) (eqv? (peek-char port) #\newline)
          (read-char port))			; skip \n that follows \r
        line)))
 
