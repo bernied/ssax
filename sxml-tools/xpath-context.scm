@@ -214,6 +214,44 @@
       num-anc))
    nodeset))
 
+;-------------------------------------------------
+; For sxpath: handling a procedure as a location step
+
+; Makes a context-set from a nodeset supplied, with the num-anc required
+;  ancestors-set ::= (listof ancestors)
+;  ancestors ::= (listof node)
+; Members of the nodeset are known to be descendants-or-selves of
+; (map car ancestors-set)
+(define (draft:find-proper-context nodeset ancestors-set num-anc)
+  (map
+   (lambda (node)
+     (if
+      (sxml:context? node)  ; already a context
+      node  ; nothing to be done  
+      (let loop ((this-level ancestors-set)
+                 (next-level '()))
+        (if
+         (null? this-level)  ; this level fully analyzed
+         (if (null? next-level)  ; failed to find
+             node
+             (loop next-level '()))
+         (let ((ancestors (car this-level)))
+           (if
+            (eq? node (car ancestors))  ; proper ancestors found
+            (draft:make-context
+             node
+             (draft:list-head (cdr ancestors) num-anc))
+            (loop (cdr this-level)
+                  (append
+                   (map
+                    (lambda (n) (cons n ancestors))
+                    ((sxml:child sxml:node?) (car ancestors)))
+                   (map
+                    (lambda (n) (cons n ancestors))
+                    ((sxml:attribute (lambda (x) #t)) (car ancestors)))
+                   next-level))))))))
+   nodeset))
+
 
 ;=========================================================================
 ; XPath axes
@@ -1199,6 +1237,31 @@
   (cond
     ((eq? (car op) 'range-to)
      (draft:signal-semantic-error "range-to function not implemented"))
+    ((eq? (car op) 'filter-expr)  ; can be produced by sxpath
+     (draft:ast-filter-expr op num-anc))
+    ((eq? (car op) 'lambda-step)  ; created by sxpath
+     (cons
+      (let ((proc (cadr op)))
+        (if
+         (and num-anc (zero? num-anc))  ; no ancestors required
+         (lambda (node position+size var-binding)
+           (proc (draft:contextset->nodeset (as-nodeset node))
+                 var-binding))
+         (lambda (node position+size var-binding)
+           (draft:find-proper-context
+            (proc (draft:contextset->nodeset (as-nodeset node))
+                  var-binding)
+            (append
+             (map sxml:context->content (as-nodeset node))
+             (apply append   ; nodes that can be obtained through var values
+                    (map
+                     (lambda (pair)
+                       (if (nodeset? (cdr pair))
+                           (map sxml:context->content (cdr pair))
+                           '()))
+                     var-binding)))
+            num-anc))))
+      num-anc))
     ((eq? (car op) 'step)
      (if
       (null? (cdddr op))  ; no Predicates
@@ -1482,8 +1545,7 @@
    ((left-lst (draft:ast-expr (cadr op) 0))
     (right-lst (draft:ast-expr (caddr op) 0)))
    (let ((mul-op
-          (sxml:relational-cmp
-           (cadr (assq (car op) `((* ,*) (div ,/) (mod ,remainder))))))
+          (cadr (assq (car op) `((* ,*) (div ,/) (mod ,remainder)))))
          (left (car left-lst))
          (right (car right-lst)))
      (cons
@@ -1844,329 +1906,20 @@
                 draft:contextset->nodeset
                 (lambda (x) x))             
             (res (as-nodeset node) (cons 1 1)
-                 (xlink:add-docs-to-vars
-                  node
+                 ;(xlink:add-docs-to-vars
+                 ; node
                   (if (null? var-binding)
-                      var-binding (car var-binding)))))))))))
+                      var-binding (car var-binding))
+                 ; )
+                 ))))))))
 
 (define draft:xpath (draft:api-helper txp:xpath->ast draft:ast-location-path))
 (define draft:xpointer (draft:api-helper txp:xpointer->ast draft:ast-xpointer))
 (define draft:xpath-expr (draft:api-helper txp:expr->ast draft:ast-expr))
+(define draft:sxpath (draft:api-helper txp:sxpath->ast draft:ast-expr))
 
 ; Aliases
 (define txpath-with-context draft:xpath)
 (define txpath/c draft:xpath)
-
-
-;==============================================================================
-; Context-based counterpart to Abbreviated SXPath
-
-;-------------------------------------------------
-; Context-involved helpers for a handling a procedure as a location step
-
-; Makes a context-set from a nodeset supplied, with the num-anc required
-;  ancestors-set ::= (listof ancestors)
-;  ancestors ::= (listof node)
-; Members of the nodeset are known to be descendants-or-selves of
-; (map car ancestors-set)
-(define (draft:find-proper-context nodeset ancestors-set num-anc)
-  (map
-   (lambda (node)
-     (if
-      (sxml:context? node)  ; already a context
-      node  ; nothing to be done  
-      (let loop ((this-level ancestors-set)
-                 (next-level '()))
-        (if
-         (null? this-level)  ; this level fully analyzed
-         (if (null? next-level)  ; failed to find
-             node
-             (loop next-level '()))
-         (let ((ancestors (car this-level)))
-           (if
-            (eq? node (car ancestors))  ; proper ancestors found
-            (draft:make-context
-             node
-             (draft:list-head (cdr ancestors) num-anc))
-            (loop (cdr this-level)
-                  (append
-                   (map
-                    (lambda (n) (cons n ancestors))
-                    ((sxml:child sxml:node?) (car ancestors)))
-                   (map
-                    (lambda (n) (cons n ancestors))
-                    ((sxml:attribute (lambda (x) #t)) (car ancestors)))
-                   next-level))))))))
-   nodeset))
-
-
-;-------------------------------------------------
-; Evaluate an abbreviated SXPath
-;	sxpath:: AbbrPath -> Converter, or
-;	sxpath:: AbbrPath -> Node|Nodeset -> Nodeset
-; AbbrPath is a list. It is translated to the full SXPath according
-; to the following rewriting rules
-; (sxpath '()) -> (node-join)
-; (sxpath '(path-component ...)) ->
-;		(node-join (sxpath1 path-component) (sxpath '(...)))
-; (sxpath1 '//) -> (node-or 
-;		     (node-self (ntype?? '*any*))
-;		     (node-closure (ntype?? '*any*)))
-; (sxpath1 '(equal? x)) -> (select-kids (node-equal? x))
-; (sxpath1 '(eq? x))    -> (select-kids (node-eq? x))
-; (sxpath1 '(*or* ...))  -> (select-kids (ntype-names??
-;                                          (cdr '(*or* ...))))
-; (sxpath1 '(*not* ...)) -> (select-kids (sxml:invert 
-;                                         (ntype-names??
-;                                          (cdr '(*not* ...)))))
-; (sxpath1 '(ns-id:* x)) -> (select-kids 
-;                                      (ntype-namespace-id?? x))
-; (sxpath1 ?symbol)     -> (select-kids (ntype?? ?symbol))
-; (sxpath1 ?string)     -> (txpath ?string)
-; (sxpath1 procedure)   -> procedure
-; (sxpath1 '(?symbol ...)) -> (sxpath1 '((?symbol) ...))
-; (sxpath1 '(path reducer ...)) ->
-;		(node-reduce (sxpath path) (sxpathr reducer) ...)
-; (sxpathr number)      -> (node-pos number)
-; (sxpathr path-filter) -> (filter (sxpath path-filter))
-(define (draft:sxpath path . ns+na)
-  (let
-      ; txpath with a fixed number of arguments
-      ; Returns:  (cons  (lambda (node var-binding) ...)  num-anc)
-      ((local-txpath
-        (lambda (xpath-string ns-binding num-anc)
-          (and-let*
-           ((ast (txp:expr->ast xpath-string ns-binding))
-            (impl-lst (draft:ast-expr ast num-anc)))
-           (let ((func (car impl-lst)))
-             (cons
-              (lambda (node var-binding)
-                (func node (cons 1 1) var-binding))
-              (cdr impl-lst)))))))
-    (letrec
-        ; sxpath function, but with a fixed number of arguments for faster
-        ; recursive calls
-        ; Returns:  (cons  (lambda (node var-binding) ...)  num-anc)
-        ((local-sxpath
-          (lambda (path ns-binding num-anc)
-            (let loop ((converters '())
-                       (vars '())  ; a list of booleans - do we need to pass
-                       ; var-bindings to the corresponding converter
-                       (path (reverse   ; path in reverse order
-                              (if (string? path) (list path) path)))
-                       (num-anc num-anc))
-              (cond
-                ((null? path)  ; parsing is finished
-                 (cons
-                  (lambda (node var-binding)
-                    (let rpt ((nodeset (as-nodeset node))
-                              (conv converters)
-                              (vrs vars))
-                      (if
-                       (null? conv)  ; the path is over
-                       nodeset
-                       (rpt
-                        (if (car vrs)  ; current converter consumes 2 arguments
-                            ((car conv) nodeset var-binding)
-                            ((car conv) nodeset))
-                        (cdr conv)
-                        (cdr vrs)))))
-                  num-anc))
-                ; *or* handler
-                ((and (pair? (car path)) 
-                      (not (null? (car path)))
-                      (eq? '*or* (caar path)))             
-                 (loop (cons
-                        (draft:child (ntype-names?? (cdar path)) num-anc)
-                        converters)
-                       (cons #f vars)
-                       (cdr path)
-                       (draft:na-minus-nneg num-anc 1)))
-                ; *not* handler 
-                ((and (pair? (car path)) 
-                      (not (null? (car path)))
-                      (eq? '*not* (caar path)))             
-                 (loop (cons
-                        (draft:child
-                         (sxml:invert (ntype-names?? (cdar path))) num-anc)
-                        converters)
-                       (cons #f vars)
-                       (cdr path)
-                       (draft:na-minus-nneg num-anc 1)))
-                ((procedure? (car path))
-                 (loop
-                  (cons
-                   (let ((proc (car path)))                                          
-                     (if
-                      (and num-anc (zero? num-anc))  ; no ancestors required
-                      (lambda (node var-binding)
-                        (proc (draft:contextset->nodeset (as-nodeset node))
-                              var-binding))                    
-                      (lambda (node var-binding)
-                        (draft:find-proper-context
-                         (proc (draft:contextset->nodeset (as-nodeset node))
-                               var-binding)
-                         (append
-                          (map
-                           sxml:context->content
-                           (as-nodeset node))
-                          (apply
-                           append
-                           (map
-                            (lambda (pair)
-                              (if
-                               (nodeset? (cdr pair))
-                               (map
-                                sxml:context->content
-                                (cdr pair))
-                               '()))
-                            var-binding)))
-                         num-anc))))
-                   converters)
-                  (cons #t vars)
-                  (cdr path)
-                  num-anc))
-                ((eq? '// (car path))
-                 (loop (cons
-                        (draft:descendant-or-self (ntype?? '*any*) num-anc)
-                        converters)
-                       (cons #f vars)
-                       (cdr path)
-                       num-anc))
-                ((eq? '.. (car path))
-                 (loop (cons 
-                        (draft:parent sxml:node? num-anc)
-                        converters)
-                       (cons #f vars)
-                       (cdr path)
-                       (draft:na+ num-anc 1)))
-                ((symbol? (car path))
-                 (loop (cons
-                        (draft:child (ntype?? (car path)) num-anc)
-                        converters)
-                       (cons #f vars)
-                       (cdr path)
-                       (draft:na-minus-nneg num-anc 1)))
-                ((string? (car path))
-                 (and-let*
-                  ((txp-res (local-txpath (car path) ns-binding num-anc)))
-                  (loop (cons (car txp-res) converters)
-                        (cons #t vars)
-                        (cdr path)
-                        (cdr txp-res)  ; num-anc required for a textual step
-                        )))
-                ((and (pair? (car path)) (eq? 'equal? (caar path)))
-                 (loop (cons
-                        (draft:child (apply node-equal? (cdar path)) num-anc)
-                        converters)
-                       (cons #f vars)
-                       (cdr path)
-                       (draft:na-minus-nneg num-anc 1)))
-                ; ns-id:* handler 
-                ((and (pair? (car path)) (eq? 'ns-id:* (caar path)))
-                 (loop (cons
-                        (draft:child (ntype-namespace-id?? (cadar path))
-                                     num-anc)
-                        converters)
-                       (cons #f vars)
-                       (cdr path)
-                       (draft:na-minus-nneg num-anc 1)))
-                ((and (pair? (car path)) (eq? 'eq? (caar path)))
-                 (loop (cons
-                        (draft:child (apply node-eq? (cdar path)) num-anc)
-                        converters)
-                       (cons #f vars)
-                       (cdr path)
-                       (draft:na-minus-nneg num-anc 1)))
-                ((pair? (car path))
-                 (let reducer ((reducing-path (cdar path))
-                               (filters '())
-                               (new-num-anc num-anc))
-                   (cond
-                     ((null? reducing-path)
-                      (and-let*
-                       ((select
-                         (if
-                          (symbol? (caar path))
-                          (let ((axis
-                                 (draft:child (ntype?? (caar path))
-                                              new-num-anc)))
-                            (cons
-                             (lambda (node . var-binding) (axis node))
-                             (draft:na-minus-nneg new-num-anc 1)))
-                          (local-sxpath (caar path) ns-binding new-num-anc))))
-                       (let ((init-fun (car select)))
-                         (loop
-                          (cons
-                           (lambda (node var-binding)
-                             (map-union
-                              (lambda (node)
-                                (let label ((nodeset
-                                             (init-fun node var-binding))
-                                            (fs (reverse filters)))
-                                  (if
-                                   (null? fs)
-                                   nodeset
-                                   (label
-                                    ((car fs) nodeset var-binding)
-                                    (cdr fs)))))
-                              (as-nodeset node)))
-                           converters)
-                          (cons #t vars)
-                          (cdr path)
-                          (cdr select)  ; num-anc required for a complicated step
-                          ))))
-                     ((number? (car reducing-path))
-                      (reducer
-                       (cdr reducing-path)
-                       (cons
-                        (lambda (node var-binding)
-                          ((node-pos (car reducing-path)) node))
-                        filters)
-                       new-num-anc))
-                     (else
-                      (and-let*
-                       ((res
-                         (local-sxpath (car reducing-path)
-                                       ns-binding
-                                       0  ; because only filtering is performed
-                                       )))
-                       (reducer
-                        (cdr reducing-path)
-                        (cons
-                         (let ((func (car res)))
-                           (lambda (node var-binding)
-                             ((sxml:filter
-                               (lambda (n) (func n var-binding)))
-                              node)))
-                         filters)
-                        (draft:na-max new-num-anc (cdr res))))))))
-                (else
-                 (cerr "Invalid path step: " (car path))
-                 #f))))))
-      (let-values*
-          (((ns-binding num-anc) (draft:arglist->ns+na ns+na)))
-        (and-let*
-         ((res (local-sxpath path
-                             ns-binding
-                             num-anc)))
-         (let ((func (car res)))
-           (if
-            (and num-anc (zero? num-anc))
-            (lambda (node . var-binding)
-              (draft:contextset->nodeset
-               (func node
-                     (xlink:add-docs-to-vars
-                      node
-                      (if (null? var-binding)
-                          var-binding (car var-binding))))))
-            (lambda (node . var-binding)
-              (func node
-                    (xlink:add-docs-to-vars
-                     node
-                     (if (null? var-binding)
-                         var-binding (car var-binding))))))))))))
-
-; Alias
 (define sxpath-with-context draft:sxpath)
 (define sxpath/c draft:sxpath)
