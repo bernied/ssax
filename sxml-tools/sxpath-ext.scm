@@ -62,22 +62,18 @@
 ; Returns a string value for a given node in accordance to
 ; XPath Rec. 5.1 - 5.7 
 (define (sxml:string-value node)
-  (if
-    (not (pair? node))  ; a text node?
-     (if (string? node)
-        node
-        "")  ; for XPath 1.0 it is an incorrect situation
-  (apply
-   string-append
-   (cons ""
-         (map
-          sxml:string-value
-          ((cond
-	     ((null? (cdr node)) cdr)
-             ((not (pair? (cadr node))) cdr)
-             ((not (equal? (caadr node) '@)) cdr)
-             (else cddr))
-           node))))))
+  (cond
+    ((not (pair? node))  ; a text node or data node
+     (sxml:string node))
+    ((null? (cdr node))
+     "")
+    (else
+     (apply string-append  ; a list of arguments is always non-null
+            (map
+             (lambda (node)
+               (if (sxml:node? node)  ; not annot-attr node or aux list node
+                   (sxml:string-value node) ""))
+             (cdr node))))))
 
 ; Select SXML element by its unique IDs
 ; XPath Rec. 4.1
