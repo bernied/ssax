@@ -3,10 +3,12 @@
 ; Examples are taken from SRFI-12, with a few modifications as needed
 ; We also added a few more tests and extensions
 ;
+; IMPORT
+; (include "myenv.scm")     or a similar prelude
+; (include "srfi-12.scm")
+; See the Makefile for more details
+;
 ; $Id$
-
-(include "myenv.scm")
-(include "srfi-12.scm")
 
 (cerr nl nl "Validating SRFI-12..." nl)
 

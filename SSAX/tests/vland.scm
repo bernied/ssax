@@ -139,7 +139,7 @@
 ; We also assume the the myenv prelude is included at this point,
 ; as well as SRFI-12. For Gambit, do the following:
 ;   (include "myenv.scm")
-;   (include "srf-12.scm")
+;   (include "srfi-12.scm")
 ; prior to evaluation of this file.
 ; For example: gsi -e '(include "myenv.scm")(include "srfi-12.scm")' vland.scm
 ; For Bigloo, the following command line can be used:
