@@ -79,7 +79,7 @@ that \"natively understand the data structures inherent in XML and
 enable optimized algorithms for processing it\" " (cite "Bosworth")
 ". At the same time the tools must be conformant and compatible with
 the W3C Recommendations. Ideally the tools should let us blend XPath
-and XLST on one hand, and the advanced XML processing on the other
+and XSLT on one hand, and the advanced XML processing on the other
 hand.")
    (p
     "The goal of a seamless extension of the W3C XML processing model
