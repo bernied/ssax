@@ -74,9 +74,9 @@
 ;   (values #f DAML-entities namespaces seed)
 ; (The original ssax:xml->sxml had '() in place of DAML-entities)
 ;
-; We also create (@@ (*NAMESPACES* . ns-assocs)) for each element
+; We also create (@ (*NAMESPACES* . ns-assocs)) for each element
 ; with a non-local element or attribute name. These local ns-assocs
-; describe only the namespaces of the elemen-gi and its attributes.
+; describe only the namespaces of the element-gi and its attributes.
 ; Sharing should be improved!
 
 (define (ssax:daml->sxml port namespace-prefix-assig)
@@ -93,57 +93,6 @@
 	    (symbol->string (car res-name))
 	    ":"
 	    (symbol->string (cdr res-name))))))
-
-       ; given the list of fragments (some of which are text strings)
-       ; reverse the list and concatenate adjacent text strings
-       (reverse-collect-str
-	(lambda (fragments)
-	  (if (null? fragments) '()	; a shortcut
-	      (let loop ((fragments fragments) (result '()) (strs '()))
-		(cond
-		 ((null? fragments)
-		  (if (null? strs) result
-		      (cons (apply string-append strs) result)))
-		 ((string? (car fragments))
-		  (loop (cdr fragments) result (cons (car fragments) strs)))
-		 (else
-		  (loop (cdr fragments)
-			(cons
-			 (car fragments)
-			 (if (null? strs) result
-			     (cons (apply string-append strs) result)))
-			'())))))))
-
-       ; given the list of fragments (some of which are text strings)
-       ; reverse the list and concatenate adjacent text strings
-       ; We also drop "unsignificant" whitespace, that is, whitespace
-       ; in front, behind and between elements. The whitespace that
-       ; is included in character data is not affected.
-       (reverse-collect-str-drop-ws
-	(lambda (fragments)
-	  (cond 
-	   ((null? fragments) '())		; a shortcut
-	   ((and (string? (car fragments))	; another shortcut
-		 (null? (cdr fragments))	; remove trailing ws
-		 (string-whitespace? (car fragments))) '())
-	   (else
-	    (let loop ((fragments fragments) (result '()) (strs '())
-		       (all-whitespace? #t))
-	      (cond
-	       ((null? fragments)
-		(if all-whitespace? result	; remove leading ws
-		    (cons (apply string-append strs) result)))
-	       ((string? (car fragments))
-		(loop (cdr fragments) result (cons (car fragments) strs)
-		      (and all-whitespace?
-			   (string-whitespace? (car fragments)))))
-	       (else
-		(loop (cdr fragments)
-		      (cons
-		       (car fragments)
-		       (if all-whitespace? result
-			   (cons (apply string-append strs) result)))
-		      '() #t))))))))
        )
     (let ((result
 	   (reverse
@@ -155,7 +104,7 @@
    
 	     FINISH-ELEMENT
 	     (lambda (elem-gi attributes namespaces parent-seed seed)
-	       (let* ((seed (reverse-collect-str-drop-ws seed))
+	       (let* ((seed (ssax:reverse-collect-str-drop-ws seed))
 		      (attrs
 		       (attlist-fold
 			(lambda (attr accum)
@@ -189,17 +138,17 @@
 				  (car ns-elem)) ; original prefix
 			    ))
 			ns-id-used))
-		      (elem-children
-		       (if (null? local-namespaces) seed
-			   (cons (list '@@
+		      (attrs
+		       (if (null? local-namespaces) attrs
+			   (cons (list '@
 				   (cons '*NAMESPACES* local-namespaces))
-				  seed)))
+				  attrs)))
 		      (sxml-element	; newly created element
 		       (cons 
 			(if (symbol? elem-gi) elem-gi
 			    (RES-NAME->SXML elem-gi))
-			(if (null? attrs) elem-children
-			    (cons (cons '@ attrs) elem-children))))
+			(if (null? attrs) seed
+			    (cons (cons '@ attrs) seed))))
 		      )
 		 (cons
 		  sxml-element parent-seed)
@@ -296,10 +245,10 @@
   ; where prefix1 is derived from ns-id1. We make it unique.
 
   (define (ns-normalize sxml)
-    ; check to see if the aux node contains a namespace association
-    ; If so, process them and add to the 'namespaces'
-    (define (add-local-namespaces aux-nodes namespaces)
-      (let ((ns (assq '*NAMESPACES* aux-nodes)))
+    ; check to see if annotations contains a namespace association
+    ; If so, process it and add to the 'namespaces'
+    (define (add-local-namespaces annotations namespaces)
+      (let ((ns (assq '*NAMESPACES* annotations)))
 	(if (not ns) namespaces
 	    (let loop ((nss (cdr ns)) (namespaces namespaces))
 	      (match-case nss
@@ -322,15 +271,17 @@
 	 (if (null? todo)
 	     (values namespaces translation)  ; we're done
 	     (loop (car todo) (cdr todo) namespaces translation)))
-	((@@ . ?-) (loop '() todo namespaces translation))
 	((*PI* . ?-) (loop '() todo namespaces translation))
+	((*NAMESPACES* . ?-) (loop '() todo namespaces translation))
 	(((and (? symbol?) ?ge) . ?children)  ; regular node
 	 (let ((namespaces
 		(match-case children
-		 (((@ . ?-) (@@ . ?aux-nodes) . ?-)
-		  (add-local-namespaces aux-nodes namespaces))
-		 (((@@ . ?aux-nodes) . ?-)
-		  (add-local-namespaces aux-nodes namespaces))
+		 (((@ . ?attrs) . ?-)
+		  (cond
+		    ((assq '@ attrs) =>
+		      (lambda (annot-assoc)
+			(add-local-namespaces (cdr annot-assoc) namespaces)))
+		    (else namespaces)))
 		 (else namespaces))))
 	   (if (assq ge translation)  ; if we have seen ge
 	     (loop children todo namespaces translation)
@@ -387,12 +338,12 @@
 ;     (cerr translation nl)
     `((@
       ((*default*       ; local override for attributes
-        . ,(lambda (attr-key . value) (enattr (translate attr-key) value))))
+        . ,(lambda (attr-key . value) (enattr (translate attr-key) value)))
+       (@ *preorder* . ,(lambda _ '()))) ; annotations handled already
       . ,(lambda (trigger . value) (cons '@ value)))
      (*default* . ,(lambda (tag . elems) (entag (translate tag) elems)))
      (*text* . ,(lambda (trigger str) 
 		  (if (string? str) (string->goodXML str) str)))
-     (@@ *preorder* . ,(lambda _ '())) ; handled already
      (*PI*
       *preorder*
       . ,(lambda (tag target body)

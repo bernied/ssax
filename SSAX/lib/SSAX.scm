@@ -2673,7 +2673,7 @@
       (cons '*TOP*
 	    (if (null? namespace-prefix-assig) result
 		(cons
-		 (list '@@ (cons '*NAMESPACES* 
+		 (list '@ (cons '*NAMESPACES* 
 				 (map (lambda (ns) (list (car ns) (cdr ns)))
 				      namespace-prefix-assig)))
 		      result)))
@@ -2738,7 +2738,7 @@
     (test "<DIV A:B='A' B='B' xmlns:A='URI1' xmlns='URI1'><A:P xmlns=''><BR/></A:P></DIV>" '()
 	  '(*TOP* (URI1:DIV (@ (URI1:B "A") (B "B")) (URI1:P (BR)))))
     (test "<DIV A:B='A' B='B' xmlns:A='URI1' xmlns='URI1'><A:P xmlns=''><BR/></A:P></DIV>" '((UA . "URI1"))
-	  '(*TOP* (@@ (*NAMESPACES* (UA "URI1")))
+	  '(*TOP* (@ (*NAMESPACES* (UA "URI1")))
 		  (UA:DIV (@ (UA:B "A") (B "B")) (UA:P (BR)))))
 
     ; A few tests from XML Namespaces Recommendation
@@ -2757,7 +2757,7 @@
            "<lineItem edi:taxClass='exempt'>Baby food</lineItem>"
            "</x>") '((EDI . "http://ecommerce.org/schema"))
 	   '(*TOP*
-	     (@@ (*NAMESPACES* (EDI "http://ecommerce.org/schema")))
+	     (@ (*NAMESPACES* (EDI "http://ecommerce.org/schema")))
 	     (x (lineItem
 		 (@ (EDI:taxClass "exempt"))
             "Baby food"))))
@@ -2813,7 +2813,7 @@
            "</Beers>")
 	      '((html . "http://www.w3.org/TR/REC-html40"))
 	      '(*TOP*
-		(@@ (*NAMESPACES* (html "http://www.w3.org/TR/REC-html40")))
+		(@ (*NAMESPACES* (html "http://www.w3.org/TR/REC-html40")))
 		(Beers (html:table
                 (html:th (html:td "Name")
                          (html:td "Origin")
@@ -2835,7 +2835,7 @@
        "<!-- 5 --><DEPARTURE>1997-05-24T07:55:00+1</DEPARTURE></RESERVATION>")
 	  '((HTML . "http://www.w3.org/TR/REC-html40"))
 	  '(*TOP*
-	    (@@ (*NAMESPACES* (HTML "http://www.w3.org/TR/REC-html40")))
+	    (@ (*NAMESPACES* (HTML "http://www.w3.org/TR/REC-html40")))
 	     (RESERVATION
 	      (NAME (@ (HTML:CLASS "largeSansSerif")) "Layman, A")
 	      (SEAT (@ (HTML:CLASS "largeMonotype") (CLASS "Y")) "33B")
@@ -2873,7 +2873,7 @@
    '((RDF . "http://www.w3.org/1999/02/22-rdf-syntax-ns#")
      (RDFS . "http://www.w3.org/2000/01/rdf-schema#")
      (ISET . "http://www.w3.org/2001/02/infoset#"))
-   '(*TOP* (@@ (*NAMESPACES*
+   '(*TOP* (@ (*NAMESPACES*
          (RDF "http://www.w3.org/1999/02/22-rdf-syntax-ns#")
          (RDFS "http://www.w3.org/2000/01/rdf-schema#")
          (ISET "http://www.w3.org/2001/02/infoset#")))
@@ -2925,7 +2925,7 @@
    '((RDF . "http://www.w3.org/1999/02/22-rdf-syntax-ns#")
      (RSS . "http://my.netscape.com/rdf/simple/0.9/")
      (ISET . "http://www.w3.org/2001/02/infoset#"))
-   '(*TOP* (@@ (*NAMESPACES*
+   '(*TOP* (@ (*NAMESPACES*
          (RDF "http://www.w3.org/1999/02/22-rdf-syntax-ns#")
          (RSS "http://my.netscape.com/rdf/simple/0.9/")
          (ISET "http://www.w3.org/2001/02/infoset#")))

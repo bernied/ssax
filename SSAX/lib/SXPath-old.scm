@@ -118,7 +118,7 @@
 (define (node-typeof? crit)
   (lambda (node)
     (case crit
-      ((*) (and (pair? node) (not (memq (car node) '(@ @@ *PI*)))))
+      ((*) (and (pair? node) (not (memq (car node) '(@ *PI*)))))
       ((*any*) #t)
       ((*text*) (string? node))
       (else

@@ -227,7 +227,7 @@
       (cons '*TOP*
 	    (if (null? namespace-prefix-assig) result
 		(cons
-		 (list '@@ (cons '*NAMESPACES* 
+		 (list '@ (cons '*NAMESPACES* 
 				 (map (lambda (ns) (list (car ns) (cdr ns)))
 				      namespace-prefix-assig)))
 		      result)))

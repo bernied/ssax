@@ -3,7 +3,7 @@
 ; This present code illustrates several ways of determining the parent
 ; of an element in an SXML tree. Some of the approaches rely on
 ; "pointers" of various kinds from an element to its parent. The
-; "pointer" and similar auxiliary data are maintained in an aux-list
+; "pointer" and similar auxiliary data are maintained in annotations
 ; of an SXML element. We illustrate how to build these auxiliary data
 ; structures -- "indices" -- as we parse an XML document into SXML.
 ;
@@ -129,15 +129,15 @@
 ; The name of a proper SXML node
 (define node-name car)
 
-; The children of a proper SXML node (some of which may be aux lists!)
+; The children of a proper SXML node (some of which may be annotations!)
 (define node-children cdr)
 
 ; Check if a SXML node is a proper SXML node: it's not a text string,
-; it's not a nodelist, it's not an aux list, it's not an attr list
+; it's not a nodelist, it's not an attr list
 (define (node-proper? sxml)
   (and (pair? sxml)
        (symbol? (node-name sxml))
-       (not (memq (node-name sxml) '(@ @@)))))
+       (not (eq? (node-name sxml) '@))))
 
 ; Check if a SXML node is the top node
 (define (node-top? sxml)
@@ -174,14 +174,26 @@
   (newline)
 )
 
-; Obtain the value associated with a given key from an aux-list of a node
+; Obtain the value associated with a given key from annotations of a node
 
 (define (aux-assq key node)
   (let*
     ((_ (assert (pair? node) (pair? (cdr node))))
-     (aux-list (cadr node))
-     (_ (assert (pair? aux-list) (eq? '@@ (car aux-list))))
-     (needed-assoc (assq key (cdr aux-list)))
+     (attr-list (cadr node))
+     (_ (assert (pair? attr-list) (eq? '@ (car attr-list))))
+     (annotations (assq '@ (cdr attr-list)))
+     (needed-assoc (assq key (cdr annotations)))
+     (_ (assert key needed-assoc)))
+    (cadr needed-assoc)))
+
+; Obtain the value associated with a given key from attributes of a node
+
+(define (attr-assq key node)
+  (let*
+    ((_ (assert (pair? node) (pair? (cdr node))))
+     (attr-list (cadr node))
+     (_ (assert (pair? attr-list) (eq? '@ (car attr-list))))
+     (needed-assoc (assq key (cdr attr-list)))
      (_ (assert key needed-assoc)))
     (cadr needed-assoc)))
 
@@ -204,7 +216,7 @@
 ; http://cvs.sf.net/cgi-bin/viewcvs.cgi/*checkout*/ssax/sxml-tools/sxpasxpath-ext.scm
 ; sxp:parent relies on a more efficient breadth-first search for parents.
 ;
-; The present approach to locating parents does not need any aux-list
+; The present approach to locating parents does not need any
 ; annotations on SXML nodes. We process SXML tree as it is constructed
 ; by ssax:xml->sxml.
 
@@ -231,7 +243,7 @@
 ;
 ; The following approach to locating node parents relies on a SXML "tree"
 ; whose nodes are annotated with real parent pointers. To be more precise,
-; each node except the *TOP* should have an aux-list with the following
+; each node except the *TOP* should have annotations with the following
 ; association
 ;   `(parent ,ptr-to-parent)
 ;
@@ -248,8 +260,8 @@
 ; XML document. The following custom XML parser xml->true-parent-sxml
 ; (an instantiation of SSAX) does that. The time overhead of adding
 ; annotations is therefore negligible. Locating a parent is also very
-; fast: we merely need to extract the reference to the parent from the
-; aux-list of a node.
+; fast: we merely need to extract the reference to the parent from
+; annotations of a node.
 ;
 ; To create real parent pointers, we must do destructive updates.  It
 ; is not possible to build cyclic data structures in a strict language
@@ -270,7 +282,7 @@
 	     (growth-pt top))
 	((ssax:make-parser
 	   ; Entering new element. Construct an SXML structure with
-	   ; what's known so far: the element name and the aux-list.
+	   ; what's known so far: the element name and the annotations.
 	   ; The element will be extended as the parser reads the element
 	   ; content. The constructed SXML structure becomes the parent
 	   ; for all XML elements that might follow. The new growth
@@ -281,7 +293,7 @@
 	     (let* ((growth-pt (car seed))
 		    (parent-el (cdr seed))
 		    (new-elem		; newly constructed element
-		      `(,elem-gi (@@ (parent ,parent-el))))
+		      `(,elem-gi (@ (@ (parent ,parent-el)))))
 		    (new-growth-pt (cdr new-elem)))
 	       (cons new-growth-pt new-elem)))
    
@@ -325,8 +337,8 @@
 ; Determining the parent of a node in an SXML tree with true
 ; parent pointers
 ; We expect that each SXML element has the form
-;	(name (@@ (parent parent-pt)) ...)
-; that is, contains an aux-list with the 'parent' association.
+;	(name (@ (@ (parent parent-pt))) ...)
+; that is, contains annotations with the 'parent' association.
 ; We extract the parent pointer and return it.
 
 (define (get-parent-from-true-pt elem)
@@ -350,7 +362,7 @@
 ;
 ; The present solution also relies on a SXML tree whose nodes are
 ; annotated with parent pointers. To be more precise, each node except
-; the *TOP* should have an aux-list with the following association
+; the *TOP* should have annotations with the following association
 ;   `(parent ,thunk-ptr-to-parent)
 ;
 ; In contrast to Solution 2 however, thunk-ptr-to-parent is not the
@@ -377,7 +389,7 @@
 ;   (member* node (node-children (get-parent-from-thunk-pt node)))
 ; is #t
 ; where member* is the ordinary procedure member that uses a special
-; equal*? procedure to compare SXML nodes modulo their aux-lists.
+; equal*? procedure to compare SXML nodes modulo their annotations.
 ;
 ; The odd feature arises from the fact that the double connected graph
 ; with forward and backward node pointers is "virtual". The graph is
@@ -423,7 +435,7 @@
        (children (node-children elem))	; Here, we assume elem has no attrs
        (new-elem
 	 (cons* name 
-	   (list '@@ (list 'parent parent))
+	   `(@ (@ (parent ,parent)))
 	   (nodelist-add-parent		; Note an implicit fixpoint!
 	     (lambda () (elem-add-parent parent elem))
 	     children))))
@@ -435,8 +447,8 @@
 ; Determining the parent of a node in an SXML tree with thunked
 ; parent pointers
 ; We expect that each SXML element has the form
-;	(name (@@ (parent thunk-parent-pt)) ...)
-; that is, contains an aux-list with the 'parent' association.
+;	(name (@ (@ (parent thunk-parent-pt))) ...)
+; that is, contains annotations with the 'parent' association.
 ; We extract the thunk-parent-pt and invoke it to yield the reference
 ; to the parent.
 
@@ -457,14 +469,14 @@
 ;
 ; The present solution also locates the parent of a node with the
 ; help of annotations attached to SXML tree nodes. To be more precise,
-; each node except the *TOP* should have an aux-list with the
+; each node except the *TOP* should have annotations with the
 ; following association
 ;  `(parent ,node-id-of-the-parent)
 ; 
 ; Here node-id-of-the-parent is a pseudo-pointer to the parent of the
 ; current node. A pseudo-pointer is an node-id, a symbol, which is a
 ; key in a dictionary of node-ids. The *TOP* element of our annotated
-; SXML tree must have an aux-list with an association
+; SXML tree must have annotations with an association
 ;  `(node-id-dict ,dictionary-of-node-ids)
 ; where dictionary-of-node-ids is, in the present case, an assoc list of
 ; (node-id pointer). The performance of the get-parent procedure improves
@@ -475,7 +487,7 @@
 ; XML document. The following custom XML parser xml->dict-parent-sxml
 ; (an instantiation of SSAX) does that. The time overhead of adding
 ; annotations is therefore negligible. To determine the parent of a
-; node, we extract the id of the parent from the aux-list of the node,
+; node, we extract the id of the parent from annotations of the node,
 ; and locate the parent itself through the dictionary-of-node-ids. If
 ; the latter is implemented as a balanced tree or a hash table, the
 ; lookup should be reasonably fast.
@@ -532,7 +544,7 @@
 		      (reverse-collect-str-drop-ws curr-sxml-tree))
 		    ((new-sxml-elem)
 		      (cons* elem-gi 
-			(list '@@ (list 'parent parent-id))
+			`(@ (@ (parent ,parent-id)))
 			curr-sxml-tree))
 		    ((new-dict)
 		      (cons (list current-id new-sxml-elem) current-dict))
@@ -569,13 +581,13 @@
 	((top-node-content) (reverse top-node-content))
 	 )
      (cons* '*TOP*
-       (list '@@ 
+       (list '@ 
 	 (list 'node-id-dict dict))
        top-node-content))
      ))))
 
 ; The following procedure takes the *TOP* node of the annotated SXML
-; tree above and extracts the node-dictionary from the aux-list of the
+; tree above and extracts the node-dictionary from annotations of the
 ; top node.
 
 ; We return a get-parent procedure that searches for and locates the
@@ -586,7 +598,7 @@
 ; the knot"
 
 (define (make-get-parent-from-dict topnode)
-  (let ((dict (aux-assq 'node-id-dict topnode)))
+  (let ((dict (attr-assq 'node-id-dict topnode)))
     (lambda (elem)
       (let ((parent-id (aux-assq 'parent elem)))
 	(cond

@@ -19,9 +19,13 @@ all-bigloo-c: run-remove-markup-bigloo run-outline-bigloo run-sxml-bigloo
 
 all-scm: test-remove-markup-scm test-outline-scm test-sxml-scm \
 	run-sxslt-advanced-scm  \
+	run-sxml-db-conv-scm \
 	run-parent-pointers-scm \
 	sxml-nesting-depth-label-scm \
 	sxml-to-sxml-scm
+
+all-petite: sxml-nesting-depth-label-petite \
+	sxml-to-sxml-petite
 
 clean:
 	rm -f *_.c *.o core a.out \
@@ -63,7 +67,7 @@ run-apply-templates-bigloo-i: apply-templates.scm \
 
 run-sxml-db-conv-i: sxml-db-conv.scm \
 		$(LIBDIR)/SSAX-code.scm
-	$(BIGLOO) $(BFLAGS) -i sxml-db-conv.scm
+	$(BIGLOO) $(BFLAGS) -i -eval '(module sxml-db-conversion (include "myenv-bigloo.scm") (include "srfi-13-local.scm") (include "char-encoding.scm") (include "util.scm") (include "look-for-str.scm") (include "input-parse.scm") (include "SSAX-code.scm") (include "SXML-tree-trans.scm"))' sxml-db-conv.scm
 
 run-daml-parse-unparse-i: daml-parse-unparse.scm \
 		$(LIBDIR)/SSAX-code.scm
@@ -116,6 +120,14 @@ run-sxslt-advanced-scm: sxslt-advanced.scm
 	-l $(LIBDIR)/SXML-tree-trans.scm \
 	-l $(LIBDIR)/SXML-to-HTML.scm -l $(LIBDIR)/SXML-to-HTML-ext.scm \
 	-l sxslt-advanced.scm
+
+run-sxml-db-conv-scm: sxml-db-conv.scm $(LIBDIR)/SSAX-code.scm
+	scm -r5 -b -l $(LIBDIR)/myenv-scm.scm  -l $(LIBDIR)/srfi-13-local.scm \
+	-l $(LIBDIR)/char-encoding.scm -l $(LIBDIR)/util.scm \
+	-l $(LIBDIR)/look-for-str.scm -l $(LIBDIR)/input-parse.scm \
+	-l $(LIBDIR)/SSAX-code.scm \
+	-l $(LIBDIR)/SXML-tree-trans.scm \
+	-l sxml-db-conv.scm
 
 run-parent-pointers-scm: parent-pointers.scm
 	scm -r5 -b -l $(LIBDIR)/myenv-scm.scm  -l $(LIBDIR)/srfi-13-local.scm \
