@@ -1162,7 +1162,7 @@
      ((names)
       (ntype-names?? (cdadr op)))
      ((not-names)
-      (sxml:invert (ntype-names?? (cdadr op))))
+      (sxml:complement (ntype-names?? (cdadr op))))
      (else
       (draft:signal-semantic-error "unknown NodeTest - " op)))))
 

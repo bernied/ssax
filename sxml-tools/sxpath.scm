@@ -20,7 +20,7 @@
 ; (sxpath1 '(eq? x))    -> (select-kids (node-eq? x))
 ; (sxpath1 '(*or* ...))  -> (select-kids (ntype-names??
 ;                                          (cdr '(*or* ...))))
-; (sxpath1 '(*not* ...)) -> (select-kids (sxml:invert 
+; (sxpath1 '(*not* ...)) -> (select-kids (sxml:complement 
 ;                                         (ntype-names??
 ;                                          (cdr '(*not* ...)))))
 ; (sxpath1 '(ns-id:* x)) -> (select-kids 
@@ -69,7 +69,7 @@
             (not (null? (car path)))
             (eq? '*not* (caar path)))
        (loop (cons
-              (select-kids (sxml:invert (ntype-names?? (cdar path))))
+              (select-kids (sxml:complement (ntype-names?? (cdar path))))
               converters)
              (cons #f root-vars)
              (cdr path)))
