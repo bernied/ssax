@@ -12,7 +12,7 @@
 \author{Oleg Kiselyov\\Software Engineering, Naval Postgraduate School, Monterey, CA 93943\\oleg@pobox.com, oleg@acm.org}
 \maketitle
 \begin{abstract}
-The present article specifies revision 2.0 of SXML. SXML is an abstract syntax tree of an XML document. SXML is also
+The present article specifies revision 2.1 of SXML. SXML is an abstract syntax tree of an XML document. SXML is also
 a concrete representation of the XML Infoset in the form of
 S-expressions. The generic tree structure of SXML lends itself to a
 compact library of combinators for querying and transforming SXML.\\The master SXML specification file is written in SXML itself. The present paper is the result of translating that SXML code into \LaTeX, using an appropriate "stylesheet". A different stylesheet converted the specification to HTML. The master file, the stylesheets and the corresponding HTML and \LaTeX documents are available at  \texttt{http://pobox.com/\textasciitilde{}oleg/ftp/Scheme/xml.html} .\\Keywords: XML, XML parsing, XML Infoset, XML Namespaces, AST, SXML, Scheme.\end{abstract}
@@ -36,14 +36,13 @@ item has a number of associated properties, e.g., name, namespace
 URI. Some properties -- for example, 'children' and 'attributes' --
 are (ordered) collections of other information items. Infoset describes
 only the information in an XML document that is relevant to
-applications. Element declarations from DTD, the XML version, parameter
-entities, etc. data used merely for parsing or validation are not
-included. Although technically Infoset is specified for XML it
-largely applies to HTML as well.
+applications. The default value of attributes declared in the DTD, parameter
+entities, the order of attributes within a start-tag, and other data used merely for parsing or validation are not included. Although technically 
+Infoset is specified for XML it largely applies to HTML as well.
 
 The hierarchy of containers comprised of text strings and other
 containers greatly lends itself to be described by
-S-expressions. S-expressions are easy to parse into an internal
+S-expressions. S-expressions \cite{McCarthy} are easy to parse into an internal
 representation suitable for traversal.  They have a simple external
 notation (albeit with many a parentheses), which is relatively easy to
 compose even by hand.  S-expressions have another advantage: \emph{provided} an appropriate design, they can represent Scheme code to be evaluated.
@@ -60,30 +59,26 @@ transformations. In John Hughes' terminology, SXML is a term
 implementation of evaluation of the XML document.
 
 \section{Notation}
-We will use both an Extended BNF Notation (EBNF) employed in the XML
-Recommendation \cite{XML}, and syntactic conventions of the
-Revised Reports on Scheme, R5RS \cite{R5RS}. The following table summarizes the differences:
+We will use an Extended BNF Notation (EBNF) employed in the XML
+Recommendation \cite{XML}. The following table summarizes the notation.
 
-\begin{table}[ht]
-\begin{tabular}{lll}
-\multicolumn{1}{l}{\minitab[l]{~}} & \multicolumn{1}{c}{\minitab[c]{EBNF notation}} & \multicolumn{1}{c}{\minitab[c]{R5RS notation}}\\
-\multicolumn{1}{l}{\minitab[l]{An optional \emph{thing}}} & \multicolumn{1}{l}{\minitab[l]{\texttt{thing?}}} & \multicolumn{1}{l}{\minitab[l]{\texttt{[thing]}}}\\
-\multicolumn{1}{l}{\minitab[l]{Zero or more \emph{thing}s}} & \multicolumn{1}{l}{\minitab[l]{\texttt{thing*}}} & \multicolumn{1}{l}{\minitab[l]{\texttt{thing ...}}}\\
-\multicolumn{1}{l}{\minitab[l]{One or more \emph{thing}s}} & \multicolumn{1}{l}{\minitab[l]{\texttt{thing+}}} & \multicolumn{1}{l}{\minitab[l]{\texttt{thing thing ...}}}\\
-\end{tabular}
-\end{table}
-
-Furthermore, 
-
-\begin{itemize}
-\item \texttt{<thing>}~ stands for a non-terminal of a grammar
-\item \texttt{thing}~ denotes a terminal of the grammar that is a Scheme identifier
-\item \texttt{"thing"}~ is a terminal of the grammar that is a Scheme string
-\item \texttt{\textit{thing}}~ is a literal Scheme symbol
-\end{itemize}
+\begin{description}
+\item [\texttt{thing?}] An optional \emph{thing}
+\item [\texttt{thing*}] Zero or more \emph{thing}s
+\item [\texttt{thing+}] One or more \emph{thing}s
+\item [\texttt{thing1 | thing2 | thing3}] Choice of \emph{thing}s
+\item [\texttt{<thing>}] A non-terminal of a grammar
+\item [\texttt{thing}] A terminal of the grammar that is a Scheme identifier
+\item [\texttt{"thing"}] A terminal of the grammar that is a Scheme string
+\item [\texttt{{\itshape thing}}] A literal Scheme symbol
+\item [\texttt{\textbf{(} <A> <B>* \textbf{)}}] An S-expression made of \texttt{<A>} followed by zero or more \texttt{<B>}
+\item [\texttt{\textbf{(} <A>\textbf{ . }<B> \textbf{)}}] An S-expression that is made by prepending \texttt{<A>} to an S-expression denoted by \texttt{<B>}
+\item [\texttt{\textbf{$MAKE-SYMBOL$(}<A>:<B>\textbf{)}}] A symbol whose string representation consists of all
+characters that spell \texttt{<A>} followed by the colon character and by the characters that spell \texttt{<B>}. The \texttt{\textbf{$MAKE-SYMBOL$(}\textbf{)}} notation can be regarded a meta-function that creates symbols.
+\end{description}
 \section{Grammar}
 \begin{tabular}{rrcp{2.8in}}
-{[}1{]} & \texttt{<TOP>} &  $::=$ & \texttt{\textit{*TOP*} <namespaces>? <PI>* <comment>* <Element> } \\
+{[}1{]} & \texttt{<TOP>} &  $::=$ & \texttt{\textbf{(} {\itshape *TOP*} <namespaces>? <PI>* <comment>* <Element> \textbf{)} } \\
 \end{tabular}
 \\
 This S-expression stands for the root of the SXML tree, a
@@ -91,16 +86,16 @@ document information item of the Infoset. It contains the root element
 of the XML document as its only child element.
 
 \begin{tabular}{rrcp{2.8in}}
-{[}2{]} & \texttt{<Element>} &  $::=$ & \texttt{<name> <attributes-list>? <namespaces>? <child-of-element>* } \\
-{[}3{]} & \texttt{<attributes-list>} &  $::=$ & \texttt{\textit{@} <attribute>* } \\
-{[}4{]} & \texttt{<attribute>} &  $::=$ & \texttt{<name> "value"? } \\
+{[}2{]} & \texttt{<Element>} &  $::=$ & \texttt{\textbf{(} <name> <attributes-list>? <namespaces>? <child-of-element>* \textbf{)} } \\
+{[}3{]} & \texttt{<attributes-list>} &  $::=$ & \texttt{\textbf{(} {\itshape @} <attribute>* \textbf{)} } \\
+{[}4{]} & \texttt{<attribute>} &  $::=$ & \texttt{\textbf{(} <name> "value"? \textbf{)} } \\
 {[}5{]} & \texttt{<child-of-element>} &  $::=$ & \texttt{<Element> | "character data" | <PI> | <comment> | <entity> } \\
 \end{tabular}
 \\
 These are the basic constructs of SXML.
 
 \begin{tabular}{rrcp{2.8in}}
-{[}6{]} & \texttt{<PI>} &  $::=$ & \texttt{\textit{*PI*} pi-target "processing instruction content string" } \\
+{[}6{]} & \texttt{<PI>} &  $::=$ & \texttt{\textbf{(} {\itshape *PI*} pi-target "processing instruction content string" \textbf{)} } \\
 \end{tabular}
 \\
 The XML Recommendation specifies that processing instructions (PI) are distinct from elements and character data; processing
@@ -108,40 +103,61 @@ instructions must be passed through to applications. In SXML, PIs are
 therefore represented by nodes of a dedicated type \texttt{*PI*}. DOM Level 2 treats processing instructions in a similar way.
 
 \begin{tabular}{rrcp{2.8in}}
-{[}7{]} & \texttt{<comment>} &  $::=$ & \texttt{\textit{*COMMENT*} "comment string" } \\
-{[}8{]} & \texttt{<entity>} &  $::=$ & \texttt{\textit{*ENTITY*} "public-id" "system-id" } \\
+{[}7{]} & \texttt{<comment>} &  $::=$ & \texttt{\textbf{(} {\itshape *COMMENT*} "comment string" \textbf{)} } \\
+{[}8{]} & \texttt{<entity>} &  $::=$ & \texttt{\textbf{(} {\itshape *ENTITY*} "public-id" "system-id" \textbf{)} } \\
 \end{tabular}
 \\
 Comments are mentioned for completeness only. A SSAX XML parser
-\cite{SSAX}, among others, transparently skips the comments --
-as it should and as the Infoset Recommendation says. However, the XML
-Recommendation also permits retaining of the comments. DOM has a
-provision for COMMENT nodes, too. The present SXML grammar allows
-comment nodes but does not mandate them by any means.
+\cite{SSAX}, among others, transparently skips the comments.
+The XML Recommendation permits the parser to pass the comments to
+an application or to completely disregard them. The present SXML grammar
+admits comment nodes but does not mandate them by any means.\\ An \texttt{<entity>} node represents a reference to an
+unexpanded external entity. This node corresponds to an unexpanded
+entity reference information item, defined in Section 2.5 of \cite{XML Infoset}. Internal parsed entities are always expanded by the
+XML processor at the point of their reference in the body of the
+document.
 
 \begin{tabular}{rrcp{2.8in}}
-{[}9{]} & \texttt{<name>} &  $::=$ & \texttt{<LocalName> | <ExpName> } ; An XML QName\\
+{[}9{]} & \texttt{<name>} &  $::=$ & \texttt{<LocalName> | <ExpName> } \\
 {[}10{]} & \texttt{<LocalName>} &  $::=$ & \texttt{NCName } \\
-{[}11{]} & \texttt{<ExpName>} &  $::=$ & \texttt{URI : <LocalName> | user-ns-prefix : <LocalName> } ; An expanded name\\
+{[}11{]} & \texttt{<ExpName>} &  $::=$ & \texttt{\textbf{$MAKE-SYMBOL$(}<namespace-id>:<LocalName>\textbf{)} } \\
+{[}12{]} & \texttt{<namespace-id>} &  $::=$ & \texttt{URI | user-ns-shortcut } \\
+{[}13{]} & \texttt{<namespaces>} &  $::=$ & \texttt{\textbf{(} {\itshape *NAMESPACES*} <namespace-assoc>* \textbf{)} } \\
+{[}14{]} & \texttt{<namespace-assoc>} &  $::=$ & \texttt{\textbf{(} <namespace-id> "URI" \textbf{)} } \\
 \end{tabular}
 \\
-\texttt{NCName} is a Scheme symbol whose spelling conforms to
-production [4] of the XML Namespaces Recommendation\cite{XML Namespaces}. \texttt{<ExpName>} is also a Scheme symbol, with an embedded colon that joins a local
-part of the name and a prefix. A \texttt{URI} is a
-Namespace URI string converted to a Scheme symbol. Universal Resource
-Identifiers (URI) may contain characters (e.g., parentheses) that are
-prohibited in Scheme identifiers. Such characters must be \%-quoted
-during the conversion from a URI string to \texttt{URI}. Universal resource identifiers are often long and unwieldy
-strings. Therefore, a SSAX parser lets a user set his own prefixes to
-represent Namespace URIs. Thus \texttt{user-ns-prefix}
-is also a Scheme identifier, which is typically far shorter than 
-\texttt{URI}.
+An SXML \texttt{<name>} is a single symbol. It is generally an expanded
+name \cite{XML Namespaces}, which conceptually consists of a
+local name and a namespace URI. The latter part may be empty, in which
+case
+\texttt{<name>} is a \texttt{NCName}: a Scheme
+symbol whose spelling conforms to production [4] of the XML Namespaces
+Recommendation \cite{XML Namespaces}. \texttt{<ExpName>} is also a Scheme symbol, whose string representation
+contains an embedded colon that joins a local and a namespace
+parts of the name. A \texttt{URI} is a Namespace URI
+string converted to a Scheme symbol. Universal Resource Identifiers (URI)
+may contain characters (e.g., parentheses) that are prohibited
+in Scheme identifiers. Such characters must be \%-quoted during the
+conversion from a URI string to \texttt{URI}. A \texttt{user-ns-shortcut} is a Scheme symbol chosen by the user to represent a namespace URI in the application program. The SSAX parser offers a user to define (short and mnemonic) unique shortcuts for Namespace URIs, which are are often long and unwieldy
+strings.
 
 \begin{tabular}{rrcp{2.8in}}
-{[}12{]} & \texttt{<namespaces>} &  $::=$ & \texttt{\textit{*NAMESPACES*} <namespace-assoc>* } \\
-{[}13{]} & \texttt{<namespace-assoc>} &  $::=$ & \texttt{URI "URI" | user-ns-prefix "URI" } \\
+{[}2e{]} & \texttt{<Element>} &  $::=$ & \texttt{\textbf{(} <name> <attributes-list>? <aux>? <child-of-element>* \textbf{)} } \\
+{[}4e{]} & \texttt{<attribute>} &  $::=$ & \texttt{\textbf{(} <name> "value"? <aux>? \textbf{)} } \\
+{[}15e{]} & \texttt{<aux>} &  $::=$ & \texttt{\textbf{(} {\itshape @@} <namespaces>? <aux-node>* \textbf{)} } \\
+{[}16e{]} & \texttt{<aux-node>} &  $::=$ & \texttt{~ } \emph{To be defined in the future}\\
 \end{tabular}
 \\
+The XML Recommendation and related standards are not firmly
+fixed, as the long list of errata and the proposed version 1.1 of XML
+clearly show. Therefore, SXML has to be able to accommodate future
+changes while guaranteeing backwards compatibility. SXML also ought to
+permit applications to store various processing information (e.g.,
+cached resolved IDREFs) in an SXML tree. To allow such extensibility, we
+introduce two new node types, \texttt{<aux>} and \texttt{<aux-node>}. The semantics of the latter is to be
+established in future versions of SXML. Other candidates for \texttt{<aux-node>} are the unique id of an element or the reference to element's parent. The structure and the semantics of the \texttt{<aux>} node is similar to those of the attribute list. Applications that do not specifically look for auxiliary
+nodes can transparently ignore any present and future extensions.
+
 \section{SXML Tree}
 Infoset's information item is a sum of its properties. This makes
 a list a particularly suitable data structure to represent an
@@ -180,15 +196,16 @@ itself is an instance of the Infoset.
 Since an SXML document is essentially a tree structure, the SXML grammar of Section 3 can be presented in the following, more uniform form:
 
 \begin{tabular}{rrcp{2.8in}}
-{[}N{]} & \texttt{<Node>} &  $::=$ & \texttt{<Element> | <attributes-list> | <attribute> | "character data" | <namespaces> | <TOP> | <PI> | <comment> | <entity> } \\
+{[}N{]} & \texttt{<Node>} &  $::=$ & \texttt{<Element> | <attributes-list> | <attribute> | "character data" | <namespaces> | <TOP> | <PI> | <comment> | <entity> | <aux> } \\
 \end{tabular}
 \\
-or as a set of two mutually-recursive datatypes:
+or as a set of two mutually-recursive datatypes, 
+\texttt{Node} and \texttt{Nodeset}, where the latter is an ordered set of \texttt{Node}s: 
 
 \begin{tabular}{rrcp{2.8in}}
-{[}N1{]} & \texttt{<Node>} &  $::=$ & \texttt{( <name> . <Nodeset> ) | "text string" } \\
-{[}N2{]} & \texttt{<Nodeset>} &  $::=$ & \texttt{( <Node> ... ) } ;; An ordered set of nodes\\
-{[}N3{]} & \texttt{<name>} &  $::=$ & \texttt{<LocalName> | <ExpName> | \textit{@} | \textit{*TOP*} | \textit{*PI*} | \textit{*COMMENT*} | \textit{*ENTITY*} | \textit{*NAMESPACES*} } \\
+{[}N1{]} & \texttt{<Node>} &  $::=$ & \texttt{\textbf{(} <name>\textbf{ . }<Nodeset> \textbf{)} | "text string" } \\
+{[}N2{]} & \texttt{<Nodeset>} &  $::=$ & \texttt{\textbf{(} <Node> <Node>* \textbf{)} } \\
+{[}N3{]} & \texttt{<name>} &  $::=$ & \texttt{<LocalName> | <ExpName> | {\itshape @} | {\itshape *TOP*} | {\itshape *PI*} | {\itshape *COMMENT*} | {\itshape *ENTITY*} | {\itshape *NAMESPACES*} | {\itshape @@} } \\
 \end{tabular}
 \\
 The uniformity of the SXML representation for elements,
@@ -201,7 +218,7 @@ attributes become redundant.
 A function \texttt{SSAX:XML->SXML} of a functional Scheme XML parsing
 framework SSAX \cite{SSAX} can convert an XML document or a
 well-formed part of it into the corresponding SXML form. The parser
-supports namespaces, character and parsed entities, xml:space,
+supports namespaces, character and parsed entities, 
 attribute value normalization, processing instructions and CDATA
 sections.
 
@@ -239,7 +256,7 @@ maps to\begin{verbatim}
 Note that the \texttt{xmlns:cars} attribute has been removed by the mapping.\end{quote}
 Using James Clark's terminology, SXML as defined by [N1] is
 precisely that tree where element type names and attribute names can
-be universal names.  According to productions [N3] and [9-11], a
+be universal names.  According to productions [N3] and [9-12], a
 universal name, \texttt{<name>}, is either a local name or an expanded
 name. Both kinds of names are Scheme identifiers. A local name has no
 colon characters in its spelling. An expanded name is spelled with at
@@ -259,14 +276,24 @@ should use the namespace name, not the prefix, in constructing names
 whose scope extends beyond the containing document."
 
 It is clearly unwieldy to deal with identifiers such as \texttt{http://www.cars.com/xml:part}. Therefore, an application that
-invokes the SSAX parser may tell the parser to map the URI \texttt{http://www.cars.com/xml} to an application-specific prefix, e.g., \texttt{c}. The parser will then produce\begin{verbatim}
+invokes the SSAX parser may tell the parser to map the URI \texttt{http://www.cars.com/xml} to an application-specific namespace shortcut \texttt{user-ns-shortcut}, e.g., \texttt{c}. The parser will then produce\begin{verbatim}
      (c:part (*NAMESPACES* (c "http://www.cars.com/xml")))
 \end{verbatim}
 To be more precise, the parser will return just\begin{verbatim}
      (c:part)
 \end{verbatim}
 If an application told the parser how to map \texttt{http://www.cars.com/xml}, the application can keep this mapping in
-its mind and will not need additional reminders.
+its mind and will not need additional reminders.We must note there is a 1-to-1 correspondence between \texttt{user-ns-shortcut}s and the corresponding namespace URIs. This is generally not true
+for XML namespace prefixes and namespace URIs. A \texttt{user-ns-shortcut} uniquely represents the corresponding namespace
+URI within the document, but an XML namespace prefix does not. For
+example, different XML prefixes may specify the same namespace
+URI; XML namespace prefixes may be redefined in children elements. The
+other difference between \texttt{user-ns-shortcut}s and
+XML namespace prefixes is that the latter are at the whims of the author
+of the document whereas the namespace shortcuts are defined by an
+XML processing application.
+
+
 
 \section{Case-sensitivity of SXML names}
 XML is a case-sensitive language. The names of XML elements,
@@ -348,6 +375,8 @@ Research Associateship Program, Naval Postgraduate School, and the
 Army Research Office under contracts 38690-MA and 40473-MA-SP.
 
 \begin{thebibliography}{}
+\bibitem{McCarthy} John McCarthy. Recursive Functions of Symbolic Expressions
+and Their Computation by Machine, Part I. Comm. ACM, 3(4):184-195, April 1960. \texttt{http://www-formal.stanford.edu/jmc/recursive/recursive.html} 
 \bibitem{Clark1999} Jim Clark. XML Namespaces. February 4, 1999. \texttt{http://www.jclark.com/xml/xmlns.htm} 
 \bibitem{R5RS} R. Kelsey, W. Clinger, J. Rees (eds.), Revised5 Report on
                       the Algorithmic Language Scheme. Higher-Order and
@@ -365,7 +394,7 @@ XPath. September 17, 2000. \texttt{http://pobox.com/\textasciitilde{}oleg/ftp/Sc
 Specification. W3C Recommendation. \texttt{http://www.w3.org/TR/REC-DOM-Level-1} 
 \bibitem{XML} World Wide Web Consortium. Extensible Markup Language (XML)
 1.0 (Second Edition). W3C Recommendation. October 6, 2000. \texttt{http://www.w3.org/TR/REC-xml} 
-\bibitem{XML Infoset} World Wide Web Consortium. XML Information Set. W3C Candidate Recommendation. May 14, 2001. \texttt{http://www.w3.org/TR/xml-infoset} 
+\bibitem{XML Infoset} World Wide Web Consortium. XML Information Set.  W3C Recommendation. 24 October 2001. \texttt{http://www.w3.org/TR/xml-infoset} 
 \bibitem{XML Namespaces} World Wide Web Consortium. Namespaces in XML. W3C Recommendation. January 14, 1999. \texttt{http://www.w3.org/TR/REC-xml-names/} 
 \bibitem{XPath} World Wide Web Consortium. XML Path Language (XPath).
 Version 1.0. W3C Recommendation. November 16, 1999. \texttt{http://www.w3.org/TR/xpath} 

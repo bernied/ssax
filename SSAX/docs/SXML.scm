@@ -7,11 +7,11 @@
     (title "SXML")
     (description "Definition of SXML: an instance of XML Infoset as
 S-expressions, an Abstract Syntax Tree of an XML document.")
-    (Date-Revision-yyyymmdd "20011007")
+    (Date-Revision-yyyymmdd "20020218")
     (Date-Creation-yyyymmdd "20010207")
     (keywords "XML, XML parsing, XML Infoset, XML Namespaces, AST, SXML, Scheme")
     (AuthorAddress "oleg@pobox.com")
-    (Revision "2.0")
+    (Revision "2.1")
     (long-title "SXML")
     (Links
      (start "index.html" (title "Scheme Hash"))
@@ -55,14 +55,13 @@ item has a number of associated properties, e.g., name, namespace
 URI. Some properties -- for example, 'children' and 'attributes' --
 are (ordered) collections of other information items. Infoset describes
 only the information in an XML document that is relevant to
-applications. Element declarations from DTD, the XML version, parameter
-entities, etc. data used merely for parsing or validation are not
-included. Although technically Infoset is specified for XML it
-largely applies to HTML as well.")
+applications. The default value of attributes declared in the DTD, parameter
+entities, the order of attributes within a start-tag, and other data used merely for parsing or validation are not included. Although technically 
+Infoset is specified for XML it largely applies to HTML as well.")
    (p
     "The hierarchy of containers comprised of text strings and other
 containers greatly lends itself to be described by
-S-expressions. S-expressions are easy to parse into an internal
+S-expressions. S-expressions " (cite "McCarthy") " are easy to parse into an internal
 representation suitable for traversal.  They have a simple external
 notation (albeit with many a parentheses), which is relatively easy to
 compose even by hand.  S-expressions have another advantage: "
@@ -83,38 +82,59 @@ implementation of evaluation of the XML document.")
 
    (Section 2 "Notation")
    (p
-    "We will use both an Extended BNF Notation (EBNF) employed in the XML
-Recommendation " (cite "XML") ", and syntactic conventions of the
-Revised Reports on Scheme, R5RS " (cite "R5RS") ". The following table summarizes the differences:")
-   (table (@ (align "center"))
-    (tr (td (n_)) (th "EBNF notation") (th "R5RS notation"))
-    (tr (td "An optional " (em "thing"))
-	(td (code (ebnf-opt "thing")))
-	(td (code "[thing]")))
-    (tr (td "Zero or more " (em "thing") "s")
-	(td (code (ebnf-* "thing")))
-	(td (code "thing ...")))
-    (tr (td "One or more " (em "thing") "s")
-	(td (code (ebnf-+ "thing")))
-	(td (code "thing thing ..."))))
-   (p "Furthermore, ")
-   (ul
-    (li (code (nonterm "thing")) (n_) " stands for a non-terminal of a grammar")
-    (li (code (term-id "thing")) (n_) " denotes a terminal of the grammar that is a Scheme identifier")
-    (li (code (term-str "thing")) (n_) " is a terminal of the grammar that is a Scheme string")
-    (li (code (term-lit "thing")) (n_) " is a literal Scheme symbol"))
+    "We will use an Extended BNF Notation (EBNF) employed in the XML
+Recommendation " (cite "XML") ". The following table summarizes the notation.")
+   (dl
+    (dt (code (ebnf-opt "thing")))
+    (dd "An optional " (em "thing"))
+
+    (dt (code (ebnf-* "thing")))
+    (dd "Zero or more " (em "thing") "s")
+
+    (dt (code (ebnf-+ "thing")))
+    (dd "One or more " (em "thing") "s")
+
+    (dt (code (ebnf-choice "thing1" "thing2" "thing3")))
+    (dd "Choice of " (em "thing") "s")
+
+    (dt (code (nonterm "thing")))
+    (dd "A non-terminal of a grammar")
+
+    (dt (code (term-id "thing")))
+    (dd "A terminal of the grammar that is a Scheme identifier")
+
+    (dt (code (term-str "thing")))
+    (dd "A terminal of the grammar that is a Scheme string")
+
+    (dt (code (term-lit "thing")))
+    (dd "A literal Scheme symbol")
+
+    (dt (code (sexp (nonterm "A") (ebnf-* (nonterm "B")))))
+    (dd "An S-expression made of " (code (nonterm "A"))
+	" followed by zero or more " (code (nonterm "B")))
+
+    (dt (code (sexp-cons (nonterm "A") (nonterm "B"))))
+    (dd "An S-expression that is made by prepending " (code (nonterm "A"))
+	" to an S-expression denoted by " (code (nonterm "B")))
+
+    (dt (code (sexp-symb (nonterm "A") ":" (nonterm "B"))))
+    (dd "A symbol whose string representation consists of all
+characters that spell "
+	(code (nonterm "A")) " followed by the colon character and by the characters that spell " (code (nonterm "B")) ". The " (code (sexp-symb "" )) " notation can be regarded a meta-function that creates symbols." )
+    )
 
    
    (Section 2 "Grammar")
    (productions
      (production 1
        (nonterm "TOP")
-       ((term-lit "*TOP*")
-	(ebnf-opt (nonterm "namespaces"))
-	;(ebnf-opt (nonterm "decl-entities"))
-	(ebnf-* (nonterm "PI"))
-	(ebnf-* (nonterm "comment"))
-	(nonterm "Element"))))
+       ((sexp
+	 (term-lit "*TOP*")
+	 (ebnf-opt (nonterm "namespaces"))
+	 ;(ebnf-opt (nonterm "decl-entities"))
+	 (ebnf-* (nonterm "PI"))
+	 (ebnf-* (nonterm "comment"))
+	 (nonterm "Element")))))
    (p
     "This S-expression stands for the root of the SXML tree, a
 document information item of the Infoset. It contains the root element
@@ -123,25 +143,28 @@ of the XML document as its only child element.")
    (productions
     (production 2
       (nonterm "Element")
-      ((nonterm "name")
-       (ebnf-opt (nonterm "attributes-list"))
-       (ebnf-opt (nonterm "namespaces"))
-       (ebnf-* (nonterm "child-of-element"))))
+      ((sexp
+	(nonterm "name")
+	(ebnf-opt (nonterm "attributes-list"))
+	(ebnf-opt (nonterm "namespaces"))
+	(ebnf-* (nonterm "child-of-element")))))
     (production 3
       (nonterm "attributes-list")
-      ((term-lit "@")
-       (ebnf-* (nonterm "attribute"))))
+      ((sexp
+	(term-lit "@")
+	(ebnf-* (nonterm "attribute")))))
     (production 4
       (nonterm "attribute")
-      ((nonterm "name")
-       (ebnf-opt (term-str "value"))))
+      ((sexp (nonterm "name")
+	     (ebnf-opt (term-str "value")))))
     (production 5
       (nonterm "child-of-element")
-      ((nonterm "Element") "|"
-       (term-str "character data") "|"
-       (nonterm "PI") "|"
-       (nonterm "comment") "|"
-       (nonterm "entity")))
+      ((ebnf-choice 
+	(nonterm "Element")
+	(term-str "character data")
+	(nonterm "PI")
+	(nonterm "comment")
+	(nonterm "entity"))))
     )
 
    (p "These are the basic constructs of SXML.")
@@ -149,9 +172,9 @@ of the XML document as its only child element.")
    (productions
     (production 6
       (nonterm "PI")
-      ((term-lit "*PI*")
+      ((sexp (term-lit "*PI*")
        (term-id "pi-target")
-       (term-str "processing instruction content string"))))
+       (term-str "processing instruction content string")))))
    (p "The XML Recommendation specifies that processing instructions (PI) are distinct from elements and character data; processing
 instructions must be passed through to applications. In SXML, PIs are
 therefore represented by nodes of a dedicated type " (code "*PI*")
@@ -160,72 +183,103 @@ therefore represented by nodes of a dedicated type " (code "*PI*")
    (productions
     (production 7
       (nonterm "comment")
-      ((term-lit "*COMMENT*")
-       (term-str "comment string")))
+      ((sexp (term-lit "*COMMENT*")
+	     (term-str "comment string"))))
     (production 8
       (nonterm "entity")
-      ((term-lit "*ENTITY*")
-       (term-str "public-id")
-       (term-str "system-id"))))
+      ((sexp (term-lit "*ENTITY*")
+	     (term-str "public-id")
+	     (term-str "system-id")))))
    (p "Comments are mentioned for completeness only. A SSAX XML parser
-" (cite "SSAX") ", among others, transparently skips the comments --
-as it should and as the Infoset Recommendation says. However, the XML
-Recommendation also permits retaining of the comments. DOM has a
-provision for COMMENT nodes, too. The present SXML grammar allows
-comment nodes but does not mandate them by any means.")
+" (cite "SSAX") ", among others, transparently skips the comments.
+The XML Recommendation permits the parser to pass the comments to
+an application or to completely disregard them. The present SXML grammar
+admits comment nodes but does not mandate them by any means." (br)
+"An " (code (nonterm "entity")) " node represents a reference to an
+unexpanded external entity. This node corresponds to an unexpanded
+entity reference information item, defined in Section 2.5 of " (cite
+"XML Infoset") ". Internal parsed entities are always expanded by the
+XML processor at the point of their reference in the body of the
+document.")
 
 
    (productions
     (production 9
       (nonterm "name")
-      ((nonterm "LocalName") "|"
-       (nonterm "ExpName"))
-      "; An XML QName")
+      ((ebnf-choice (nonterm "LocalName")
+		    (nonterm "ExpName"))))
     (production 10
       (nonterm "LocalName")
       ((term-id "NCName")))
     (production 11
       (nonterm "ExpName")
-      ((term-id "URI") ":" (nonterm "LocalName") "|"
-       (term-id "user-ns-prefix") ":" (nonterm "LocalName"))
-      "; An expanded name")
+      ((sexp-symb (nonterm "namespace-id") ":" (nonterm "LocalName"))))
+    (production 12
+      (nonterm "namespace-id")
+      ((ebnf-choice
+	(term-id "URI") (term-id "user-ns-shortcut"))))
+    (production 13
+      (nonterm "namespaces")
+      ((sexp
+	(term-lit "*NAMESPACES*")
+	(ebnf-* (nonterm "namespace-assoc")))))
+    (production 14
+      (nonterm "namespace-assoc")
+      ((sexp (nonterm "namespace-id") (term-str "URI"))))
+
     )
-   (p (code (term-id "NCName")) " is a Scheme symbol whose spelling conforms to
-production [4] of the XML Namespaces Recommendation" (cite "XML Namespaces") ". " (code (nonterm "ExpName"))
-" is also a Scheme symbol, with an embedded colon that joins a local
-part of the name and a prefix. A " (code (term-id "URI")) " is a
-Namespace URI string converted to a Scheme symbol. Universal Resource
-Identifiers (URI) may contain characters (e.g., parentheses) that are
-prohibited in Scheme identifiers. Such characters must be %-quoted
-during the conversion from a URI string to " (code (term-id "URI"))
-". Universal resource identifiers are often long and unwieldy
-strings. Therefore, a SSAX parser lets a user set his own prefixes to
-represent Namespace URIs. Thus " (code (term-id "user-ns-prefix")) "
-is also a Scheme identifier, which is typically far shorter than 
-" (code (term-id "URI")) ".")
+   (p "An SXML " (code (nonterm "name")) " is a single symbol. It is generally an expanded
+name " (cite "XML Namespaces") ", which conceptually consists of a
+local name and a namespace URI. The latter part may be empty, in which
+case
+" (code (nonterm "name")) " is a " (code (term-id "NCName")) ": a Scheme
+symbol whose spelling conforms to production [4] of the XML Namespaces
+Recommendation " (cite "XML Namespaces") ". " (code (nonterm
+"ExpName")) " is also a Scheme symbol, whose string representation
+contains an embedded colon that joins a local and a namespace
+parts of the name. A " (code (term-id "URI")) " is a Namespace URI
+string converted to a Scheme symbol. Universal Resource Identifiers (URI)
+may contain characters (e.g., parentheses) that are prohibited
+in Scheme identifiers. Such characters must be %-quoted during the
+conversion from a URI string to " (code (term-id "URI"))
+". A " (code (term-id "user-ns-shortcut")) " is a Scheme symbol chosen by the user to represent a namespace URI in the application program. The SSAX parser offers a user to define (short and mnemonic) unique shortcuts for Namespace URIs, which are are often long and unwieldy
+strings.")
 
    (productions
-    (production 12
-      (nonterm "namespaces")
-      ((term-lit "*NAMESPACES*")
-       (ebnf-* (nonterm "namespace-assoc"))))
-    (production 13
-      (nonterm "namespace-assoc")
-      ((term-id "URI") (term-str "URI") "|"
-       (term-id "user-ns-prefix") (term-str "URI"))))
+    (production "2e"
+      (nonterm "Element")
+      ((sexp
+	(nonterm "name")
+	(ebnf-opt (nonterm "attributes-list"))
+	(ebnf-opt (nonterm "aux"))
+	(ebnf-* (nonterm "child-of-element")))))
+    (production "4e"
+      (nonterm "attribute")
+      ((sexp (nonterm "name")
+	     (ebnf-opt (term-str "value"))
+	     (ebnf-opt (nonterm "aux")))))
+    (production "15e"
+      (nonterm "aux")
+      ((sexp
+	(term-lit "@@")
+	(ebnf-opt (nonterm "namespaces"))
+	(ebnf-* (nonterm "aux-node")))))
+    (production "16e"
+      (nonterm "aux-node")
+      ((n_))
+      (em "To be defined in the future"))
+    )
 
-
-  #|
-<Element> ::= (<name> [<attributes-coll>] <child-of-elem> ...)
-<attributes-coll> ::= (@ <attrib> ...)
-<attrib> ::= (<name> "value") | (<name>)
-<COMMENT> ::= (*COMMENT* "comment string")
-<NAMESPACES> ::= (*NAMESPACES* <namespace-assoc> ...)
-<ENTITY> ::= (*ENTITY* "public-id" "system-id")
-<namespace-assoc> ::= (<namespace-prefix> "URI") |
-		      (<namespace-prefix> <URI>) |
-		      (<user-prefix> "URI")
-   |#
+   (p "The XML Recommendation and related standards are not firmly
+fixed, as the long list of errata and the proposed version 1.1 of XML
+clearly show. Therefore, SXML has to be able to accommodate future
+changes while guaranteeing backwards compatibility. SXML also ought to
+permit applications to store various processing information (e.g.,
+cached resolved IDREFs) in an SXML tree. To allow such extensibility, we
+introduce two new node types, " (code (nonterm "aux")) " and " (code (nonterm "aux-node")) ". The semantics of the latter is to be
+established in future versions of SXML. Other candidates for " (code (nonterm "aux-node")) " are the unique id of an element or the reference to element's parent. The structure and the semantics of the " (code (nonterm
+"aux")) " node is similar to those of the attribute list. Applications that do not specifically look for auxiliary
+nodes can transparently ignore any present and future extensions."  )
 
 
    (Section 2 "SXML Tree")
@@ -271,37 +325,43 @@ itself is an instance of the Infoset.")
    (productions
     (production "N"
       (nonterm "Node")
-      ((nonterm "Element") "|"
-       (nonterm "attributes-list") "|"
-       (nonterm "attribute") "|"
-       (term-str "character data") "|"
-       (nonterm "namespaces") "|"
-       (nonterm "TOP") "|"
-       (nonterm "PI") "|"
-       (nonterm "comment") "|"
-       (nonterm "entity"))))
+      ((ebnf-choice
+	(nonterm "Element")
+	(nonterm "attributes-list")
+	(nonterm "attribute")
+	(term-str "character data")
+	(nonterm "namespaces")
+	(nonterm "TOP")
+	(nonterm "PI")
+	(nonterm "comment")
+	(nonterm "entity")
+	(nonterm "aux")))))
    (p
-    "or as a set of two mutually-recursive datatypes:")
+    "or as a set of two mutually-recursive datatypes, 
+" (code "Node") " and " (code "Nodeset") ", where the latter is an ordered set of " (code "Node") "s: ")
 
    (productions
     (production "N1"
       (nonterm "Node")
-      ("(" (nonterm "name") "." (nonterm "Nodeset") ")" "|"
-	(term-str "text string")))
+      ((ebnf-choice
+	(sexp-cons (nonterm "name") (nonterm "Nodeset"))
+	(term-str "text string"))))
     (production "N2"
       (nonterm "Nodeset")
-      ("(" (nonterm "Node") "..." ")")
-      ";; An ordered set of nodes")
+      ((sexp (nonterm "Node") (ebnf-* (nonterm "Node")))
+      ))
     (production "N3"
       (nonterm "name")
-      ((nonterm "LocalName") "|"
-       (nonterm "ExpName") "|"
-       (term-lit "@") "|"
-       (term-lit "*TOP*") "|"
-       (term-lit "*PI*") "|"
-       (term-lit "*COMMENT*") "|"
-       (term-lit "*ENTITY*") "|"
-       (term-lit "*NAMESPACES*"))))
+      ((ebnf-choice
+	(nonterm "LocalName")
+	(nonterm "ExpName")
+	(term-lit "@")
+	(term-lit "*TOP*")
+	(term-lit "*PI*")
+	(term-lit "*COMMENT*")
+	(term-lit "*ENTITY*")
+	(term-lit "*NAMESPACES*")
+	(term-lit "@@")))))
 
    (p
     "The uniformity of the SXML representation for elements,
@@ -315,7 +375,7 @@ attributes become redundant.")
     "A function " (code "SSAX:XML->SXML") " of a functional Scheme XML parsing
 framework SSAX " (cite "SSAX") " can convert an XML document or a
 well-formed part of it into the corresponding SXML form. The parser
-supports namespaces, character and parsed entities, xml:space,
+supports namespaces, character and parsed entities, 
 attribute value normalization, processing instructions and CDATA
 sections.")
 
@@ -359,7 +419,7 @@ attribute. So, for example"
    (div
     "Using James Clark's terminology, SXML as defined by [N1] is
 precisely that tree where element type names and attribute names can
-be universal names.  According to productions [N3] and [9-11], a
+be universal names.  According to productions [N3] and [9-12], a
 universal name, "
     (code (nonterm "name")) ", is either a local name or an expanded
 name. Both kinds of names are Scheme identifiers. A local name has no
@@ -373,7 +433,7 @@ SXML, James Clark's example will appear as follows:"
      "(http://www.cars.com/xml:part (@)"
      "   (*NAMESPACES* (cars \"http://www.cars.com/xml\")))"))
 
-   (div
+   (p
     "Such a representation also agrees with the Namespaces Recommendation "
     (cite "XML Namespaces") ", which says: \"Note that the prefix
 functions only as a placeholder for a namespace name. Applications
@@ -383,14 +443,26 @@ whose scope extends beyond the containing document.\"")
    (div "It is clearly unwieldy to deal with identifiers such as "
 	(code "http://www.cars.com/xml:part") ". Therefore, an application that
 invokes the SSAX parser may tell the parser to map the URI "
-	(code "http://www.cars.com/xml") " to an application-specific prefix, e.g., " (code "c") ". The parser will then produce"
+	(code "http://www.cars.com/xml") " to an application-specific namespace shortcut " (code (term-id "user-ns-shortcut")) ", e.g., " (code "c") ". The parser will then produce"
 	(verbatim
 	 "(c:part (*NAMESPACES* (c \"http://www.cars.com/xml\")))")
 	"To be more precise, the parser will return just"
 	(verbatim
 	 "(c:part)")
 	"If an application told the parser how to map " (code "http://www.cars.com/xml") ", the application can keep this mapping in
-its mind and will not need additional reminders.")
+its mind and will not need additional reminders."
+	(p "We must note there is a 1-to-1 correspondence between " (code (term-id "user-ns-shortcut"))
+"s and the corresponding namespace URIs. This is generally not true
+for XML namespace prefixes and namespace URIs. A " (code (term-id
+"user-ns-shortcut")) " uniquely represents the corresponding namespace
+URI within the document, but an XML namespace prefix does not. For
+example, different XML prefixes may specify the same namespace
+URI; XML namespace prefixes may be redefined in children elements. The
+other difference between " (code (term-id "user-ns-shortcut")) "s and
+XML namespace prefixes is that the latter are at the whims of the author
+of the document whereas the namespace shortcuts are defined by an
+XML processing application."))
+
 
 
    (Section 2 "Case-sensitivity of SXML names")
@@ -571,6 +643,12 @@ full one: " (code "(OPTION (@ (checked)))") " and " (code "(OPTION (@ (checked \
 
 
    (References
+
+    (bibitem "McCarthy" "McCarthy"
+       "John McCarthy. Recursive Functions of Symbolic Expressions
+and Their Computation by Machine, Part I. Comm. ACM, 3(4):184-195, April 1960."
+       (URL "http://www-formal.stanford.edu/jmc/recursive/recursive.html"))
+
     (bibitem "Clark1999" "Clark1999"
        "Jim Clark. XML Namespaces. February 4, 1999."
        (URL "http://www.jclark.com/xml/xmlns.htm"))
@@ -610,7 +688,7 @@ Specification. W3C Recommendation."
        (URL "http://www.w3.org/TR/REC-xml"))
 
     (bibitem "XML Infoset" "XML Infoset"
-       "World Wide Web Consortium. XML Information Set. W3C Candidate Recommendation. May 14, 2001."
+       "World Wide Web Consortium. XML Information Set.  W3C Recommendation. 24 October 2001."
        (URL "http://www.w3.org/TR/xml-infoset"))
 
     (bibitem "XML Namespaces" "XML Namespaces"
@@ -633,106 +711,7 @@ Version 1.0. W3C Recommendation. November 16, 1999."
 ;========================================================================
 ;			HTML generation
 
-(include "util.scm")
-(include "SXML-to-HTML.scm")
-
-; Look up a value associated with a symbolic key in alist (key value)
-; and return (value)
-; If failed, write a warning and return the default value, if non-#f
-; A lookup failure is fatal if the default value is #f
-(define (lookup-def key alist default-value)
-  (cond
-   ((assq key alist) => cdr)
-   (default-value
-     (cerr "Failed to find a binding for a key " key
-	   ". The default value " default-value " will be used")
-     default-value)
-   (else
-    (error "Failed to find a binding for a key " key))))
-
-
-; Procedure make-header HEAD-PARMS
-; Create the 'head' SXML/HTML tag. HEAD-PARMS is an assoc list of
-; (h-key h-value), where h-value is a typically string;
-; h-key is a symbol:
-; title, description, AuthorAddress, keywords,
-; Date-Revision-yyyymmdd, Date-Creation-yyyymmdd,
-; long-title
-; One of the h-key can be Links.
-; In that case, h-value is a list of
-;	(l-key l-href (attr value) ...)
-; where l-key is one of the following:
-;	start, contents, prev, next, top, home
-
-(define (make-header head-parms)
-  `(head
-    (title ,(car (lookup-def 'title head-parms #f)))
-    (meta (@ (http-equiv "Content-Type")
-	     (content "text/html; charset=US-ASCII")))
-    ,(map
-      (lambda (key)
-	(let ((val (car (lookup-def key head-parms '(#f)))))
-	  (and val
-	       `(meta (@ (name ,(symbol->string key)) (content ,val))))))
-      '(description AuthorAddress keywords
-	Date-Revision-yyyymmdd Date-Creation-yyyymmdd))
-    ,(let ((links (lookup-def 'Links head-parms '())))
-      (and (pair? links)
-	   (map
-	    (lambda (link-key)
-	      (let ((val (lookup-def link-key links '())))
-		(and (pair? val)
-		     `(link (@ (rel ,(symbol->string link-key))
-			       (href ,(car val))
-			       ,@(cdr val))))))
-	    '(start contents prev next)))))
-)
-
-; Create a navigational bar. The argument head-parms is the same
-; as the one passed to make-header. We're only concerned with the
-; h-value Links
-(define (make-navbar head-parms)
-  (let ((links (lookup-def 'Links head-parms '()))
-	(nav-labels '((prev . "previous")
-		      (next . "next")
-		      (contents . "contents")
-		      (top . "top"))))
-    (and (pair? links)
-      `(div (@ (align "center") (class "navbar"))
-	 ,(let loop ((nav-labels nav-labels) (first? #t))
-	    (if (null? nav-labels) '()
-		(let ((val (car
-			    (lookup-def (caar nav-labels) links '(#f)))))
-		  (if (not val)
-		      (loop (cdr nav-labels) first?)
-		      (cons
-		       (list " " (if first? #f '(n_)) " "
-			     `(a (@ (href ,val)) ,(cdar nav-labels)))
-		       (loop (cdr nav-labels) #f))))))
-	 (hr)))
-))
-			      
-
-; Create a footer. The argument head-parms is the same
-; as passed to make-header.
-(define (make-footer head-parms)
-  `((br)
-    (div (hr))
-    (h3 "Last updated "
-	,(let* ((date-revised
-		 (car (lookup-def 'Date-Revision-yyyymmdd head-parms #f)))
-		(tstamp (OS:string->time "%Y%m%d" date-revised)))
-	   (OS:cftime "%B %e, %Y" tstamp)))
-    ,(let ((links (lookup-def 'Links head-parms '())))
-       (and (pair? links)
-	    (let ((home (car (lookup-def 'home links '(#f)))))
-	      (and home
-		   `(p "This site's top page is "
-		       (a (@ (href ,home)) (strong ,home)))))))
-    (div (address "oleg@pobox.com or oleg@acm.org  or oleg@computer.org"
-       (br)
-       "Your comments, problem reports, questions are very welcome!"))))
-
+(include "SXML-to-HTML-ext.scm")
 
 
 ; Generating HTML
@@ -940,6 +919,25 @@ corresponding stylesheets are available at " master-url ".</font></blockquote>")
       . ,(lambda (tag term)
 	   (list term "+")))
 
+     (ebnf-choice	; Choice of terms
+      . ,(lambda (tag . terms)
+	   (list-intersperse terms " | ")))
+
+     (sexp		; S-expression constructor
+      . ,(lambda (tag . terms)
+	   (list "<strong>(</strong> " (list-intersperse terms " ") 
+		 " <strong>)</strong>")))
+
+     (sexp-cons		; S-expression constructor, like cons
+      . ,(lambda (tag car cdr)
+	   (list "<strong>(</strong> " car "<strong> . </strong>" cdr  
+		 " <strong>)</strong>")))
+
+     (sexp-symb		; Symbol constructor
+      . ,(lambda (tag . terms)
+	   (list "<strong><em>MAKE-SYMBOL</em>(</strong>" 
+		 terms "<strong>)</strong>")))
+
      (production
       . ,(lambda (tag number lhs rhs . comment)
 	   (list "<tr valign=top><td align=right><a name=\"prod-" number
@@ -949,7 +947,7 @@ corresponding stylesheets are available at " master-url ".</font></blockquote>")
 		 "<td align=left><code>" 
 		 (if (pair? rhs)
 		     (list-intersperse rhs " ")
-		     rsh)
+		     rhs)
 		 "</code> " comment
 		 "</td></tr>\n")))
 
