@@ -1452,7 +1452,7 @@
                                       new-src
                                       new-vacant))
                              (loop (cdr foll-siblings)
-                                   (descs (ddo:attr-child (car foll-siblings)))
+                                   (ddo:attr-child (car foll-siblings))
                                    (ddo:discard-attributes
                                     (car foll-siblings) src)
                                    (+ vacant-num 1)
@@ -1576,7 +1576,8 @@
                            (append
                             (reverse res)
                             (associate-num
-                             (if nonself? prec-siblings (cdr prec-siblings))
+                             ; DL: was: (if nonself? prec-siblings (cdr prec-siblings))
+                             prec-siblings
                              ancestors vacant-num))
                            pos-res)
                           src  ; always null
