@@ -1,4 +1,8 @@
 ;; Validation tests for SXPath-with-context: "xpath-context.scm"
+;
+; Please send bug reports and comments to:
+;   lisovsky@acm.org      Kirill Lisovsky
+;   lizorkin@hotbox.ru    Dmitry Lizorkin
 
 ;@ Document
 (define old-doc

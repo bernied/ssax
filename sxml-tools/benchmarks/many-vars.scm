@@ -1,4 +1,8 @@
 ;; Evaluating XPath expression that contains many XPath variables
+;
+; Please send bug reports and comments to:
+;   lisovsky@acm.org      Kirill Lisovsky
+;   lizorkin@hotbox.ru    Dmitry Lizorkin
 
 ; Generates n variables
 ; Returns (listof string)

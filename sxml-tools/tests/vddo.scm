@@ -1,4 +1,8 @@
 ;; Validation tests for DDO SXPath: "ddo-axes.scm" + "ddo-xpath.scm"
+;
+; Please send bug reports and comments to:
+;   lisovsky@acm.org      Kirill Lisovsky
+;   lizorkin@hotbox.ru    Dmitry Lizorkin
 
 ; We define a document
 (define old-doc

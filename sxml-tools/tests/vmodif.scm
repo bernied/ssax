@@ -1,4 +1,8 @@
 ;; Validation tests for SXML modification tool: "modif.scm"
+;
+; Please send bug reports and comments to:
+;   lisovsky@acm.org      Kirill Lisovsky
+;   lizorkin@hotbox.ru    Dmitry Lizorkin
 
 (define tree1
   '(html

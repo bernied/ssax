@@ -1,6 +1,10 @@
 ; Reproducing benchmark expreriments suggested in paper by Gottlob:
 ; "Efficient Algorithms for Processing XPath Queries", VLDB 2002
 ; http://www.dbai.tuwien.ac.at/research/xmltaskforce/vldb2002.pdf
+;
+; Please send bug reports and comments to:
+;   lisovsky@acm.org      Kirill Lisovsky
+;   lizorkin@hotbox.ru    Dmitry Lizorkin
 
 ; Generates a flat document
 (define (gott:doc i)

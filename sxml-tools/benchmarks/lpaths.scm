@@ -1,4 +1,8 @@
 ;; Benchmarks for location paths evaluation
+;
+; Please send bug reports and comments to:
+;   lisovsky@acm.org      Kirill Lisovsky
+;   lizorkin@hotbox.ru    Dmitry Lizorkin
 
 ;-------------------------------------------------
 ; Generators

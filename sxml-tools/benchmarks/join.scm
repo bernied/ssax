@@ -1,5 +1,9 @@
 ;; Comparing different algorithms of evaluating XPath equality comparison
 ; (In XPath 2.0 such a kind of comparison is called General Comparison)
+;
+; Please send bug reports and comments to:
+;   lisovsky@acm.org      Kirill Lisovsky
+;   lizorkin@hotbox.ru    Dmitry Lizorkin
 
 (define (sxml:list-head lst k)
   (if (or (null? lst) (zero? k))

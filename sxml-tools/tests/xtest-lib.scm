@@ -1,3 +1,9 @@
+; This software is in Public Domain.
+; IT IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+;
+; Please send bug reports and comments to:
+;   lisovsky@acm.org      Kirill Lisovsky
+
 ;==============================================================================
 ; Test generator doesn't not use any external code for its own purpose in order
 ; to avoid any interference with tested code.

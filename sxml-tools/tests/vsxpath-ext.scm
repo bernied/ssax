@@ -1,4 +1,8 @@
 ;; Validation tests for "sxpath-ext.scm"
+;
+; Please send bug reports and comments to:
+;   lisovsky@acm.org      Kirill Lisovsky
+;   lizorkin@hotbox.ru    Dmitry Lizorkin
 
 ;@ test-document
 (define xt-doc
