@@ -101,6 +101,10 @@
 ; A few convenient functions that are not in Bigloo
 (define (call-with-input-string str proc)
     (proc (open-input-string str)))
+(define (call-with-output-string proc)
+  (let ((port (open-output-string)))
+    (proc port)
+    (close-output-port port)))
 
 
 ; like cout << arguments << args
@@ -175,6 +179,9 @@
 			; string-null? str -> bool
 			; See Olin Shiver's Underground String functions
 (define-macro (string-null? str) `(zero? (string-length ,str)))
+
+; Often-used OS-specific function
+(define OS:file-length file-size)
 
 ; Support for let-values* form
 
