@@ -161,73 +161,81 @@
    (bigloo (cout "Expanded in Bigloo" nl))
    (else #f))
 
-  (assert (= 1
-	     (+
-	      (cond-expand (gambit 1) (else 0))
-	      (cond-expand (scm 1) (else 0))
-	      (cond-expand (mit-scheme 1) (else 0))
-	      (cond-expand (bigloo 1) (else 0)))))
-  (cond-expand
-   (gambit (assert (failed? (cond-expand ((not gambit) #t)))))
-   (else #t))
-  (assert (memv
-	   (cond-expand
-	    (gambit 0 1)
-	    (scm 0 2)
-	    (bigloo 0 3)
-	    (mit-scheme 0 4)
-	    (else 0))
-	   '(1 2 3 4)))
-  (assert (memv
-	   (cond-expand
-	    ((and bigloo srfi-0) 0 3)
-	    ((and gambit srfi-0) 0 1)
-	    ((and scm srfi-0) 0 2)
-	    ((and mit-scheme srfi-0) 0 4)
-	    (else 0))
-	   '(1 2 3 4)))
-  (assert (memv
-	   (cond-expand
-	    ((or xxx gambit zzz) 0 1)
-	    ((or xxx scm zzz) 0 2)
-	    ((or xxx bigloo zzz) 0 3)
-	    ((or xxx mit-scheme zzz) 0 4)
-	    (else 0))
-	   '(1 2 3 4)))
-  (assert (memv
-	   (cond-expand
-	    ((not gambit) 0 1)
-	    ((not scm) 0 2)
-	    ((not mit-scheme) 0 4)
-	    ((not bigloo) 0 3)
-	    (else 0))
-	   '(1 2)))
-  (assert (memv
-	   (cond-expand
-	    ((or (not gambit) (and gambit gambit)) 0 1)
-	    ((or (not scm) (and scm scm)) 0 2)
-	    ((or (not mit-scheme) (and mit-scheme mit-scheme)) 0 4)
-	    ((or (not bigloo) (and bigloo bigloo)) 0 3)
-	    (else 0))
-	   '(1 2 3 4)))
   (assert (cond-expand (xxx (/ 1 0)) (else #t)))
   (assert (cond-expand ((not xxx) #t)))
-  (assert (cond-expand ((not (and gambit scm mit-scheme)) #t)))
   (assert (cond-expand ((or xxx (not xxx)) #t)))
   (assert (cond-expand ((and (not xxx) xxx) (/ 1 0)) (else #t)))
-  (assert
-   (cond-expand
-    (gambit (positive? +inf.))  ; works only in Gambit
-    (scm (procedure? try-load)) ; works only in SCM
-    (bigloo (<fx 1 2))		; works only in Bigloo
-    (mit-scheme (fix:+ 1 2))	; works only in MIT-Scheme
-    (else #f)))
-  (assert
-   (cond-expand
-    ((or gambit scm bigloo mit-scheme) 
-     (char=? #\newline (string-ref "\n" 0)))
-    ((or scm mit-scheme) (eq? 'a 'A))
-    (else #f)))
+
+  (cond-expand
+    ((or gambit scm mit-scheme bigloo)
+      (assert (= 1
+		(+
+		  (cond-expand (gambit 1) (else 0))
+		  (cond-expand (scm 1) (else 0))
+		  (cond-expand (mit-scheme 1) (else 0))
+		  (cond-expand (bigloo 1) (else 0)))))
+      (cond-expand
+	(gambit (assert (failed? (cond-expand ((not gambit) #t)))))
+	(else #t))
+      (assert (memv
+		(cond-expand
+		  (gambit 0 1)
+		  (scm 0 2)
+		  (bigloo 0 3)
+		  (mit-scheme 0 4)
+		  (else 0))
+		'(1 2 3 4)))
+      (assert (memv
+		(cond-expand
+		  ((and bigloo srfi-0) 0 3)
+		  ((and gambit srfi-0) 0 1)
+		  ((and scm srfi-0) 0 2)
+		  ((and mit-scheme srfi-0) 0 4)
+		  (else 0))
+		'(1 2 3 4)))
+      (assert (memv
+		(cond-expand
+		  ((or xxx gambit zzz) 0 1)
+		  ((or xxx scm zzz) 0 2)
+		  ((or xxx bigloo zzz) 0 3)
+		  ((or xxx mit-scheme zzz) 0 4)
+		  (else 0))
+		'(1 2 3 4)))
+      (assert (memv
+		(cond-expand
+		  ((not gambit) 0 1)
+		  ((not scm) 0 2)
+		  ((not mit-scheme) 0 4)
+		  ((not bigloo) 0 3)
+		  (else 0))
+		'(1 2)))
+      (assert (memv
+		(cond-expand
+		  ((or (not gambit) (and gambit gambit)) 0 1)
+		  ((or (not scm) (and scm scm)) 0 2)
+		  ((or (not mit-scheme) (and mit-scheme mit-scheme)) 0 4)
+		  ((or (not bigloo) (and bigloo bigloo)) 0 3)
+		  (else 0))
+		'(1 2 3 4)))
+      (assert (cond-expand ((not (and gambit scm mit-scheme)) #t)))
+      (assert
+	(cond-expand
+	  (gambit (positive? +inf.))  ; works only in Gambit
+	  (scm (procedure? try-load)) ; works only in SCM
+	  (bigloo (<fx 1 2))		; works only in Bigloo
+	  (mit-scheme (fix:+ 1 2))	; works only in MIT-Scheme
+	  (else #f)))
+      (assert
+	(cond-expand
+	  ((or gambit scm bigloo mit-scheme) 
+	    (char=? #\newline (string-ref "\n" 0)))
+	  ((or scm mit-scheme) (eq? 'a 'A))
+	  (else #f)))
+      )
+    (else
+      (cerr nl "Cond-expand test skipped: platform is not known to the test"
+	nl))
+    )
 )
 
 (cerr nl "Verifying cons*..." nl)
@@ -269,23 +277,25 @@
 )
 
 (cerr nl "Verifying list-intersperse and list-intersperse! ..." nl)
-(let ((test-l '(4 5 "7" (9))))
+(let ((test-l '(4 5 "7" (9)))
+      (clone-list 			; Return a newly allocated copy of lst
+	(lambda (lst) (append lst '()))))
   (assert (equal? '() (list-intersperse '() 1)))
   (assert (equal? '(4) (list-intersperse '(4) 1)))
   (assert (equal? '(4 1 5) (list-intersperse '(4 5) 1)))
   (assert (equal? '(4 #\, 5 #\, "7" #\, #\9)
       (list-intersperse '(4 5 "7" #\9) #\,)))
-  (let ((test-clone (append test-l '())))
+  (let ((test-clone (clone-list test-l)))
     (assert (equal? '(4 () 5 () "7" () (9))
         (list-intersperse test-clone '())))
     (assert (equal? test-l test-clone)))
 
   (assert (equal? '() (list-intersperse! '() 1)))
   (assert (equal? '(4) (list-intersperse! '(4) 1)))
-  (assert (equal? '(4 1 5) (list-intersperse! '(4 5) 1)))
+  (assert (equal? '(4 1 5) (list-intersperse! (clone-list '(4 5)) 1)))
   (assert (equal? '(4 #\, 5 #\, "7" #\, #\9)
-      (list-intersperse! '(4 5 "7" #\9) #\,)))
-  (let ((test-clone (append test-l '()))
+      (list-intersperse! (clone-list '(4 5 "7" #\9)) #\,)))
+  (let ((test-clone (clone-list test-l))
         (test-result '(4 () 5 () "7" () (9))))
     (assert (equal? test-result
         (list-intersperse! test-clone '())))
