@@ -105,6 +105,10 @@
 ; IMPORT
 ; parser-error ssax:warn, see Handling of errors, below
 ; functions declared in files util.scm, input-parse.scm and look-for-str.scm
+; char-encoding.scm for various platform-specific character-encoding functions.
+; From SRFI-13: string-concatenate/shared and string-concatenate-reverse/shared
+; If a particular implementation lacks SRFI-13 support, please
+; include the file srfi-13-local.scm
 
 ; Handling of errors
 ; This package relies on a function parser-error, which must be defined
@@ -142,31 +146,12 @@
 ; $Id$
 
 
-	; To run this code under Gambit, execute the following:
-	; gsi -e "(include \"../lib/myenv.scm\")" \
-	; -e "(include \"../lib/catch-error.scm\")" \
-	; -e "(include \"../lib/util.scm\")" \
-	; -e "(include \"../lib/look-for-str.scm\")" \
-	; -e "(include \"../lib/input-parse.scm\")" SSAX.scm
-
-	; To run this code under SCM, do
-	; scm myenv-scm.scm catch-error.scm util.scm input-parse.scm
-	; look-for-str.scm SSAX.scm 
-
-	; To run this code under MIT Scheme, do
-	; scheme -load myenv-mit.scm catch-error.scm input-parse.scm util.scm \
-	; look-for-str.scm SSAX.scm
-
-	; Current versions of SSAX ports to other Scheme systems
-	; (including Bigloo, Guile, Chicken, and PLT Scheme) are available from
-	;	http://pair.com/lisovsky/download/ssax/
-	; I'm deeply grateful to Kirill Lisovsky for developing and
-	; maintaining these versions. His comments and suggestions are
-	; appreciated indeed.
-
-	; See http://pobox.com/~oleg/ftp/Scheme/
-	; for myenv.scm and other input parsing functions used
-	; in the present code.
+	; See the Makefile in the ../tests directory
+	; (in particular, the rule vSSAX) for an example of how
+	; to run this code on various Scheme systems.
+	; See SSAX examples for many samples of using this code,
+	; again, on a variety of Scheme systems.
+	; See http://ssax.sf.net/
 
 
 ; The following macro runs built-in test cases -- or does not run,
@@ -371,7 +356,7 @@
 ; Normally the definition of ssax:warn is to be provided by the user.
 (run-test
  (define (ssax:warn port msg . other-msg)
-   (apply cerr (cons* "\nWarning: " msg other-msg)))
+   (apply cerr (cons* nl "Warning: " msg other-msg)))
 )
 
 
@@ -410,6 +395,42 @@
 	 (equal? e1 e2)))))
 )
 
+; The following function, which is often used in validation tests,
+; lets us conveniently enter newline, CR and tab characters in a character
+; string.
+;	unesc-string: ESC-STRING -> STRING
+; where ESC-STRING is a character string that may contain
+;    %n  -- for #\newline
+;    %r  -- for #\return
+;    %t  -- for #\tab
+;    %%  -- for #\%
+;
+; The result of unesc-string is a character string with all %-combinations
+; above replaced with their character equivalents
+
+(run-test
+ (define (unesc-string str)
+   (call-with-input-string str
+     (lambda (port)
+       (let loop ((frags '()))
+	 (let* ((token (next-token '() '(#\% *eof*) "unesc-string" port))
+		(cterm (read-char port))
+		(frags (cons token frags)))
+	   (if (eof-object? cterm) (string-concatenate-reverse/shared frags)
+	     (let ((cchar (read-char port)))  ; char after #\%
+	       (if (eof-object? cchar)
+		 (error "unexpected EOF after reading % in unesc-string:" str)
+		 (loop
+		   (cons
+		     (case cchar
+		       ((#\n) (string #\newline))
+		       ((#\r) (string char-return))
+		       ((#\t) (string char-tab))
+		       ((#\%) "%")
+		       (else (error "bad %-char in unesc-string:" cchar)))
+		     frags))))))))))
+)
+	     
 
 ; Test if a string is made of only whitespace
 ; An empty string is considered made of whitespace as well
@@ -453,6 +474,7 @@
       (lp (cdr lis) (kons (car lis) ans)))))
 
 
+
 ;========================================================================
 ;		Lower-level parsers and scanners
 ;
@@ -471,7 +493,7 @@
 ; encounters while scanning the PORT. This character is left
 ; on the input stream.
 
-(define ssax:S-chars '(#\space #\tab #\return #\newline))
+(define ssax:S-chars (map ascii->char '(32 10 9 13)))
 
 (define (ssax:skip-S port)
   (skip-while ssax:S-chars port))
@@ -683,7 +705,7 @@
 
 (define (ssax:read-pi-body-as-string port)
   (ssax:skip-S port)		; skip WS after the PI target name
-  (apply string-append
+  (string-concatenate/shared
     (let loop ()
       (let ((pi-fragment
 	     (next-token '() '(#\?) "reading PI content" port)))
@@ -743,18 +765,15 @@
 ; Note, &lt; and &amp; are not specially recognized (and are not expanded)!
 
 (define ssax:read-cdata-body 
-  (let ((nl-str (string #\newline)))
+  (let ((cdata-delimiters (list char-return #\newline #\] #\&)))
 
     (lambda (port str-handler seed)
       (let loop ((seed seed))
-	(let ((fragment (next-token '() '(#\return #\newline #\] #\&)
+	(let ((fragment (next-token '() cdata-delimiters
 				    "reading CDATA" port)))
 			; that is, we're reading the char after the 'fragment'
      (case (read-char port)	
-       ((#\newline) (loop (str-handler fragment nl-str seed)))
-       ((#\return)		; if the next char is #\newline, skip it
-         (if (eqv? (peek-char port) #\newline) (read-char port))
-         (loop (str-handler fragment nl-str seed)))
+       ((#\newline) (loop (str-handler fragment nl seed)))
        ((#\])
 	(if (not (eqv? (peek-char port) #\]))
 	    (loop (str-handler fragment "]" seed))
@@ -778,20 +797,22 @@
 	    (loop 
 	     (str-handler ent-ref ""
 			  (str-handler fragment "&" seed)))))))
-       (else
-         (parser-error port "can't happen"))))))))
+       (else		; Must be CR: if the next char is #\newline, skip it
+         (if (eqv? (peek-char port) #\newline) (read-char port))
+         (loop (str-handler fragment nl seed)))
+       ))))))
 
 ; a few lines of validation code
 (run-test (letrec
   ((consumer (lambda (fragment foll-fragment seed)
      (cons* (if (equal? foll-fragment (string #\newline))
-		" NL\n" foll-fragment) fragment seed)))
+		" NL" foll-fragment) fragment seed)))
    (test (lambda (str expected-result)
 	   (newline) (display "body: ") (write str)
 	   (newline) (display "Result: ")
 	   (let ((result
 		   (reverse 
-		     (call-with-input-string str
+		     (call-with-input-string (unesc-string str)
 		       (lambda (port) (ssax:read-cdata-body port consumer '()))
 		       ))))
 	     (write result)
@@ -803,9 +824,10 @@
   (test "abcd]]]]>" '("abcd" "" "]" "" "]" ""))
   (test "abcd]]]]]>" '("abcd" "" "]" "" "]" "" "]" ""))
   (test "abcd]]]a]]>" '("abcd" "" "]" "" "]]" "" "a" ""))
-  (test "abc\r\ndef\n]]>" '("abc" " NL\n" "def" " NL\n"))
-  (test "\r\n\r\n]]>" '("" " NL\n" "" " NL\n"))
-  (test "\r\n\r\na]]>" '("" " NL\n" "" " NL\n" "a" ""))
+  (test "abc%r%ndef%n]]>" '("abc" " NL" "def" " NL"))
+  (test "%r%n%r%n]]>" '("" " NL" "" " NL"))
+  (test "%r%n%r%na]]>" '("" " NL" "" " NL" "a" ""))
+  (test "%r%r%r%na]]>" '("" " NL" "" " NL" "" " NL" "a" ""))
   (test "abc&!!!]]>" '("abc" "&" "" "" "!!!" ""))
   (test "abc]]&gt;&gt&amp;]]]&gt;and]]>"
     '("abc" "" "]]" "" "" ">" "" "&" "gt" "" "" "&" "amp" "" ";" "" "]" ""
@@ -825,6 +847,15 @@
 ; the char reference
 ; Faults detected:
 ;	WFC: XML-Spec.html#wf-Legalchar
+;
+; According to Secttion "4.1 Character and Entity References"
+; of the XML Recommendation:
+;  "[Definition: A character reference refers to a specific character
+;   in the ISO/IEC 10646 character set, for example one not directly
+;   accessible from available input devices.]"
+; Therefore, we use a ucscode->char function to convert a character
+; code into the character -- *regardless* of the current character
+; encoding of the input stream.
 
 (define (ssax:read-char-ref port)
   (let* ((base
@@ -833,7 +864,7 @@
          (name (next-token '() '(#\;) "XML [66]" port))
          (char-code (string->number name base)))
     (read-char port)	; read the terminating #\; char
-    (if (integer? char-code) (integer->char char-code)
+    (if (integer? char-code) (ucscode->char char-code)
       (parser-error port "[wf-Legalchar] broken for '" name "'"))))
 
 
@@ -947,7 +978,7 @@
 ;	WFC: XML-Spec.html#uniqattspec
 
 (define ssax:read-attributes  ; ssax:read-attributes port entities
- (let ()
+ (let ((value-delimeters (append ssax:S-chars '(#\< #\&))))
 		; Read the AttValue from the PORT up to the delimiter
 		; (which can be a single or double-quote character,
 		; or even a symbol *eof*)
@@ -957,33 +988,30 @@
 		; prepended.
   (define (read-attrib-value delimiter port entities prev-fragments)
     (let* ((new-fragments
-	    (cons
-	     (next-token '() (cons delimiter
-				   '(#\newline #\return #\space #\tab #\< #\&))
-			 "XML [10]" port)
+	    (cons (next-token '() (cons delimiter value-delimeters)
+		              "XML [10]" port)
 	     prev-fragments))
 	   (cterm (read-char port)))
-      (if (or (eof-object? cterm) (eqv? cterm delimiter))
-	  new-fragments
-          (case cterm
-            ((#\newline #\space #\tab)
-              (read-attrib-value delimiter port entities
-				 (cons " " new-fragments)))
-            ((#\return)
-              (if (eqv? (peek-char port) #\newline) (read-char port))
-              (read-attrib-value delimiter port entities
-				 (cons " " new-fragments)))
-            ((#\&)
-              (cond
-                ((eqv? (peek-char port) #\#)
-                  (read-char port)
-                  (read-attrib-value delimiter port entities
-		     (cons (string (ssax:read-char-ref port)) new-fragments)))
-                (else
-		 (read-attrib-value delimiter port entities
-		     (read-named-entity port entities new-fragments)))))
-            ((#\<) (parser-error port "[CleanAttrVals] broken"))
-            (else (parser-error port "Can't happen"))))))
+      (cond
+	((or (eof-object? cterm) (eqv? cterm delimiter))
+	  new-fragments)
+	((eqv? cterm char-return)	; treat a CR and CRLF as a LF
+	  (if (eqv? (peek-char port) #\newline) (read-char port))
+	  (read-attrib-value delimiter port entities
+	                     (cons " " new-fragments)))
+	((memv cterm ssax:S-chars)
+	  (read-attrib-value delimiter port entities
+	                     (cons " " new-fragments)))
+	((eqv? cterm #\&)
+	  (cond
+	    ((eqv? (peek-char port) #\#)
+	      (read-char port)
+	      (read-attrib-value delimiter port entities
+		(cons (string (ssax:read-char-ref port)) new-fragments)))
+	    (else
+	      (read-attrib-value delimiter port entities
+		(read-named-entity port entities new-fragments)))))
+	(else (parser-error port "[CleanAttrVals] broken")))))
 
 		; we have read "&" that introduces a named entity reference.
 		; read this reference and return the result of
@@ -1015,10 +1043,9 @@
 	      (loop 
 	       (or (attlist-add attr-list 
 		     (cons name 
-			   (apply string-append
-				  (reverse
-				   (read-attrib-value delimiter port entities
-						      '())))))
+			   (string-concatenate-reverse/shared
+			     (read-attrib-value delimiter port entities
+						      '()))))
 		   (parser-error port "[uniqattspec] broken for " name))))))))
 ))
 
@@ -1028,41 +1055,44 @@
 	     (newline) (display "input: ") (write str)
 	     (newline) (display "Result: ")
 	     (let ((result
-		     (call-with-input-string str
+		     (call-with-input-string (unesc-string str)
 		       (lambda (port)
 			 (ssax:read-attributes port decl-entities)))))
 	       (write result) (newline)
 	       (assert (equal? result expected-res))))))
     (test "" '() '())
-    (test "href='http://a\tb\r\n\r\n\nc'" '()
+    (test "href='http://a%tb%r%n%r%n%nc'" '()
 	  `((,(string->symbol "href") . "http://a b   c")))
-    (test "_1 ='12&amp;' _2= \"\r\n\t12&#10;3\">" '()
-	  '((_1 . "12&") (_2 . "  12\n3")))
-    (test "\tAbc='&lt;&amp;&gt;&#x0A;'\nNext='12&ent;34' />" 
+    (test "href='http://a%tb%r%r%n%rc'" '()
+	  `((,(string->symbol "href") . "http://a b   c")))
+    (test "_1 ='12&amp;' _2= \"%r%n%t12&#10;3\">" '()
+	  `((_1 . "12&") (_2 . ,(unesc-string "  12%n3"))))
+    (test "%tAbc='&lt;&amp;&gt;&#x0A;'%nNext='12&ent;34' />" 
 	  '((ent . "&lt;xx&gt;"))
-	  `((,(string->symbol "Abc") . ,(string-append "<&>"
-					    (string #\newline)))
+	  `((,(string->symbol "Abc") . ,(unesc-string "<&>%n"))
 	    (,(string->symbol "Next") . "12<xx>34")))
-    (test "\tAbc='&lt;&amp;&gt;&#x0A;'\nNext='12&en;34' />" 
+    (test "%tAbc='&lt;&amp;&gt;&#x0d;'%nNext='12&ent;34' />" 
+	  '((ent . "&lt;xx&gt;"))
+	  `((,(string->symbol "Abc") . ,(unesc-string "<&>%r"))
+	    (,(string->symbol "Next") . "12<xx>34")))
+    (test "%tAbc='&lt;&amp;&gt;&#x0A;'%nNext='12&en;34' />" 
 	  `((en . ,(lambda () (open-input-string "&quot;xx&apos;"))))
-	  `((,(string->symbol "Abc") . ,(string-append "<&>"
-					    (string #\newline)))
+	  `((,(string->symbol "Abc") . ,(unesc-string "<&>%n"))
 	    (,(string->symbol "Next") . "12\"xx'34")))
-    (test "\tAbc='&lt;&amp;&gt;&#x0A;'\nNext='12&ent;34' />" 
+    (test "%tAbc='&lt;&amp;&gt;&#x0A;'%nNext='12&ent;34' />" 
 	  '((ent . "&lt;&ent1;T;&gt;") (ent1 . "&amp;"))
-	  `((,(string->symbol "Abc") . ,(string-append "<&>"
-					    (string #\newline)))
+	  `((,(string->symbol "Abc") . ,(unesc-string "<&>%n"))
 	    (,(string->symbol "Next") . "12<&T;>34")))
     (assert (failed?
-	(test "\tAbc='&lt;&amp;&gt;&#x0A;'\nNext='12&ent;34' />" 
+	(test "%tAbc='&lt;&amp;&gt;&#x0A;'%nNext='12&ent;34' />" 
 	  '((ent . "<&ent1;T;&gt;") (ent1 . "&amp;")) '())))
     (assert (failed?
-	(test "\tAbc='&lt;&amp;&gt;&#x0A;'\nNext='12&ent;34' />" 
+	(test "%tAbc='&lt;&amp;&gt;&#x0A;'%nNext='12&ent;34' />" 
 	  '((ent . "&lt;&ent;T;&gt;") (ent1 . "&amp;")) '())))
     (assert (failed?
-	(test "\tAbc='&lt;&amp;&gt;&#x0A;'\nNext='12&ent;34' />" 
+	(test "%tAbc='&lt;&amp;&gt;&#x0A;'%nNext='12&ent;34' />" 
 	  '((ent . "&lt;&ent1;T;&gt;") (ent1 . "&ent;")) '())))
-    (test "html:href='http://a\tb\r\n\r\n\nc'" '()
+    (test "html:href='http://a%tb%r%n%r%n%nc'" '()
 	  `(((,(string->symbol "html") . ,(string->symbol "href"))
 	     . "http://a b   c")))
     (test "html:href='ref1' html:src='ref2'" '()
@@ -1621,8 +1651,8 @@
 	; ssax:read-char-data port expect-eof? str-handler seed
 (define ssax:read-char-data
  (let
-     ((terminators-usual '(#\< #\& #\return))
-      (terminators-usual-eof '(#\< *eof* #\& #\return))
+     ((terminators-usual (list #\< #\& char-return))
+      (terminators-usual-eof (list #\< '*eof* #\& char-return))
 
       (handle-fragment
        (lambda (fragment str-handler seed)
@@ -1706,17 +1736,18 @@
      (if (string-null? foll-fragment) (cons fragment seed)
 	 (cons* foll-fragment fragment seed))))
    (test (lambda (str expect-eof? expected-data expected-token)
-	   (display "\nbody: ") (write str) (display "\nResult: ")
+	   (newline) (display "body: ") (write str)
+	   (newline) (display "Result: ")
 	  (let*-values
 	   (((seed token)
-	     (call-with-input-string str
+	     (call-with-input-string (unesc-string str)
 		(lambda (port)
 		 (ssax:read-char-data port expect-eof? str-handler '()))))
 	    ((result) (reverse seed)))
 	   (write result)
 	   (display " ")
 	   (display token)
-	   (assert (equal? result expected-data)
+	   (assert (equal? result (map unesc-string expected-data))
 		   (equal? token expected-token)))))
    )
   (test "" #t '() eof-object)
@@ -1730,28 +1761,29 @@
   (test " a &lt;" #f '(" a ") a-ref)
 
   (test " <!-- comment--> a  a<BR/>" #f '(" " " a  a") a-tag)
-  (test " <!-- comment-->\ra  a<BR/>" #f '(" " "" "\n" "a  a") a-tag)
-  (test " <!-- comment-->\r\na  a<BR/>" #f '(" " "" "\n" "a  a") a-tag)
-  (test " <!-- comment-->\r\na\t\r\r\na<BR/>" #f
-	'(" " "" "\n" "a\t" "\n" "" "\n" "a") a-tag)
+  (test " <!-- comment-->%ra  a<BR/>" #f '(" " "" "%n" "a  a") a-tag)
+  (test " <!-- comment-->%r%na  a<BR/>" #f '(" " "" "%n" "a  a") a-tag)
+  (test " <!-- comment-->%r%na%t%r%r%na<BR/>" #f
+	'(" " "" "%n" "a%t" "%n" "" "%n" "a") a-tag)
   (test "a<!-- comment--> a  a<BR/>" #f '("a" " a  a") a-tag)
   (test "&#x21;<BR/>" #f '("" "!") a-tag)
-  (test "&#x21;\n<BR/>" #f '("" "!" "\n") a-tag)
-  (test "\t&#x21;\n<BR/>" #f '("\t" "!" "\n") a-tag)
-  (test "\t&#x21;\na a<BR/>" #f '("\t" "!" "\na a") a-tag)
-  (test "\t&#x21;\ra a<BR/>" #f '("\t" "!" "" "\n" "a a") a-tag)
+  (test "&#x21;%n<BR/>" #f '("" "!" "%n") a-tag)
+  (test "%t&#x21;%n<BR/>" #f '("%t" "!" "%n") a-tag)
+  (test "%t&#x21;%na a<BR/>" #f '("%t" "!" "%na a") a-tag)
+  (test "%t&#x21;%ra a<BR/>" #f '("%t" "!" "" "%n" "a a") a-tag)
+  (test "%t&#x21;%r%na a<BR/>" #f '("%t" "!" "" "%n" "a a") a-tag)
 
-  (test " \ta &#x21;   b <BR/>" #f '(" \ta " "!" "   b ") a-tag)
-  (test " \ta &#x20;   b <BR/>" #f '(" \ta " " " "   b ") a-tag)
+  (test " %ta &#x21;   b <BR/>" #f '(" %ta " "!" "   b ") a-tag)
+  (test " %ta &#x20;   b <BR/>" #f '(" %ta " " " "   b ") a-tag)
 
   (test "<![CDATA[<]]><BR/>" #f '("<") a-tag)
   (test "<![CDATA[]]]><BR/>" #f '("]") a-tag)
-  (test "\t<![CDATA[<]]><BR/>" #f '("\t" "<") a-tag)
-  (test "\t<![CDATA[<]]>a b<BR/>" #f '("\t" "<" "a b") a-tag)
-  (test "\t<![CDATA[<]]>  a b<BR/>" #f '("\t" "<" "  a b") a-tag)
+  (test "%t<![CDATA[<]]><BR/>" #f '("%t" "<") a-tag)
+  (test "%t<![CDATA[<]]>a b<BR/>" #f '("%t" "<" "a b") a-tag)
+  (test "%t<![CDATA[<]]>  a b<BR/>" #f '("%t" "<" "  a b") a-tag)
 
-  (test "\td <![CDATA[  <\r\r\n]]>  a b<BR/>" #f 
-	'("\td " "  <" "\n" "" "\n" "  a b") a-tag)
+  (test "%td <![CDATA[  <%r%r%n]]>  a b<BR/>" #f 
+	'("%td " "  <" "%n" "" "%n" "  a b") a-tag)
 ))
 
 
@@ -1809,7 +1841,7 @@
 	  ((null? pi-handlers)
 	   (if default `((else (,default port target seed)))
 	       '((else
-		  (ssax:warn port "\nSkipping PI: " target nl)
+		  (ssax:warn port "Skipping PI: " target nl)
 		  (ssax:skip-pi port)
 		  seed))))
 	  ((eq? '*DEFAULT* (caar pi-handlers))
@@ -2255,7 +2287,7 @@
 	  (test
 	   (lambda (str doctype-fn expected)
 	     (cout nl "Parsing: " str nl)
-	     (let ((result (simple-parser str doctype-fn)))
+	     (let ((result (simple-parser (unesc-string str) doctype-fn)))
 	       (write result)
 	       (assert (equal? result expected)))))
 	  )
@@ -2280,21 +2312,24 @@
 	      " link "
 	      ('"I" (@ (('"xml" . '"space") "default")) "itlink ")
 	      " " "&" "amp;")))
-   (test "<itemize><item>This   is item 1 </item>\n<!-- Just:a comment --><item>Item 2</item>\n </itemize>" dummy-doctype-fn 
-	 '(('"itemize" ('"item" "This   is item 1 ")
-	    "\n" ('"item" "Item 2") "\n ")))
-  (test " <P><![CDATA[<BR>\n<![CDATA[<BR>]]&gt;]]></P>"
-	dummy-doctype-fn '(('"P" "<BR>" "\n" "<![CDATA[<BR>" "]]" "" ">")))
+   (test "<itemize><item>This   is item 1 </item>%n<!-- Just:a comment --><item>Item 2</item>%n </itemize>" dummy-doctype-fn 
+	 `(('"itemize" ('"item" "This   is item 1 ")
+	    ,(unesc-string "%n") ('"item" "Item 2") ,(unesc-string "%n "))))
+  (test " <P><![CDATA[<BR>%n<![CDATA[<BR>]]&gt;]]></P>"
+	dummy-doctype-fn  `(('"P" "<BR>" ,nl "<![CDATA[<BR>" "]]" "" ">")))
 
-  (test "<?xml version='1.0'?>\n\n<Reports TStamp='1'></Reports>"
+  (test " <P><![CDATA[<BR>%r<![CDATA[<BR>]]&gt;]]></P>"
+	dummy-doctype-fn `(('"P" "<BR>" ,nl "<![CDATA[<BR>" "]]" "" ">")))
+
+  (test "<?xml version='1.0'?>%n%n<Reports TStamp='1'></Reports>"
 	dummy-doctype-fn '(('"Reports" (@ ('"TStamp" "1")))))
-  (test "\n<?PI xxx?><!-- Comment \n -\r-->\n<?PI1 zzz?><T/>" 
+  (test "%n<?PI xxx?><!-- Comment %n -%r-->%n<?PI1 zzz?><T/>" 
 	dummy-doctype-fn '(('"T")))
-  (test "<!DOCTYPE T SYSTEM 'system1' ><!-- comment -->\n<T/>"
+  (test "<!DOCTYPE T SYSTEM 'system1' ><!-- comment -->%n<T/>"
 	(lambda (elem-gi seed) (assert (equal? elem-gi ''"T"))
 		(values #f '() '() seed))
 	'(('"T")))
-  (test "<!DOCTYPE T PUBLIC '//EN/T' \"system1\" [ <!ELEMENT a 'aa'> ]>\n<?pi?><T/>" 
+  (test "<!DOCTYPE T PUBLIC '//EN/T' \"system1\" [ <!ELEMENT a 'aa'> ]>%n<?pi?><T/>" 
 	(lambda (elem-gi seed) (assert (equal? elem-gi ''"T"))
 		(values #f '() '() seed))
 	'(('"T")))
@@ -2459,6 +2494,72 @@
 ;		Highest-level parsers: XML to SXML
 ;
 
+; First, a few utility procedures that turned out useful
+
+;     ssax:reverse-collect-str LIST-OF-FRAGS -> LIST-OF-FRAGS
+; given the list of fragments (some of which are text strings)
+; reverse the list and concatenate adjacent text strings.
+; We can prove from the general case below that if LIST-OF-FRAGS
+; has zero or one element, the result of the procedure is equal?
+; to its argument. This fact justifies the shortcut evaluation below.
+(define (ssax:reverse-collect-str fragments)
+  (cond
+    ((null? fragments) '())	; a shortcut
+    ((null? (cdr fragments)) fragments) ; see the comment above
+    (else
+      (let loop ((fragments fragments) (result '()) (strs '()))
+	(cond
+	  ((null? fragments)
+	    (if (null? strs) result
+	      (cons (string-concatenate/shared strs) result)))
+	  ((string? (car fragments))
+	    (loop (cdr fragments) result (cons (car fragments) strs)))
+	  (else
+	    (loop (cdr fragments)
+	      (cons
+		(car fragments)
+		(if (null? strs) result
+		  (cons (string-concatenate/shared strs) result)))
+	      '())))))))
+
+
+;     ssax:reverse-collect-str-drop-ws LIST-OF-FRAGS -> LIST-OF-FRAGS
+; given the list of fragments (some of which are text strings)
+; reverse the list and concatenate adjacent text strings.
+; We also drop "unsignificant" whitespace, that is, whitespace
+; in front, behind and between elements. The whitespace that
+; is included in character data is not affected.
+; We use this procedure to "intelligently" drop "insignificant"
+; whitespace in the parsed SXML. If the strict compliance with
+; the XML Recommendation regarding the whitespace is desired, please
+; use the ssax:reverse-collect-str procedure instead.
+
+(define (ssax:reverse-collect-str-drop-ws fragments)
+  (cond 
+    ((null? fragments) '())		; a shortcut
+    ((null? (cdr fragments))		; another shortcut
+     (if (and (string? (car fragments)) (string-whitespace? (car fragments)))
+       '() fragments))			; remove trailing ws
+    (else
+      (let loop ((fragments fragments) (result '()) (strs '())
+		  (all-whitespace? #t))
+	(cond
+	  ((null? fragments)
+	    (if all-whitespace? result	; remove leading ws
+	      (cons (string-concatenate/shared strs) result)))
+	  ((string? (car fragments))
+	    (loop (cdr fragments) result (cons (car fragments) strs)
+	      (and all-whitespace?
+		(string-whitespace? (car fragments)))))
+	  (else
+	    (loop (cdr fragments)
+	      (cons
+		(car fragments)
+		(if all-whitespace? result
+		  (cons (string-concatenate/shared strs) result)))
+	      '() #t)))))))
+
+
 ; procedure: ssax:xml->sxml PORT NAMESPACE-PREFIX-ASSIG
 ;
 ; This is an instance of a SSAX parser above that returns an SXML
@@ -2484,56 +2585,6 @@
 	    ":"
 	    (symbol->string (cdr res-name))))))
 
-       ; given the list of fragments (some of which are text strings)
-       ; reverse the list and concatenate adjacent text strings
-       (reverse-collect-str
-	(lambda (fragments)
-	  (if (null? fragments) '()	; a shortcut
-	      (let loop ((fragments fragments) (result '()) (strs '()))
-		(cond
-		 ((null? fragments)
-		  (if (null? strs) result
-		      (cons (apply string-append strs) result)))
-		 ((string? (car fragments))
-		  (loop (cdr fragments) result (cons (car fragments) strs)))
-		 (else
-		  (loop (cdr fragments)
-			(cons
-			 (car fragments)
-			 (if (null? strs) result
-			     (cons (apply string-append strs) result)))
-			'())))))))
-
-       ; given the list of fragments (some of which are text strings)
-       ; reverse the list and concatenate adjacent text strings
-       ; We also drop "unsignificant" whitespace, that is, whitespace
-       ; in front, behind and between elements. The whitespace that
-       ; is included in character data is not affected.
-       (reverse-collect-str-drop-ws
-	(lambda (fragments)
-	  (cond 
-	   ((null? fragments) '())		; a shortcut
-	   ((and (string? (car fragments))	; another shortcut
-		 (null? (cdr fragments))	; remove trailing ws
-		 (string-whitespace? (car fragments))) '())
-	   (else
-	    (let loop ((fragments fragments) (result '()) (strs '())
-		       (all-whitespace? #t))
-	      (cond
-	       ((null? fragments)
-		(if all-whitespace? result	; remove leading ws
-		    (cons (apply string-append strs) result)))
-	       ((string? (car fragments))
-		(loop (cdr fragments) result (cons (car fragments) strs)
-		      (and all-whitespace?
-			   (string-whitespace? (car fragments)))))
-	       (else
-		(loop (cdr fragments)
-		      (cons
-		       (car fragments)
-		       (if all-whitespace? result
-			   (cons (apply string-append strs) result)))
-		      '() #t))))))))
        )
     (let ((result
 	   (reverse
@@ -2545,7 +2596,7 @@
    
 	     FINISH-ELEMENT
 	     (lambda (elem-gi attributes namespaces parent-seed seed)
-	       (let ((seed (reverse-collect-str-drop-ws seed))
+	       (let ((seed (ssax:reverse-collect-str-drop-ws seed))
 		     (attrs
 		      (attlist-fold
 		       (lambda (attr accum)
@@ -2606,9 +2657,9 @@
 (run-test (letrec
     ((test (lambda (str namespace-assig expected-res)
 	  (newline) (display "input: ")
-	  (write str) (newline) (display "Result: ")
+	  (write (unesc-string str)) (newline) (display "Result: ")
 	  (let ((result
-		 (call-with-input-string str
+		 (call-with-input-string (unesc-string str)
 		     (lambda (port)
 		       (ssax:xml->sxml port namespace-assig)))))
 	    (pp result)
@@ -2616,7 +2667,7 @@
 
     (test " <BR/>" '() '(*TOP* (BR)))
     (test "<BR></BR>" '() '(*TOP* (BR)))
-    (test " <BR CLEAR='ALL'\nCLASS='Class1'/>" '()
+    (test " <BR CLEAR='ALL'%nCLASS='Class1'/>" '()
 	  '(*TOP* (BR (@ (CLEAR "ALL") (CLASS "Class1")))))
     (test "   <A HREF='URL'>  link <I>itlink </I> &amp;amp;</A>" '()
 	  '(*TOP* (A (@ (HREF "URL")) "  link " (I "itlink ") " &amp;")))
@@ -2630,26 +2681,29 @@
     (test " <P><?pi1  p1 content ?>?<?pi2 pi2? content? ??></P>" '()
 	  '(*TOP* (P (*PI* pi1 "p1 content ") "?"
 		     (*PI* pi2 "pi2? content? ?"))))
-    (test " <P>some text <![CDATA[<]]>1\n&quot;<B>strong</B>&quot;\r</P>"
+    (test " <P>some text <![CDATA[<]]>1%n&quot;<B>strong</B>&quot;%r</P>"
 	  '()
-	  '(*TOP* (P "some text <1\n\"" (B "strong") "\"\n")))
-    (test " <P><![CDATA[<BR>\n<![CDATA[<BR>]]&gt;]]></P>" '()
-	  '(*TOP* (P "<BR>\n<![CDATA[<BR>]]>")))
-;    (test "<T1><T2>it&apos;s\r\nand   that\n</T2>\r\n\r\n\n</T1>" '()
-;	  '(*TOP* (T1 (T2 "it's\nand   that\n") "\n\n\n")))
-    (test "<T1><T2>it&apos;s\r\nand   that\n</T2>\r\n\r\n\n</T1>" '()
-	  '(*TOP* (T1 (T2 "it's\nand   that\n"))))
-    (test "<!DOCTYPE T SYSTEM 'system1' ><!-- comment -->\n<T/>" '()
+	  `(*TOP* (P ,(unesc-string "some text <1%n\"")
+		      (B "strong") ,(unesc-string "\"%n"))))
+    (test " <P><![CDATA[<BR>%n<![CDATA[<BR>]]&gt;]]></P>" '()
+	  `(*TOP* (P ,(unesc-string "<BR>%n<![CDATA[<BR>]]>"))))
+;    (test "<T1><T2>it&apos;s%r%nand   that%n</T2>%r%n%r%n%n</T1>" '()
+;	  '(*TOP* (T1 (T2 "it's%nand   that%n") "%n%n%n")))
+    (test "<T1><T2>it&apos;s%r%nand   that%n</T2>%r%n%r%n%n</T1>" '()
+	  `(*TOP* (T1 (T2 ,(unesc-string "it's%nand   that%n")))))
+    (test "<T1><T2>it&apos;s%rand   that%n</T2>%r%n%r%n%n</T1>" '()
+	  `(*TOP* (T1 (T2 ,(unesc-string "it's%nand   that%n")))))
+    (test "<!DOCTYPE T SYSTEM 'system1' ><!-- comment -->%n<T/>" '()
 	  '(*TOP* (T)))
-    (test "<?xml version='1.0'?>\n<WEIGHT unit=\"pound\">\n<NET certified='certified'> 67 </NET>\n<GROSS> 95 </GROSS>\n</WEIGHT>" '()
+    (test "<?xml version='1.0'?>%n<WEIGHT unit=\"pound\">%n<NET certified='certified'> 67 </NET>%n<GROSS> 95 </GROSS>%n</WEIGHT>" '()
 	  '(*TOP* (*PI* xml "version='1.0'") (WEIGHT (@ (unit "pound"))
                 (NET (@ (certified "certified")) " 67 ")
                 (GROSS " 95 "))
 		  ))
-;     (test "<?xml version='1.0'?>\n<WEIGHT unit=\"pound\">\n<NET certified='certified'> 67 </NET>\n<GROSS> 95 </GROSS>\n</WEIGHT>" '()
+;     (test "<?xml version='1.0'?>%n<WEIGHT unit=\"pound\">%n<NET certified='certified'> 67 </NET>%n<GROSS> 95 </GROSS>%n</WEIGHT>" '()
 ; 	  '(*TOP* (*PI* xml "version='1.0'") (WEIGHT (@ (unit "pound"))
-;                "\n" (NET (@ (certified "certified")) " 67 ")
-;                "\n" (GROSS " 95 ") "\n")
+;                "%n" (NET (@ (certified "certified")) " 67 ")
+;                "%n" (GROSS " 95 ") "%n")
 ; 		  ))
     (test "<DIV A:B='A' B='B' xmlns:A='URI1' xmlns='URI1'><A:P xmlns=''><BR/></A:P></DIV>" '()
 	  '(*TOP* (URI1:DIV (@ (URI1:B "A") (B "B")) (URI1:P (BR)))))
@@ -2757,12 +2811,11 @@
 	      (SEAT (@ (HTML:CLASS "largeMonotype") (CLASS "Y")) "33B")
 	      (HTML:A (@ (HREF "/cgi-bin/ResStatus")) "Check Status")
 	      (DEPARTURE "1997-05-24T07:55:00+1"))))
-
     ; Part of RDF from the XML Infoset
-        (test (apply string-append (list-intersperse '(
-  "<?xml version='1.0' encoding='utf-8' standalone='yes'?>"
-  "<!-- this can be decoded as US-ASCII or iso-8859-1 as well,"
-     "  since it contains no characters outside the US-ASCII repertoire -->"
+        (test (string-concatenate/shared (list-intersperse '(
+   "<?xml version='1.0' encoding='utf-8' standalone='yes'?>"
+   "<!-- this can be decoded as US-ASCII or iso-8859-1 as well,"
+   "  since it contains no characters outside the US-ASCII repertoire -->"
    "<rdf:RDF xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#'"
    "         xmlns:rdfs='http://www.w3.org/2000/01/rdf-schema#'"
    "          xmlns='http://www.w3.org/2001/02/infoset#'>"
@@ -2819,7 +2872,7 @@
 	 (RDFS:range (@ (resource "#AttributeSet")))))))
 	  
     ; Part of RDF from RSS of the Daemon News Mall
-        (test (apply string-append (list-intersperse '(
+        (test (string-concatenate/shared (list-intersperse '(
   "<?xml version='1.0'?><rdf:RDF "
     "xmlns:rdf='http://www.w3.org/1999/02/22-rdf-syntax-ns#' "
      "xmlns='http://my.netscape.com/rdf/simple/0.9/'>"
@@ -2862,7 +2915,7 @@
                   (RSS:link
                     "http://mall.daemonnews.org/?page=shop/flypage&product_id=912&category_id=1761")))))
 
-    (test (apply string-append (list-intersperse 
+    (test (string-concatenate/shared (list-intersperse 
        '("<Forecasts TStamp='958082142'>"
 	 "<TAF TStamp='958066200' LatLon='36.583, -121.850' BId='724915'"
 	 "  SName='KMRY, MONTEREY PENINSULA'>"
