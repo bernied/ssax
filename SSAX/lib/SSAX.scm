@@ -157,6 +157,7 @@
 	; See http://pobox.com/~oleg/ftp/Scheme/
 	; for myenv.scm and other input parsing functions used
 	; in the present code.
+; Move inside the run-test, just as catch-error.scm below???
 (include "myenv.scm")
 
 
@@ -417,6 +418,21 @@
 	 (equal? e1 e2)))))
 )
 	      
+
+; Test if a string is made of only whitespace
+; An empty string is considered made of whitespace as well
+(define (string-whitespace? str)
+  (let ((len (string-length str)))
+    (cond
+     ((zero? len) #t)
+     ((= 1 len) (char-whitespace? (string-ref str 0)))
+     ((= 2 len) (and (char-whitespace? (string-ref str 0))
+		     (char-whitespace? (string-ref str 1))))
+     (else
+      (let loop ((i 0))
+	(or (>= i len)
+	    (and (char-whitespace? (string-ref str i))
+		 (loop (++ i)))))))))
 
 ; Find val in alist
 ; Return (values found-el remaining-alist) or
@@ -2490,6 +2506,37 @@
 			 (if (null? strs) result
 			     (cons (apply string-append strs) result)))
 			'())))))))
+
+       ; given the list of fragments (some of which are text strings)
+       ; reverse the list and concatenate adjacent text strings
+       ; We also drop "unsignificant" whitespace, that is, whitespace
+       ; in front, behind and between elements. The whitespace that
+       ; is included in character data is not affected.
+       (reverse-collect-str-drop-ws
+	(lambda (fragments)
+	  (cond 
+	   ((null? fragments) '())		; a shortcut
+	   ((and (string? (car fragments))	; another shortcut
+		 (null? (cdr fragments))	; remove trailing ws
+		 (string-whitespace? (car fragments))) '())
+	   (else
+	    (let loop ((fragments fragments) (result '()) (strs '())
+		       (all-whitespace? #t))
+	      (cond
+	       ((null? fragments)
+		(if all-whitespace? result	; remove leading ws
+		    (cons (apply string-append strs) result)))
+	       ((string? (car fragments))
+		(loop (cdr fragments) result (cons (car fragments) strs)
+		      (and all-whitespace?
+			   (string-whitespace? (car fragments)))))
+	       (else
+		(loop (cdr fragments)
+		      (cons
+		       (car fragments)
+		       (if all-whitespace? result
+			   (cons (apply string-append strs) result)))
+		      '() #t))))))))
        )
     (let ((result
 	   (reverse
@@ -2501,7 +2548,7 @@
    
 	     FINISH-ELEMENT
 	     (lambda (elem-gi attributes namespaces parent-seed seed)
-	       (let ((seed (reverse-collect-str seed))
+	       (let ((seed (reverse-collect-str-drop-ws seed))
 		     (attrs
 		      (attlist-fold
 		       (lambda (attr accum)
@@ -2586,15 +2633,22 @@
 	  '(*TOP* (P "some text <1\n\"" (B "strong") "\"\n")))
     (test " <P><![CDATA[<BR>\n<![CDATA[<BR>]]&gt;]]></P>" '()
 	  '(*TOP* (P "<BR>\n<![CDATA[<BR>]]>")))
+;    (test "<T1><T2>it&apos;s\r\nand   that\n</T2>\r\n\r\n\n</T1>" '()
+;	  '(*TOP* (T1 (T2 "it's\nand   that\n") "\n\n\n")))
     (test "<T1><T2>it&apos;s\r\nand   that\n</T2>\r\n\r\n\n</T1>" '()
-	  '(*TOP* (T1 (T2 "it's\nand   that\n") "\n\n\n")))
+	  '(*TOP* (T1 (T2 "it's\nand   that\n"))))
     (test "<!DOCTYPE T SYSTEM 'system1' ><!-- comment -->\n<T/>" '()
 	  '(*TOP* (T)))
     (test "<?xml version='1.0'?>\n<WEIGHT unit=\"pound\">\n<NET certified='certified'> 67 </NET>\n<GROSS> 95 </GROSS>\n</WEIGHT>" '()
 	  '(*TOP* (*PI* xml "version='1.0'") (WEIGHT (@ (unit "pound"))
-               "\n" (NET (@ (certified "certified")) " 67 ")
-               "\n" (GROSS " 95 ") "\n")
+                (NET (@ (certified "certified")) " 67 ")
+                (GROSS " 95 "))
 		  ))
+;     (test "<?xml version='1.0'?>\n<WEIGHT unit=\"pound\">\n<NET certified='certified'> 67 </NET>\n<GROSS> 95 </GROSS>\n</WEIGHT>" '()
+; 	  '(*TOP* (*PI* xml "version='1.0'") (WEIGHT (@ (unit "pound"))
+;                "\n" (NET (@ (certified "certified")) " 67 ")
+;                "\n" (GROSS " 95 ") "\n")
+; 		  ))
     (test "<DIV A:B='A' B='B' xmlns:A='URI1' xmlns='URI1'><A:P xmlns=''><BR/></A:P></DIV>" '()
 	  '(*TOP* (URI1:DIV (@ (URI1:B "A") (B "B")) (URI1:P (BR)))))
     (test "<DIV A:B='A' B='B' xmlns:A='URI1' xmlns='URI1'><A:P xmlns=''><BR/></A:P></DIV>" '((UA . "URI1"))
@@ -2610,7 +2664,7 @@
 	   '(*TOP* 
 	     (x (lineItem
 		 (@ (http://ecommerce.org/schema:taxClass "exempt"))
-            "Baby food") "\n")))
+            "Baby food"))))
     (test (string-append 
 	   "<x xmlns:edi='http://ecommerce.org/schema'>"
            "<!-- the 'taxClass' attribute's  ns http://ecommerce.org/schema -->"
@@ -2738,34 +2792,28 @@
          (RDFS "http://www.w3.org/2000/01/rdf-schema#")
          (ISET "http://www.w3.org/2001/02/infoset#"))
        (*PI* xml "version='1.0' encoding='utf-8' standalone='yes'")
-       (RDF:RDF "\n"
-	(RDFS:Class (@ (ID "Boolean"))) "\n"
-	(ISET:Boolean (@ (ID "Boolean.true"))) "\n"
-	(ISET:Boolean (@ (ID "Boolean.false"))) "\n\n"
-	(RDFS:Class (@ (ID "InfoItem"))) "\n"
+       (RDF:RDF
+	(RDFS:Class (@ (ID "Boolean")))
+	(ISET:Boolean (@ (ID "Boolean.true")))
+	(ISET:Boolean (@ (ID "Boolean.false")))
+	(RDFS:Class (@ (ID "InfoItem")))
 	(RDFS:Class (@ (RDFS:subClassOf "#InfoItem") (ID "Document")))
-	"\n"
 	(RDFS:Class (@ (RDFS:subClassOf "#InfoItem") (ID "Element")))
-	"\n"
 	(RDFS:Class (@ (RDFS:subClassOf "#InfoItem") (ID "Attribute")))
-	"\n"
 	(RDFS:Class
 	 (@ (RDFS:subClassOf
 	     "http://www.w3.org/1999/02/22-rdf-syntax-ns#Bag")
 	    (ID "InfoItemSet")))
-	"\n"
 	(RDFS:Class
 	 (@ (RDFS:subClassOf "#InfoItemSet") (ID "AttributeSet")))
-	"\n\n"
 	(RDFS:Property
-	 (@ (ID "allDeclarationsProcessed")) "\n"
-	 (RDFS:domain (@ (resource "#Document"))) "\n"
+	 (@ (ID "allDeclarationsProcessed"))
+	 (RDFS:domain (@ (resource "#Document")))
 	 (RDFS:range (@ (resource "#Boolean"))))
-	"\n"
 	(RDFS:Property
-	 (@ (ID "attributes")) "\n"
-	 (RDFS:domain (@ (resource "#Element"))) "\n"
-	 (RDFS:range (@ (resource "#AttributeSet"))) "\n") "\n")))
+	 (@ (ID "attributes"))
+	 (RDFS:domain (@ (resource "#Element")))
+	 (RDFS:range (@ (resource "#AttributeSet")))))))
 	  
     ; Part of RDF from RSS of the Daemon News Mall
         (test (apply string-append (list-intersperse '(
@@ -2786,7 +2834,7 @@
      "<link>http://mall.daemonnews.org/?page=shop/flypage&amp;product_id=912&amp;category_id=1761</link>"
      "</item>"
      "</rdf:RDF>")
-   "" ;(string #\newline)
+   (string #\newline)
    ))
    '((RDF . "http://www.w3.org/1999/02/22-rdf-syntax-ns#")
      (RSS . "http://my.netscape.com/rdf/simple/0.9/")
@@ -2827,7 +2875,7 @@
 	 "<VAR Title='BECMG 0708' TRange='958114800, 958118400'>VRB05KT</VAR>"
 	 "</PERIOD></TAF>"
 	 "</Forecasts>")
-       "" ;(string #\newline)
+       (string #\newline)
        ))
 	  '()
 	  '(*TOP* (Forecasts

@@ -47,7 +47,7 @@ test-outline-scm:
 	-l outline.scm -l run-outline.scm \
 	-e '(main (list "myself" "xml/total_weather.xsl"))'
 
-test-outline-scm:
+test-sxml-scm:
 	scm -b -l $(LIBDIR)/myenv-scm.scm  -l $(LIBDIR)/util.scm \
 	-l $(LIBDIR)/look-for-str.scm -l $(LIBDIR)/input-parse.scm \
 	-l $(LIBDIR)/SSAX-code.scm \
