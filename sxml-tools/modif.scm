@@ -294,38 +294,53 @@
 ; handler - specifies the required transformation over the node selected
 ; base-node - the node with respect to which the location path was evaluated
 (define (sxml:lambdas-upd-specifiers->targets doc lambdas-upd-specifiers)
-  (letrec
-      ((construct-targets
-        (lambda (base-context lambdas-upd-specifiers)
-          (let* ((triple (car lambdas-upd-specifiers))
-                 (context-set ((car triple)
-                               (list base-context)
-                               (cons 1 1)
-                               '()  ; dummy var-binding
-                               ))
-                 (res (map
-                       (lambda (context)
-                         (list context
-                               (caddr triple)  ; handler
-                               (sxml:context->node base-context)))
-                       context-set))
-                 (next (cdr lambdas-upd-specifiers)))
-            (if
-             (null? next)  ; no more members
-             res
-             (append
-              res
-              (if
-               (cadadr lambdas-upd-specifiers)  ; the following is relative
-               (map-union
-                (lambda (context)
-                  (construct-targets context next))
-                context-set)
-               (construct-targets doc next))))))))
+  (let ((doc-list (list doc)))
+    (letrec
+        ((construct-targets
+          ; base-cntxtset - base context set for the current upd-specifier
+          ; lambdas-upd-specifiers - is assumed to be non-null?
+          (lambda (base-cntxtset lambdas-upd-specifiers)
+            (let ((triple (car lambdas-upd-specifiers)))
+              ; Iterates members of the base context-set
+              ; new-base ::= (listof context-set)
+              ; Each context-set is obtained by applying the txpath-lambda
+              ; to the each member of base-cntxtset
+              (let iter-base ((base-cntxtset base-cntxtset)
+                              (res '())
+                              (new-base '()))
+                (if
+                 (null? base-cntxtset)  ; finished scanning base context-set
+                 (if
+                  (null? (cdr lambdas-upd-specifiers))  ; no more members
+                  res
+                  (append
+                   res
+                   (construct-targets
+                    (if
+                     (cadadr lambdas-upd-specifiers)  ; following is relative
+                     (apply ddo:unite-multiple-context-sets new-base)
+                     doc-list)
+                    (cdr lambdas-upd-specifiers))))
+                 (let* ((curr-base-context (car base-cntxtset))
+                        (context-set ((car triple)
+                                      (list curr-base-context)
+                                      (cons 1 1)
+                                      '()  ; dummy var-binding
+                                      )))
+                   (iter-base
+                    (cdr base-cntxtset)
+                    (append res
+                            (map
+                             (lambda (context)
+                               (list context
+                                     (caddr triple)  ; handler
+                                     (sxml:context->node curr-base-context)))
+                             context-set))
+                    (cons context-set new-base)))))))))
     (if
      (null? lambdas-upd-specifiers)  ; no transformation rules
      '()
-     (construct-targets doc lambdas-upd-specifiers))))
+     (construct-targets doc-list lambdas-upd-specifiers)))))
 
 ;  "Precompiles" each of update-specifiers, by transforming location paths and
 ;  update actions into lambdas.
@@ -359,13 +374,15 @@
             (if
              (eq? (car ast) 'absolute-location-path)
              (values
-              (draft:ast-relative-location-path
+              (ddo:ast-relative-location-path
                (cons 'relative-location-path (cdr ast))
                #f  ; keep all ancestors
+               #t  ; on a single level, since a single node
+               0   ; zero predicate nesting
                )
               #f)
              (values
-              (draft:ast-relative-location-path ast #f)
+              (ddo:ast-relative-location-path ast #f #t 0)
               (not (null? res))   ; absolute for the first rule
               ))))
           (if
@@ -435,7 +452,7 @@
                    curr)
                   (and-let*
                    ((ast (txp:xpath->ast (caddr curr)))
-                    (txpath-pair (draft:ast-location-path ast #f)))
+                    (txpath-pair (ddo:ast-location-path ast #f #t 0)))
                    (iter (cdr src)
                          (cons
                           (list
