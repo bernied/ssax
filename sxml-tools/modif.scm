@@ -259,21 +259,11 @@
                (null? curr-handlers)
                new-curr-node
                (process-this
-                (if (nodeset? new-curr-node)
-                    (map-union
-                     (lambda (node)
-                       (as-nodeset
-                        ((cadar curr-handlers)  ; lambda
-                         node
-                         (caar curr-handlers)  ; context
-                         (caddar curr-handlers)  ; base-node
-                         )))
-                     new-curr-node)
-                    ((cadar curr-handlers)  ; lambda
-                     new-curr-node
-                     (caar curr-handlers)  ; context
-                     (caddar curr-handlers)  ; base-node
-                     ))                      
+                ((cadar curr-handlers)  ; lambda
+                 new-curr-node
+                 (caar curr-handlers)  ; context
+                 (caddar curr-handlers)  ; base-node
+                 )                      
                 (cdr curr-handlers)))))))))
     (let ((targets-alist
            (map-union
@@ -386,10 +376,11 @@
                #f  ; keep all ancestors
                #t  ; on a single level, since a single node
                0   ; zero predicate nesting
+               '(0)  ; initial var-mapping
                )
               #f)
              (values
-              (ddo:ast-relative-location-path ast #f #t 0)
+              (ddo:ast-relative-location-path ast #f #t 0 '(0))
               (not (null? res))   ; absolute for the first rule
               ))))
           (if
@@ -459,7 +450,7 @@
                    curr)
                   (and-let*
                    ((ast (txp:xpath->ast (caddr curr)))
-                    (txpath-pair (ddo:ast-location-path ast #f #t 0)))
+                    (txpath-pair (ddo:ast-location-path ast #f #t 0 '(0))))
                    (iter (cdr src)
                          (cons
                           (list
@@ -486,35 +477,53 @@
 ; The lambda specifies the node to be inserted
 (define (modif:insert-following node-specifier)
   (lambda (node context base-node)
-    (cons node (as-nodeset (node-specifier context base-node)))))
+    ((if (nodeset? node) append cons)
+     node
+     (as-nodeset (node-specifier context base-node)))))
 
 (define (modif:insert-preceding node-specifier)
   (lambda (node context base-node)
     (let ((new (node-specifier context base-node)))
-      (if (nodeset? new)
-          (append new (list node))
-          (list new node)))))
+      ((if (nodeset? new) append cons)
+       new
+       (as-nodeset node)))))
 
 (define (modif:insert-into node-specifier)
   (lambda (node context base-node)
-    (if (not (pair? node))  ; can't insert into
-        node
-        (append node (as-nodeset (node-specifier context base-node))))))
+    (let* ((to-insert (as-nodeset (node-specifier context base-node)))
+           (insert-into-single  ; inserts into single node
+            (lambda (node)
+              (if (not (pair? node))  ; can't insert into
+                  node
+                  (append node to-insert)))))
+      (if (nodeset? node)
+          (map insert-into-single node)
+          (insert-into-single node)))))
     
 ; Rename
 (define (modif:rename new-name)
-  (lambda (node context base-node)
-    (if (pair? node)  ; named node
-        (cons new-name (cdr node))
-        node)))
+  (let ((rename-single  ; renames a single node
+         (lambda (node)
+           (if (pair? node)  ; named node
+               (cons new-name (cdr node))
+               node))))
+    (lambda (node context base-node)
+      (if (nodeset? node)
+          (map rename-single node)
+          (rename-single node)))))
 
 ; Delete
 (define modif:delete
   (lambda (node context base-node) '()))
 
 (define modif:delete-undeep
-  (lambda (node context base-node)
-    (if (pair? node) (cdr node) '())))
+  (let ((delete-undeep-single
+         (lambda (node)
+           (if (pair? node) (cdr node) '()))))
+    (lambda (node context base-node)
+      (if (nodeset? node)
+          (map delete-undeep-single node)
+          (delete-undeep-single node)))))
 
 
 ;==========================================================================
