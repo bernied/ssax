@@ -54,7 +54,7 @@
   (apply cerr (cons message specialising-msgs))
   (cerr nl)
   (exit 4))
-(define (SSAX:warn port message . specialising-msgs)
+(define (ssax:warn port message . specialising-msgs)
   (apply cerr (cons message specialising-msgs))
   (cerr nl))
 
@@ -136,7 +136,7 @@ This is a <cite>citation</cite>. Move <a href='url'>in</a>.text</div>"
 ; parser [SSAX], this step can be accomplished as follows:
 (define doc-sxml
   (call-with-input-string doc
-     (lambda (port) (SSAX:XML->SXML port '()))))
+     (lambda (port) (ssax:xml->sxml port '()))))
 
 (cout nl 
   ">>>The following is the sample document to transform, in its SXML form" nl)

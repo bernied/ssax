@@ -15,7 +15,7 @@
   (apply cerr (cons message specialising-msgs))
   (cerr nl)
   (exit 4))
-(define (SSAX:warn port message . specialising-msgs)
+(define (ssax:warn port message . specialising-msgs)
   (apply cerr (cons message specialising-msgs))
   (cerr nl))
 

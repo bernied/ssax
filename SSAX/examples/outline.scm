@@ -11,7 +11,7 @@
   ; To be more precise, the seed is the string of space characters
   ; to output to indent the current element. The indent increases by two
   ; space characters for the next nested element.
-  ((SSAX:make-parser
+  ((ssax:make-parser
 	   NEW-LEVEL-SEED 
 	   (lambda (elem-gi attributes namespaces
 			      expected-content seed)

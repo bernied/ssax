@@ -31,7 +31,7 @@
   (apply cerr (cons message specialising-msgs))
   (cerr nl)
   (exit 4))
-(define (SSAX:warn port message . specialising-msgs)
+(define (ssax:warn port message . specialising-msgs)
   (apply cerr (cons message specialising-msgs))
   (cerr nl))
 
@@ -67,21 +67,21 @@
 
 ; The following is an instantiation variation of the SSAX parser
 ; to handle specified internal parsed entities.
-; This code is identical to SSAX:XML->SXML except one line in
+; This code is identical to ssax:xml->sxml except one line in
 ; the DOCTYPE handler:
 ;   (values #f DAML-entities namespaces seed)
-; (The original SSAX:XML->SXML had '() in place of DAML-entities)
+; (The original ssax:xml->sxml had '() in place of DAML-entities)
 ;
 ; We also create (@@ (*NAMESPACES* . ns-assocs)) for each element
 ; with a non-local element or attribute name. These local ns-assocs
 ; describe only the namespaces of the elemen-gi and its attributes.
 ; Sharing should be improved!
 
-(define (SSAX:DAML->SXML port namespace-prefix-assig)
+(define (ssax:daml->sxml port namespace-prefix-assig)
   (letrec
       ((namespaces
 	(map (lambda (el)
-	       (cons* #f (car el) (SSAX:uri-string->symbol (cdr el))))
+	       (cons* #f (car el) (ssax:uri-string->symbol (cdr el))))
 	     namespace-prefix-assig))
 
        (RES-NAME->SXML
@@ -145,7 +145,7 @@
        )
     (let ((result
 	   (reverse
-	    ((SSAX:make-parser
+	    ((ssax:make-parser
 	     NEW-LEVEL-SEED 
 	     (lambda (elem-gi attributes namespaces
 			      expected-content seed)
@@ -211,10 +211,10 @@
 	     DOCTYPE
 	     (lambda (port docname systemid internal-subset? seed)
 	       (when internal-subset?
-		     (SSAX:warn port
+		     (ssax:warn port
 			   "Internal DTD subset is not currently handled ")
-		     (SSAX:skip-internal-dtd port))
-	       (SSAX:warn port "DOCTYPE DECL " docname " "
+		     (ssax:skip-internal-dtd port))
+	       (ssax:warn port "DOCTYPE DECL " docname " "
 		     systemid " found and skipped")
 	       (values #f DAML-entities namespaces seed))
 
@@ -226,7 +226,7 @@
 	     ((*DEFAULT* .
 		(lambda (port pi-tag seed)
 		  (cons
-		   (list '*PI* pi-tag (SSAX:read-pi-body-as-string port))
+		   (list '*PI* pi-tag (ssax:read-pi-body-as-string port))
 		   seed))))
 	     )
 	    port '()))))
@@ -236,7 +236,7 @@
 ; Parse a DAML file
 (define (parse-daml daml-file)
   (call-with-input-file daml-file
-     (lambda (port) (SSAX:DAML->SXML port 
+     (lambda (port) (ssax:daml->sxml port 
 	; Define the following user namespace shortcuts
 	 '((rdfs . "http://www.w3.org/2000/01/rdf-schema#")
 	  (rdf . "http://www.w3.org/1999/02/22-rdf-syntax-ns#")
@@ -353,7 +353,7 @@
 				   (caddr seen-assoc) ":" local-name))
 			 translation))))
 	       (else    ; come across a new namespace. If we used 
-		(let    ; SSAX:DAML->SXML above, this should not happen
+		(let    ; ssax:daml->sxml above, this should not happen
 		    ((prefix (symbol->string (gensym)))) ; choose gensym
 		  (cerr nl "Namespace Previously not seen: " ns-symbol nl)
 		  (loop 

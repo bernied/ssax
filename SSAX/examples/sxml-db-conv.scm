@@ -48,7 +48,7 @@
   (apply cerr (cons message specialising-msgs))
   (cerr nl)
   (exit 4))
-(define (SSAX:warn port message . specialising-msgs)
+(define (ssax:warn port message . specialising-msgs)
   (apply cerr (cons message specialising-msgs))
   (cerr nl))
 
@@ -85,7 +85,7 @@
 	 ; by a ns-user-shortcut 'h'. See the SXML Specification
 	 ; for a more detailed discussion of the namespaces in SXML.
 	 (call-with-input-string doc-xml
-	   (lambda (port) (SSAX:XML->SXML port
+	   (lambda (port) (ssax:xml->sxml port
 			       '((h . "http://www.w3c.org/HTML/")))))))
     (cout nl 
      ">>>The following is the sample document to transform: " nl
@@ -114,6 +114,7 @@
 	    (apply (car procs) (cons (length (cdr procs)) (cdr procs))))))
      (*text* . ,(lambda (trigger str) str))
      (*TOP* . ,(lambda x x))
+     (@@ . ,(lambda x x))
      (*NAMESPACES* *preorder*
 		   ; Replace namespace declarations of the source document
 		   ; with the namespace declarations of the target document.
@@ -146,10 +147,12 @@
 	   (pre-post-order
 	    (match-case elems
 			; the root element had its own attributes, add xmlns:
-	      (((*NAMESPACES* . ?ns) (?rootname (@ . ?attrs) . ?children))
+	      (((@@ ??- (*NAMESPACES* . ?ns) . ?_)
+		 (?rootname (@ . ?attrs) . ?children))
 	       `(,rootname (@ ,@(map make-xmlns ns) . ,attrs) . ,children))
 			; the root element had no attr list: make one
-	      (((*NAMESPACES* . ?ns) (?rootname . ?children))
+	      (((@@ ??- (*NAMESPACES* . ?ns) . ?-)
+		 (?rootname . ?children))
 	      `(,rootname (@ . ,(map make-xmlns ns)) . ,children))
 	      (else elems))
 	    this-ss)))

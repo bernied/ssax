@@ -18,7 +18,7 @@
 (define (remove-markup xml-port)
     ; Accumulate the text values of leaves in a seed, in reverse order
     (let ((result
-	   ((SSAX:make-parser
+	   ((ssax:make-parser
 	     NEW-LEVEL-SEED 
 	     (lambda (elem-gi attributes namespaces
 			      expected-content seed)

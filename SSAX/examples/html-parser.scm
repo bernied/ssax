@@ -15,7 +15,7 @@
 ; To satisfy SSAX imports
 
 (define parser-error error)
-(define SSAX:warn cerr)
+(define ssax:warn cerr)
 
 (define doc
 "<html> <head> <title> </title> <title> whatever </title> </head>
@@ -52,7 +52,7 @@
 ; and singular attributes like <ul compact>
 
 
-(define SSAX:read-attributes  ; SSAX:read-attributes port entities
+(define ssax:read-attributes  ; ssax:read-attributes port entities
  (let ()
 		; Read the AttValue from the PORT up to the delimiter
 		; (which can be a single or double-quote character,
@@ -84,7 +84,7 @@
                 ((eqv? (peek-char port) #\#)
                   (read-char port)
                   (read-attrib-value delimiter port entities
-		     (cons (string (SSAX:read-char-ref port)) new-fragments)))
+		     (cons (string (ssax:read-char-ref port)) new-fragments)))
                 (else
 		 (read-attrib-value delimiter port entities
 		     (read-named-entity port entities new-fragments)))))
@@ -99,9 +99,9 @@
 		; The current position will be after ";" that terminates
 		; the entity reference
   (define (read-named-entity port entities fragments)
-    (let ((name (SSAX:read-NCName port)))
+    (let ((name (ssax:read-NCName port)))
       (assert-curr-char '(#\;) "XML [68]" port)
-      (SSAX:handle-parsed-entity port name entities
+      (ssax:handle-parsed-entity port name entities
 	(lambda (port entities fragments)
 	  (read-attrib-value '*eof* port entities fragments))
 	(lambda (str1 str2 fragments)
@@ -111,10 +111,10 @@
 
   (lambda (port entities)
     (let loop ((attr-list (make-empty-attlist)))
-      (if (not (SSAX:ncname-starting-char? (SSAX:skip-S port))) attr-list
-	  (let ((name (SSAX:read-QName port)))
-	    (if (eqv? #\= (SSAX:skip-S port)) ; name=value
-		(let ((delimiter (begin (read-char port) (SSAX:skip-S port))))
+      (if (not (ssax:ncname-starting-char? (ssax:skip-S port))) attr-list
+	  (let ((name (ssax:read-QName port)))
+	    (if (eqv? #\= (ssax:skip-S port)) ; name=value
+		(let ((delimiter (begin (read-char port) (ssax:skip-S port))))
 		  (case delimiter
 		    ((#\' #\") (read-char port) ; name="val" or name='val'
 		     (loop 
@@ -161,10 +161,10 @@
     (cons (make-end-tag elem-gi) seed))
 
   (define (read-content port entities seed parent-seed attributes)
-    (let-values*
-     ((expect-eof? #t)
+    (let*-values
+     (((expect-eof?) #t)
       ((seed term-token)
-       (SSAX:read-char-data port expect-eof? str-handler seed)))
+       (ssax:read-char-data port expect-eof? str-handler seed)))
      (if (eof-object? term-token)
 	 seed
 	 (case (xml-token-kind term-token)
@@ -175,7 +175,7 @@
 	    (let ((seed
 		   (cond
 		    ((assq (xml-token-head term-token)
-			   SSAX:predefined-parsed-entities) =>
+			   ssax:predefined-parsed-entities) =>
 			   (lambda (entity-text-assoc)
 			     (str-handler (cdr entity-text-assoc) "" seed)))
 		    (else seed)		; Ignore an unknown entity
@@ -191,11 +191,11 @@
 	    (error "Can't happen: " term-token))))))
 
   (define (handle-start-tag start-tag-head port entities parent-seed)
-    (let-values*
+    (let*-values
      (((elem-gi attributes namespaces expected-content)
-       (SSAX:complete-start-tag start-tag-head port #f
+       (ssax:complete-start-tag start-tag-head port #f
 				entities '()))
-      (seed
+      ((seed)
        (new-level-seed elem-gi attributes
 		       namespaces expected-content parent-seed)))
      (read-content port entities seed parent-seed attributes)))

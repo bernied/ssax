@@ -16,7 +16,7 @@
   (apply cerr (cons message specialising-msgs))
   (cerr nl)
   (exit 4))
-(define (SSAX:warn port message . specialising-msgs)
+(define (ssax:warn port message . specialising-msgs)
   (apply cerr (cons message specialising-msgs))
   (cerr nl))
 
@@ -33,6 +33,6 @@
       (help))		; at least one argument, besides argv[0], is expected
   (pp 
    (call-with-input-file (cadr argv)
-     (lambda (port) (SSAX:XML->SXML port '()))))
+     (lambda (port) (ssax:xml->sxml port '()))))
 )
 
