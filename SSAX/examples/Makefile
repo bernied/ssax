@@ -8,7 +8,8 @@ LIBDIR=../lib
 all-bigloo-i: run-html-parse-sample-bigloo-i \
 	run-pull-punct-bigloo-i \
 	run-apply-templates-bigloo-i \
-	run-sxml-db-conv-i
+	run-sxml-db-conv-i \
+	run-daml-parse-unparse-i
 
 clean:
 	rm -f *_.c *.o core a.out \

@@ -110,22 +110,38 @@ SXML Transformations
 The following three examples demonstrate SXML transformations, from
 trivial to advanced. The advanced examples exhibit context-sensitive
 transformations: the result of the conversion of an SXML tag depends on
-that tag's context (i.e., sibling, parent or descendant tags). See also
+that tag's context, i.e., siblings, parents or descendants. See also
 ../docs/Makefile for an SXML transformation that turns SXML.scm (the
 SXML Specification's master file) into HTML and LaTeX documents. The
 examples in this directory:
 
 	apply-templates.scm
-		A simple example of XSLT-like 'apply-templates' form
+		A simple example of a XSLT-like 'apply-templates' form
 	sxml-db-conv.scm
 		Using higher-order transformers for context-sensitive
 		transformations. The example also shows the treatment of
 		XML Namespaces in SXML and the namespace-aware
 		pretty-printing of SXML into XML.
 	pull-punct-sxml.scm
-		Context-sensitive recursive transformation
-		and breadth-first-like traversals of the SXML document
+		A Context-sensitive recursive transformation
+		and breadth-first-like traversals of a SXML document
 
 	$ make run-apply-templates-bigloo-i
 	$ make run-pull-punct-bigloo-i
 	$ make run-sxml-db-conv-i
+
+
+Parsing and Unparsing of a Namespace-rich XML document
+------------------------------------------------------
+
+The file daml-parse-unparse.scm parses a DAML (DARPA Agent Markup
+Language -- XML ontology) document and unparses it. A DAML document
+has a _great_ deal of namespaces. Some of them are represented by
+namespace shortcuts, some are not. The test prints out the SXML after
+the parsing, with all the XML namespaces ids and URIs. The file
+daml-parse-unparse.scm file unparses the SXML tree back into XML. The
+code then verifies that we can parse that unprased document
+again. Furthermore, the code tests that the following invariant holds:
+        PARSE . UNPARSE . PARSE === PARSE
+
+	$ make run-daml-parse-unparse-i
