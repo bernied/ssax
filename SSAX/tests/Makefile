@@ -72,7 +72,7 @@ make-biglooc=echo "(module test (include \"myenv-bigloo.scm\") \
 	     $(BIGLOO) $(BFLAGS) -o $(2) $(TMPSCM) && rm -f $(TMPSCM) && \
 	     ./$(strip $(2))
 
-make-scmi= scm -b -l $(LIBDIR)/myenv-scm.scm \
+make-scmi= scm -b -r5 -l $(LIBDIR)/myenv-scm.scm \
 	   $(foreach file,$(1),-l $(LIBDIR)/$(file)) \
 	   -l $(2).scm
 
