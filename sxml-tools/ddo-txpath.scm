@@ -13,6 +13,17 @@
 (define (ddo:or . args)
   (if (null? args) #f (or (car args) (apply ddo:or (cdr args)))))
 
+(define (ddo:foldl op init lst)
+  (if (null? lst)
+      init
+      (ddo:foldl op (op (car lst) init) (cdr lst))))
+
+(define (ddo:foldr op init lst)
+  (if (null? lst)
+      init
+      (op (car lst)
+          (ddo:foldr op init (cdr lst)))))
+
 ; Definition of types
 (define ddo:type-nodeset 'ddo:type-nodeset)
 (define ddo:type-number 'ddo:type-number)
@@ -124,8 +135,8 @@
             nset
             (let ((size (length nset)))  ; context size
               (let iter-pairs ((nset nset)
-                            (res '())
-                            (pos 1))                          
+                               (res '())
+                               (pos 1))                          
                 (if
                  (null? nset)  ; continue with the next predicate
                  (iter-preds (reverse res) (cdr preds))
@@ -846,7 +857,7 @@
 ; can be used
 
 ;-------------------------------------------------
-; In this section, each function accepts 4 arguments
+; In this section, each function accepts 5 arguments
 ;  op - S-expression which represents the operation
 ;  num-anc - how many ancestors are required in the context after that
 ;   operation
@@ -858,6 +869,11 @@
 ;   In particular, pred-nesting=0 denotes the outer expression, pred-nesting=1
 ;   denotes the expression enclosed into a predicate, pred-nesting=2 for an
 ;   expression that is enclosed into 2 predicates, etc
+;  vars2offsets - mapping from variable names to their offsets in a var-vector
+;  vars2offsets ::= (cons vacant-offset
+;                         (listof (cons var-name var-offset))
+;  vacant-offset - a number, initially starts from 0
+;  var-offset - offset for a particular variable within a vector
 ;
 ; AST processing functions return either #f, which signals of a
 ; semantic error, or
@@ -866,7 +882,8 @@
 ;        single-level?
 ;        requires-position?
 ;        expr-type
-;        deep-predicates )
+;        deep-predicates
+;        vars2offsets )
 ;  position+size - the same to what was called 'context' in TXPath-1
 ;  requires-position? - whether position() or last() functions are encountered
 ;   in the internal expression
@@ -881,19 +898,23 @@
 
 ; {1} <LocationPath> ::= <RelativeLocationPath>
 ;                        | <AbsoluteLocationPath>
-(define (ddo:ast-location-path op num-anc single-level? pred-nesting)
+(define (ddo:ast-location-path
+         op num-anc single-level? pred-nesting vars2offsets)
   (case (car op)
     ((absolute-location-path)
-     (ddo:ast-absolute-location-path op num-anc single-level? pred-nesting))
+     (ddo:ast-absolute-location-path
+      op num-anc single-level? pred-nesting vars2offsets))
     ((relative-location-path)
-     (ddo:ast-relative-location-path op num-anc single-level? pred-nesting))
+     (ddo:ast-relative-location-path
+      op num-anc single-level? pred-nesting vars2offsets))
     (else
      (draft:signal-semantic-error "improper LocationPath - " op))))
 
 ; {2} <AbsoluteLocationPath> ::= (absolute-location-path  <Step>* )
 ; NOTE: single-level? is dummy here, since AbsoluteLocationPath always
 ; starts from a single node - the root of the document
-(define (ddo:ast-absolute-location-path op num-anc single-level? pred-nesting)
+(define (ddo:ast-absolute-location-path
+         op num-anc single-level? pred-nesting vars2offsets)
   (cond
     ((not (eq? (car op) 'absolute-location-path))
      (draft:signal-semantic-error "not an AbsoluteLocationPath - " op))
@@ -906,10 +927,12 @@
       #f  ; doesn't require position
       ddo:type-nodeset
       '()  ; no deep predicates
+      vars2offsets
       ))
     (else
      (and-let*
-      ((steps-res (ddo:ast-step-list (cdr op) num-anc #t pred-nesting)))
+      ((steps-res (ddo:ast-step-list
+                   (cdr op) num-anc #t pred-nesting vars2offsets)))
       (cons
        (if
         (null? (cdar steps-res))  ; only a single step
@@ -930,13 +953,15 @@
              ))))))
 
 ; {3} <RelativeLocationPath> ::= (relative-location-path  <Step>+ )
-(define (ddo:ast-relative-location-path op num-anc single-level? pred-nesting)
+(define (ddo:ast-relative-location-path
+         op num-anc single-level? pred-nesting vars2offsets)
   (if
    (not (eq? (car op) 'relative-location-path))
    (draft:signal-semantic-error "not a RelativeLocationPath - " op)
    (and-let*
     ((steps-res
-      (ddo:ast-step-list (cdr op) num-anc single-level? pred-nesting)))
+      (ddo:ast-step-list
+       (cdr op) num-anc single-level? pred-nesting vars2offsets)))
     (cons
      (if
       (null? (cdar steps-res))  ; only a single step
@@ -954,12 +979,12 @@
 
 ; {4} <Step> ::= (step  <AxisSpecifier> <NodeTest> <Predicate>* )
 ;                | (range-to  (expr <Expr>)  <Predicate>* )
-(define (ddo:ast-step op num-anc single-level? pred-nesting)
+(define (ddo:ast-step op num-anc single-level? pred-nesting vars2offsets)
   (cond
     ((eq? (car op) 'range-to)
      (draft:signal-semantic-error "range-to function not implemented"))
     ((eq? (car op) 'filter-expr)
-     (ddo:ast-filter-expr op num-anc single-level? pred-nesting))
+     (ddo:ast-filter-expr op num-anc single-level? pred-nesting vars2offsets))
     ((eq? (car op) 'lambda-step)  ; created by sxpath
      (let ((proc (cadr op)))
        (list
@@ -980,6 +1005,7 @@
         #f  ; position-required?
         ddo:type-any
         '()  ; no deep predicates
+        vars2offsets
         )))
     ((eq? (car op) 'step)
      (if
@@ -997,17 +1023,19 @@
           #f
           ddo:type-nodeset
           '()  ; no deep predicates
+          vars2offsets
           )))
       ; There are Predicates
       (and-let*
        ((preds-res (ddo:ast-predicate-list
-                    (cdddr op) 0 #t (+ pred-nesting 1)))
+                    (cdddr op) 0 #t (+ pred-nesting 1) vars2offsets))
         (preds-res
          (if (and (list-ref preds-res 3)  ; position required for the predicate
                   (< pred-nesting 3))  ; level of nesting matters
              (ddo:ast-predicate-list  ; the second pass
               (cdddr op) 0 #t
               (+ pred-nesting 2)  ; called for quadratic number of times
+              vars2offsets
               )
              preds-res  ; do not need to change anything
              ))
@@ -1034,18 +1062,21 @@
           #f  ; position-required?
           ddo:type-nodeset
           (list-ref preds-res 5)  ; deep predicates
+          (list-ref preds-res 6)  ; new var-binding
           )))))
     (else
      (draft:signal-semantic-error "not a Step - " op))))
 
 ; {4a} ( <Step>+ )
 ; Returns (list (listof step-impl)
-;               num-anc single-level? requires-position? expr-type)
+;               num-anc single-level? requires-position? expr-type
+;               deep-predicates vars2offsets)
 ; or #f
 ; TECHNICAL NOTE: To calculate 'single-level?', we need to process steps in
 ; straight orger. To calculate 'num-anc', we need to process steps in reverse
 ; order. This thus has to be implemented in 2 passes
-(define (ddo:ast-step-list step-lst num-anc single-level? pred-nesting)
+(define (ddo:ast-step-list
+         step-lst num-anc single-level? pred-nesting vars2offsets)
   (let (; Calculates single-level? for each step in the step-lst
         ; Returns: (listof single-level?)
         ; where each member of the REVERSED result list corresponds to the step
@@ -1080,22 +1111,25 @@
                 (sl?-lst single-level-lst)
                 (res-lst '())
                 (num-anc num-anc)
-                (deep-predicates '()))
+                (deep-predicates '())
+                (vars2offsets vars2offsets))
        (if
         (null? steps-to-view)  ; everyone processed
         (list res-lst
               num-anc (car single-level-lst) #f
-              ddo:type-nodeset deep-predicates)
+              ddo:type-nodeset deep-predicates vars2offsets)
         (and-let*
          ((step-res
            (ddo:ast-step
-            (car steps-to-view) num-anc (car sl?-lst) pred-nesting)))
+            (car steps-to-view) num-anc (car sl?-lst)
+            pred-nesting vars2offsets)))
          (loop
           (cdr steps-to-view)
           (cdr sl?-lst)
           (cons (car step-res) res-lst)
           (cadr step-res)
           (append (list-ref step-res 5) deep-predicates)
+          (list-ref step-res 6)  ; new vars2offsets
           )))))))
 
 ; {8} <Predicate> ::= (predicate  <Expr> )
@@ -1105,12 +1139,12 @@
 ; NOTE: Unlike 'draft:ast-predicate', we don't implement any filtering here,
 ;  because it depends on the particular axis in the step. Filtering is
 ;  performed on the higher level
-(define (ddo:ast-predicate op num-anc single-level? pred-nesting)
+(define (ddo:ast-predicate op num-anc single-level? pred-nesting vars2offsets)
   (if
    (not (eq? (car op) 'predicate))
    (draft:signal-semantic-error "not an Predicate - " op)
    (and-let*
-    ((expr-res (ddo:ast-expr (cadr op) 0 #t pred-nesting)))
+    ((expr-res (ddo:ast-expr (cadr op) 0 #t pred-nesting vars2offsets)))
     (let ((requires-position?
            (or (cadddr expr-res)  ; predicate expression requires position
                (memq (list-ref expr-res 4)  ; involves position implicitly
@@ -1119,7 +1153,10 @@
        (((pred-impl deep-predicates)
        (if        
         (> pred-nesting 3)  ; this is a deep predicate
-        (let ((pred-id (ddo:generate-pred-id)))
+        (let ((pred-id (ddo:generate-pred-id)
+                       ; TODO: DL: should be (car vars2offsets) i.e. vacant-pos
+                       ))
+          ; TODO: SHOULD INCREASE VACANT-POS
           (values
            ((if requires-position?
                 ddo:get-pred-value-pos ddo:get-pred-value)
@@ -1138,7 +1175,9 @@
              (caddr expr-res)  ; single-level? - we don't care
              requires-position?
              (list-ref expr-res 4)  ; return type
-             deep-predicates))))))
+             deep-predicates
+             (list-ref expr-res 6)  ; vars2offsets             
+             ))))))
 
 ; {8a} ( <Predicate>+ )
 ; Returns (list (listof pred-impl)
@@ -1149,13 +1188,24 @@
 ; NOTE: single-level? is dummy here, since a Predicate is always called for
 ;  a single node to be filtered
 ; NOTE: information about the type for each Predicate is lost
-(define (ddo:ast-predicate-list op-lst num-anc single-level? pred-nesting)
-  (let ((pred-res-lst (map
-                       (lambda (op) (ddo:ast-predicate op 0 #t pred-nesting))
-                       op-lst)))
-    (if
-     (member #f pred-res-lst)  ; error detected
-     #f
+(define (ddo:ast-predicate-list
+         op-lst num-anc single-level? pred-nesting vars2offsets)
+  (let ((pred-res-lst
+         (ddo:foldr          
+          (lambda (op init)
+            (cons
+             (ddo:ast-predicate
+              op 0 #t pred-nesting
+              (if (or (null? init)  ; called for the first time
+                      (not (car init)))
+                  vars2offsets
+                  (list-ref (car init) 6)  ; vars2offsets from previous pred
+                  ))
+             init))
+          '()
+          op-lst)))
+    (and
+     (not (memv #f pred-res-lst))  ; error detected
      (list (map car pred-res-lst)
            (apply draft:na-max (map cadr pred-res-lst))
            #t
@@ -1164,7 +1214,9 @@
            (apply append   ; deep-predicates
                   (map
                    (lambda (pred-res) (list-ref pred-res 5))
-                   pred-res-lst))))))
+                   pred-res-lst))
+           (list-ref (car pred-res-lst) 6)  ; vars2offsets
+           ))))
 
 ; {9} <Expr> ::= <OrExpr>
 ;                | <AndExpr>
@@ -1180,51 +1232,73 @@
 ;                | <Number>
 ;                | <FunctionCall>
 ;                | <LocationPath>
-(define (ddo:ast-expr op num-anc single-level? pred-nesting)
+(define (ddo:ast-expr op num-anc single-level? pred-nesting vars2offsets)
   (case (car op)
     ((or)
-     (ddo:ast-or-expr op num-anc single-level? pred-nesting))
+     (ddo:ast-or-expr op num-anc single-level? pred-nesting vars2offsets))
     ((and)
-     (ddo:ast-and-expr op num-anc single-level? pred-nesting))
+     (ddo:ast-and-expr op num-anc single-level? pred-nesting vars2offsets))
     ((= !=)
-     (ddo:ast-equality-expr op num-anc single-level? pred-nesting))
+     (ddo:ast-equality-expr op num-anc single-level? pred-nesting vars2offsets))
     ((< > <= >=)
-     (ddo:ast-relational-expr op num-anc single-level? pred-nesting))
+     (ddo:ast-relational-expr
+      op num-anc single-level? pred-nesting vars2offsets))
     ((+ -)
-     (ddo:ast-additive-expr op num-anc single-level? pred-nesting))
+     (ddo:ast-additive-expr op num-anc single-level? pred-nesting vars2offsets))
     ((* div mod)
-     (ddo:ast-multiplicative-expr op num-anc single-level? pred-nesting))
+     (ddo:ast-multiplicative-expr
+      op num-anc single-level? pred-nesting vars2offsets))
     ((union-expr)
-     (ddo:ast-union-expr op num-anc single-level? pred-nesting))
+     (ddo:ast-union-expr op num-anc single-level? pred-nesting vars2offsets))
     ((path-expr)
-     (ddo:ast-path-expr op num-anc single-level? pred-nesting))
+     (ddo:ast-path-expr op num-anc single-level? pred-nesting vars2offsets))
     ((filter-expr)
-     (ddo:ast-filter-expr op num-anc single-level? pred-nesting))
+     (ddo:ast-filter-expr op num-anc single-level? pred-nesting vars2offsets))
     ((variable-reference)
-     (ddo:ast-variable-reference op num-anc single-level? pred-nesting))
+     (ddo:ast-variable-reference
+      op num-anc single-level? pred-nesting vars2offsets))
     ((literal)
-     (ddo:ast-literal op num-anc single-level? pred-nesting))
+     (ddo:ast-literal op num-anc single-level? pred-nesting vars2offsets))
     ((number)
-     (ddo:ast-number op num-anc single-level? pred-nesting))
+     (ddo:ast-number op num-anc single-level? pred-nesting vars2offsets))
     ((function-call)
-     (ddo:ast-function-call op num-anc single-level? pred-nesting))
+     (ddo:ast-function-call op num-anc single-level? pred-nesting vars2offsets))
     ((absolute-location-path)
-     (ddo:ast-absolute-location-path op num-anc single-level? pred-nesting))
+     (ddo:ast-absolute-location-path
+      op num-anc single-level? pred-nesting vars2offsets))
     ((relative-location-path)
-     (ddo:ast-relative-location-path op num-anc single-level? pred-nesting))
+     (ddo:ast-relative-location-path
+      op num-anc single-level? pred-nesting vars2offsets))
     (else
      (draft:signal-semantic-error "unknown Expr - " op))))
 
+; Applies AST processing to a list of operations
+(define (ddo:apply-ast-procedure
+         ast-procedure op-lst num-anc single-level? pred-nesting vars2offsets)
+  (ddo:foldr
+   (lambda (expr init)
+     (cons
+      (ast-procedure
+       expr num-anc single-level? pred-nesting
+       (if (or (null? init)  ; called for the first time
+               (not (car init))  ; error during previously processed expr
+               )
+           vars2offsets
+           (list-ref (car init) 6)  ; vars2offsets from previous expr
+           ))
+      init))
+   '()
+   op-lst))
+
 ; {10} <OrExpr> ::= (or <Expr> <Expr>+ )
 ; NOTE: num-anc is dummy here, since it is always 0 for OrExpr
-(define (ddo:ast-or-expr op num-anc single-level? pred-nesting)
+(define (ddo:ast-or-expr op num-anc single-level? pred-nesting vars2offsets)
   (let ((expr-res-lst
-         (map
-          (lambda (expr) (ddo:ast-expr expr 0 single-level? pred-nesting))
-          (cdr op))))
-    (if
-     (member #f expr-res-lst)  ; error detected
-     #f
+         (ddo:apply-ast-procedure
+          ddo:ast-expr
+          (cdr op) 0 single-level? pred-nesting vars2offsets)))
+    (and
+     (not (memv #f expr-res-lst))  ; error detected
      (let ((expr-impls (map car expr-res-lst)))
      (list
       (lambda (nodeset position+size var-binding)
@@ -1240,18 +1314,19 @@
       (apply append   ; deep-predicates
              (map
               (lambda (expr-res) (list-ref expr-res 5))
-              expr-res-lst)))))))
+              expr-res-lst))
+      (list-ref (car expr-res-lst) 6)  ; vars2offsets
+      )))))
 
 ; {11} <AndExpr> ::= (and <Expr> <Expr>+ )
 ; NOTE: num-anc is dummy here, since it is always 0 for AndExpr
-(define (ddo:ast-and-expr op num-anc single-level? pred-nesting)
+(define (ddo:ast-and-expr op num-anc single-level? pred-nesting vars2offsets)
   (let ((expr-res-lst
-         (map
-          (lambda (expr) (ddo:ast-expr expr 0 single-level? pred-nesting))
-          (cdr op))))
-    (if
-     (member #f expr-res-lst)  ; error detected
-     #f
+         (ddo:apply-ast-procedure
+          ddo:ast-expr
+          (cdr op) 0 single-level? pred-nesting vars2offsets)))
+    (and
+     (not (memv #f expr-res-lst))  ; error detected
      (let ((expr-impls (map car expr-res-lst)))
      (list
       (lambda (nodeset position+size var-binding)
@@ -1269,15 +1344,22 @@
       (apply append   ; deep-predicates
              (map
               (lambda (expr-res) (list-ref expr-res 5))
-              expr-res-lst)))))))
+              expr-res-lst))
+      (list-ref (car expr-res-lst) 6)  ; vars2offsets
+      )))))
 
 ; {12} <EqualityExpr> ::= (=  <Expr> <Expr> )
 ;                         | (!=  <Expr> <Expr> )
 ; NOTE: num-anc is dummy here, since it is always 0 for EqualityExpr
-(define (ddo:ast-equality-expr op num-anc single-level? pred-nesting)
+(define (ddo:ast-equality-expr
+         op num-anc single-level? pred-nesting vars2offsets)
   (and-let*
-   ((left-lst (ddo:ast-expr (cadr op) 0 single-level? pred-nesting))
-    (right-lst (ddo:ast-expr (caddr op) 0 single-level? pred-nesting)))
+   ((left-lst
+     (ddo:ast-expr (cadr op) 0 single-level? pred-nesting vars2offsets))
+    (right-lst
+     (ddo:ast-expr (caddr op) 0 single-level? pred-nesting
+                   (list-ref left-lst 6)  ; vars2offsets for left part
+                   )))
    (let ((cmp-op (cadr (assq (car op) `((= ,sxml:equal?)
                                         (!= ,sxml:not-equal?)))))
          (left (car left-lst))
@@ -1294,17 +1376,24 @@
       (or (cadddr left-lst) (cadddr right-lst))  ; position-required?
       ddo:type-boolean
       (append (list-ref left-lst 5)   ; deep-predicates
-              (list-ref right-lst 5))))))
+              (list-ref right-lst 5))
+      (list-ref right-lst 6)  ; vars2offsets for right part
+      ))))
       
 ; {13} <RelationalExpr> ::= (<  <Expr> <Expr> )
 ;                           | (>  <Expr> <Expr> )
 ;                           | (<=  <Expr> <Expr> )
 ;                           | (>=  <Expr> <Expr> )
 ; NOTE: num-anc is dummy here, since it is always 0 for RelationalExpr
-(define (ddo:ast-relational-expr op num-anc single-level? pred-nesting)
+(define (ddo:ast-relational-expr
+         op num-anc single-level? pred-nesting vars2offsets)
   (and-let*
-   ((left-lst (ddo:ast-expr (cadr op) 0 single-level? pred-nesting))
-    (right-lst (ddo:ast-expr (caddr op) 0 single-level? pred-nesting)))
+   ((left-lst
+     (ddo:ast-expr (cadr op) 0 single-level? pred-nesting vars2offsets))
+    (right-lst
+     (ddo:ast-expr (caddr op) 0 single-level? pred-nesting
+                   (list-ref left-lst 6)  ; vars2offsets for left part
+                   )))
    (let ((cmp-op
           (sxml:relational-cmp
            (cadr (assq (car op) `((< ,<) (> ,>) (<= ,<=) (>= ,>=))))))
@@ -1322,19 +1411,21 @@
       (or (cadddr left-lst) (cadddr right-lst))  ; position-required?
       ddo:type-boolean
       (append (list-ref left-lst 5)   ; deep-predicates
-              (list-ref right-lst 5))))))
+              (list-ref right-lst 5))
+      (list-ref right-lst 6)  ; vars2offsets for right part
+      ))))
 
 ; {14} <AdditiveExpr> ::= (+  <Expr> <Expr> )
 ;                         | (-  <Expr> <Expr>? )
 ; NOTE: num-anc is dummy here, since it is always 0 for AdditiveExpr
-(define (ddo:ast-additive-expr op num-anc single-level? pred-nesting)
+(define (ddo:ast-additive-expr
+         op num-anc single-level? pred-nesting vars2offsets)
   (let ((expr-res-lst
-         (map
-          (lambda (expr) (ddo:ast-expr expr 0 single-level? pred-nesting))
-          (cdr op))))
-    (if
-     (member #f expr-res-lst)  ; error detected
-     #f
+         (ddo:apply-ast-procedure
+          ddo:ast-expr
+          (cdr op) 0 single-level? pred-nesting vars2offsets)))
+    (and
+     (not (memv #f expr-res-lst))  ; error detected
      (let ((add-op (cadr (assq (car op) `((+ ,+) (- ,-)))))
            (expr-impls (map car expr-res-lst)))
      (list
@@ -1354,16 +1445,23 @@
       (apply append   ; deep-predicates
              (map
               (lambda (expr-res) (list-ref expr-res 5))
-              expr-res-lst)))))))
+              expr-res-lst))
+      (list-ref (car expr-res-lst) 6)  ; vars2offsets
+      )))))
 
 ; {15} <MultiplicativeExpr> ::= (*  <Expr> <Expr> )
 ;                               | (div  <Expr> <Expr> )
 ;                               | (mod  <Expr> <Expr> )
 ; NOTE: num-anc is dummy here, since it is always 0 for MultiplicativeExpr
-(define (ddo:ast-multiplicative-expr op num-anc single-level? pred-nesting)
+(define (ddo:ast-multiplicative-expr
+         op num-anc single-level? pred-nesting vars2offsets)
   (and-let*
-   ((left-lst (ddo:ast-expr (cadr op) 0 single-level? pred-nesting))
-    (right-lst (ddo:ast-expr (caddr op) 0 single-level? pred-nesting)))
+   ((left-lst
+     (ddo:ast-expr (cadr op) 0 single-level? pred-nesting vars2offsets))
+    (right-lst
+     (ddo:ast-expr (caddr op) 0 single-level? pred-nesting
+                   (list-ref left-lst 6)  ; vars2offsets for left part
+                   )))
    (let ((mul-op
           (sxml:relational-cmp
            (cadr (assq (car op) `((* ,*) (div ,/) (mod ,remainder))))))
@@ -1383,80 +1481,91 @@
       (or (cadddr left-lst) (cadddr right-lst))  ; position-required?
       ddo:type-number
       (append (list-ref left-lst 5)   ; deep-predicates
-              (list-ref right-lst 5))))))
+              (list-ref right-lst 5))
+      (list-ref right-lst 6)  ; vars2offsets for right part
+      ))))
 
 ; {16} <UnionExpr> ::= (union-expr  <Expr> <Expr>+ )
 ; TECHNICAL NOTE: For implementing the union while supporting distinct document
 ; order, we need num-ancestors=#f for the arguments of the union-expr. This
 ; operation is time-consuming and should be avoided
-(define (ddo:ast-union-expr op num-anc single-level? pred-nesting)
+(define (ddo:ast-union-expr op num-anc single-level? pred-nesting vars2offsets)
   (let ((expr-res-lst
-         (map
-          (lambda (expr na)
+         (ddo:foldr
+          (lambda (expr init)
             (let ((expr-res
-                   (ddo:ast-expr expr na single-level? pred-nesting)))
-              (if
-               (not (or (eq? (list-ref expr-res 4) ddo:type-nodeset)
-                        (eq? (list-ref expr-res 4) ddo:type-any)))
-               (draft:signal-semantic-error
-                "expression to be unioned evaluates to a non-nodeset - "
-                expr)
-               expr-res)))
-          (cdr op)
-          (reverse  ; number of ancestors for each of the expressions unioned
-           (cons
-            num-anc  ; the last expr doesn't require num-ancestors=#f
-            (map
-             (lambda (dummy) #f)
-             (cddr op)  ; (cdr op) is non-null
-             ))))))
-    (if
-     (member #f expr-res-lst)  ; error detected
-     #f
+                   (if 
+                    (or (null? init)  ; called for the first time
+                        (not (car init)))                   
+                    (ddo:ast-expr
+                     expr num-anc  ; not necessarily all ancestors
+                     single-level? pred-nesting vars2offsets)
+                    (ddo:ast-expr
+                     expr #f single-level? pred-nesting
+                     (list-ref (car init) 6)  ; vars2offsets from previous expr
+                     ))))
+              (cons
+               (if
+                (not (or (eq? (list-ref expr-res 4) ddo:type-nodeset)
+                         (eq? (list-ref expr-res 4) ddo:type-any)))               
+                (draft:signal-semantic-error
+                 "expression to be unioned evaluates to a non-nodeset - "
+                 expr)
+                expr-res)
+               init)))
+          '()
+          (cdr op))))
+    (and
+     (not (memv #f expr-res-lst))  ; error detected
      (let ((expr-impls (map car expr-res-lst)))
-     (list
-      (lambda (nodeset position+size var-binding)
-        (let rpt ((res '())
-                  (fs expr-impls))
-          (if
-           (null? fs)
-           res
-           (let ((nset ((car fs) nodeset position+size var-binding)))
-             (rpt
-              (ddo:unite-2-contextsets 
-               res
-               (cond
-                 ((not (nodeset? nset))
-                  (sxml:xpointer-runtime-error
-                   "expected - nodeset instead of " nset)
-                  '())
-                 (else nset)))
-              (cdr fs))))))
-      #f  ; num-ancestors
-      #f     ; single-level? after this step
-      (apply ddo:or (map cadddr expr-res-lst))  ; position-required?
-      ddo:type-nodeset
-      (apply append   ; deep-predicates
-             (map
-              (lambda (expr-res) (list-ref expr-res 5))
-              expr-res-lst)))))))
+       (list
+        (lambda (nodeset position+size var-binding)
+          (let rpt ((res '())
+                    (fs expr-impls))
+            (if
+             (null? fs)
+             res
+             (let ((nset ((car fs) nodeset position+size var-binding)))
+               (rpt
+                (ddo:unite-2-contextsets 
+                 res
+                 (cond
+                   ((not (nodeset? nset))
+                    (sxml:xpointer-runtime-error
+                     "expected - nodeset instead of " nset)
+                    '())
+                   (else nset)))
+                (cdr fs))))))
+        #f  ; num-ancestors
+        #f     ; single-level? after this step
+        (apply ddo:or (map cadddr expr-res-lst))  ; position-required?
+        ddo:type-nodeset
+        (apply append   ; deep-predicates
+               (map
+                (lambda (expr-res) (list-ref expr-res 5))
+                expr-res-lst))
+        (list-ref (car expr-res-lst) 6)  ; vars2offsets
+        )))))
 
 ; {17} <PathExpr> ::= (path-expr  <FilterExpr> <Step>+ )
 ; TECHNICAL NOTE: To calculate 'single-level?', we need to process components
 ; in straight orger. To calculate 'num-anc', we need to process steps in
 ; reverse order. It is too expensive to make the 2 passes, that's why we
 ; consider single-level?=#f for steps
-(define (ddo:ast-path-expr op num-anc single-level? pred-nesting)
+(define (ddo:ast-path-expr op num-anc single-level? pred-nesting vars2offsets)
   (and-let*
     ((steps-res (ddo:ast-step-list
                  (cddr op) num-anc
                  #f  ; consider single-level?=#f after FilterExpr
-                 pred-nesting))
+                 pred-nesting
+                 vars2offsets))
      (filter-lst (ddo:ast-filter-expr
                   (cadr op)
                   (cadr steps-res)  ; num-ancestors
                   single-level?
-                  pred-nesting)))
+                  pred-nesting
+                  (list-ref steps-res 6)  ; vars2offsets from steps-list
+                  )))
     (if
      (not (or (eq? (list-ref filter-lst 4) ddo:type-nodeset)
               (eq? (list-ref filter-lst 4) ddo:type-any)))
@@ -1485,18 +1594,20 @@
         (cadddr filter-lst)  ; position-required?
         ddo:type-nodeset
         (append (list-ref filter-lst 5)   ; deep-predicates
-                (list-ref steps-res 5)))))))
+                (list-ref steps-res 5))
+        (list-ref filter-lst 6)  ; vars2offsets from filter-lst
+        )))))
 
 ; {18} <FilterExpr> ::= (filter-expr (primary-expr  <Expr> )
 ;                                    <Predicate>* )
-(define (ddo:ast-filter-expr op num-anc single-level? pred-nesting)
+(define (ddo:ast-filter-expr op num-anc single-level? pred-nesting vars2offsets)
   (cond
     ((not (eq? (car op) 'filter-expr))
      (draft:signal-semantic-error "not an FilterExpr - " op))
     ((not (eq? (caadr op) 'primary-expr))
      (draft:signal-semantic-error "not an PrimaryExpr - " (cadr op)))
     ((null? (cddr op))  ; no Predicates
-     (ddo:ast-expr (cadadr op) num-anc single-level? pred-nesting))
+     (ddo:ast-expr (cadadr op) num-anc single-level? pred-nesting vars2offsets))
     ((and (null? (cdddr op))   ; a single predicate
           (ddo:check-special-predicate (caddr op)))
      => (lambda (special-pred-impl)          
@@ -1504,7 +1615,7 @@
            ((expr-lst (ddo:ast-expr
                        (cadadr op)
                        num-anc   ; special predicate doesn't require ancestors
-                       single-level? pred-nesting)))
+                       single-level? pred-nesting vars2offsets)))
            (list
             (ddo:filter-expr-special-predicate
              (car expr-lst) special-pred-impl)
@@ -1513,14 +1624,18 @@
             (cadddr expr-lst)  ; position-required?
             ddo:type-nodeset
             (list-ref expr-lst 5)  ; deep-predicates
+            (list-ref expr-lst 6)  ; vars2offsets
             ))))
     (else   ; the general case
      (and-let*
-       ((preds-res (ddo:ast-predicate-list (cddr op) 0 #t (+ pred-nesting 1)))
+       ((preds-res (ddo:ast-predicate-list
+                    (cddr op) 0 #t (+ pred-nesting 1) vars2offsets))
         (expr-lst (ddo:ast-expr
                    (cadadr op)
                    (draft:na-max num-anc (cadr preds-res))  ; num-anc
-                   single-level? pred-nesting)))
+                   single-level? pred-nesting
+                   (list-ref preds-res 6)  ; vars2offsets from predicates
+                   )))
        (if
         (not (or (eq? (list-ref expr-lst 4) ddo:type-nodeset)
                  (eq? (list-ref expr-lst 4) ddo:type-any)))
@@ -1538,10 +1653,13 @@
            (cadddr expr-lst)  ; position-required?
            ddo:type-nodeset
            (append (list-ref expr-lst 5)   ; deep-predicates
-                   (list-ref preds-res 5)))))))))
+                   (list-ref preds-res 5))
+           (list-ref expr-lst 6)  ; vars2offsets from expr-lst
+           )))))))
 
 ; {19} <VariableReference> ::= (variable-reference  <String> )
-(define (ddo:ast-variable-reference op num-anc single-level? pred-nesting)
+(define (ddo:ast-variable-reference
+         op num-anc single-level? pred-nesting vars2offsets)
   (let ((name (string->symbol (cadr op))))
     (list
      (lambda (nodeset position+size var-binding)
@@ -1555,26 +1673,31 @@
      #t  ; ATTENTION: in is not generally on the single-level
      #f
      ddo:type-any  ; type cannot be statically determined
-     '()  ; deep-predicates
+     '()  ; deep-predicates     
+     (cons    ; TODO: proper handling of variable names
+      (+ (car vars2offsets) 1)
+      (cons (cons name (car vars2offsets))      
+            (cdr vars2offsets)))
      )))
 
 ; {20} <Literal> ::= (literal  <String> )
-(define (ddo:ast-literal op num-anc single-level? pred-nesting)
+(define (ddo:ast-literal op num-anc single-level? pred-nesting vars2offsets)
   (let ((literal (cadr op)))
     (list
      (lambda (nodeset position+size var-binding) literal)
-     0 #t #f ddo:type-string '())))
+     0 #t #f ddo:type-string '() vars2offsets)))
 
 ; {21} <Number> :: (number  <Number> )
-(define (ddo:ast-number op num-anc single-level? pred-nesting)
+(define (ddo:ast-number op num-anc single-level? pred-nesting vars2offsets)
   (let ((number (cadr op)))
     (list
      (lambda (nodeset position+size var-binding) number)
-     0 #t #f ddo:type-number '())))
+     0 #t #f ddo:type-number '() vars2offsets)))
 
 ; {22} <FunctionCall> ::= (function-call (function-name  <String> )
 ;                                        (argument  <Expr> )* )
-(define (ddo:ast-function-call op num-anc single-level? pred-nesting)
+(define (ddo:ast-function-call
+         op num-anc single-level? pred-nesting vars2offsets)
   (let ((core-alist
          ; (list fun-name min-num-args max-num-args na4res impl
          ;       single-level? requires-position? expr-type)         
@@ -1651,7 +1774,7 @@
                (and-let*
                 ((args-impl-lst (ddo:ast-function-arguments
                                  (cddr op)  ; list of arguments
-                                 single-level? pred-nesting)))
+                                 single-level? pred-nesting vars2offsets)))
                 (list
                  ; Producing a function implementation
                  (apply (list-ref description 4)
@@ -1671,7 +1794,11 @@
                  (apply append   ; deep-predicates
                         (map
                          (lambda (arg-res) (list-ref arg-res 5))
-                         args-impl-lst))))))))
+                         args-impl-lst))
+                 (if (null? args-impl-lst)  ; no arguments
+                     vars2offsets
+                     (list-ref (car args-impl-lst) 6))
+                 ))))))
            (else  ; function definition not found
             (draft:signal-semantic-error
              "function call to an unknown function - " (cadadr op))))))
@@ -1681,21 +1808,30 @@
 ; Returns:  #f  or
 ;  (listof 
 ;    (list expr-impl num-anc single-level? requires-position? expr-type
-;          deep-predicates))
+;          deep-predicates vars2offsets))
 ; NOTE: In XPath Core Function Library, none of the function arguments
 ; is required to save any ancestors in the context
-(define (ddo:ast-function-arguments op-lst single-level? pred-nesting)
+(define (ddo:ast-function-arguments
+         op-lst single-level? pred-nesting vars2offsets)
   (let ((arg-res-lst
-         (map
-          (lambda (op)
-            (if
-             (not (eq? (car op) 'argument))
-             (draft:signal-semantic-error "not an Argument - " op)
-             (ddo:ast-expr (cadr op) 0 single-level? pred-nesting)))
+         (ddo:foldr
+          (lambda (op init)            
+            (cons
+             (if
+              (not (eq? (car op) 'argument))
+              (draft:signal-semantic-error "not an Argument - " op)
+              (ddo:ast-expr
+               (cadr op) 0 single-level? pred-nesting
+               (if (or (null? init)  ; called for the first time
+                       (not (car init)))
+                   vars2offsets
+                   (list-ref (car init) 6)  ; vars2offsets from previous pred
+                   )))
+             init))
+          '()
           op-lst)))
-    (if
-     (member #f arg-res-lst)  ; semantic error detected
-     #f
+    (and
+     (not (memv #f arg-res-lst))  ; semantic error detected
      arg-res-lst)))
 
 
@@ -1734,7 +1870,9 @@
         (impl-lst (ast-parser ast num-anc
                               #t  ; we suppose single-level?=#t for src
                               0  ; predicate nesting is zero
+                              '(0)  ; initial vars2offsets
                               )))
+       ;(pp (list-ref impl-lst 6))
        (let ((impl-lambda
               (if
                (and num-anc (zero? num-anc))
