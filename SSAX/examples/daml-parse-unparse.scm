@@ -1,9 +1,23 @@
-;      Pretty-printing from SXML to XML
+; Parse a DAML ontology into SXML and pretty-print it back into XML
+;
+; This code is an example of parsing and _unparsing_ of a notably
+; namespace-heavy XML/SXML. The XML document in question also
+; makes an extensive use of named parsed entities.
+;
+; This code verifies that 
+;     PARSE . UNPARSE . PARSE === PARSE
+; In the first step, the code parses a DAML document and prints the
+; resulting SXML. In the second step, we unparse the SXML back into
+; XML. Finally, we parse that XML again and compare the result with
+; that of the first step.
+;
+; A Bigloo Scheme system is assumed. We extensively rely on the
+; match-case form provided by Bigloo.
 ;
 ; $Id$
 
 
-(module sxml-to-xml
+(module xml-to-sxml-to-xml
 	(include "myenv-bigloo.scm")
 	(include "util.scm")
 	(include "look-for-str.scm")
@@ -23,10 +37,11 @@
 
 ; The file is downloaded from
 ; http://www.daml.org/services/daml-s/0.7/CongoProfile.daml
-;(define daml-file "/tmp/aa.xml")
 (define daml-file "xml/CongoProfile.daml")
+; A temp file to store the result of unparsing
+(define unparsed-file "/tmp/a.xml") 
 
-; Internal entities declared in that file
+; Internal entities declared in the CongoProfile.daml file
 (define DAML-entities
   '((rdf . "http://www.w3.org/1999/02/22-rdf-syntax-ns")
     (rdfs . "http://www.w3.org/2000/01/rdf-schema")
@@ -47,6 +62,9 @@
     (DEFAULT . "http://www.daml.org/services/daml-s/0.7/CongoProfile.daml")
     ))
 
+;------------------------------------------------------------------------
+;			Parsing of DAML
+
 ; The following is an instantiation variation of the SSAX parser
 ; to handle specified internal parsed entities.
 ; This code is identical to SSAX:XML->SXML except one line in
@@ -54,6 +72,11 @@
 ;   (values #f DAML-entities namespaces seed)
 ; (The original SSAX:XML->SXML had '() in place of DAML-entities)
 ;
+; We also create (@@ (*NAMESPACES* . ns-assocs)) for each element
+; with a non-local element or attribute name. These local ns-assocs
+; describe only the namespaces of the elemen-gi and its attributes.
+; Sharing should be improved!
+
 (define (SSAX:DAML->SXML port namespace-prefix-assig)
   (letrec
       ((namespaces
@@ -130,22 +153,55 @@
    
 	     FINISH-ELEMENT
 	     (lambda (elem-gi attributes namespaces parent-seed seed)
-	       (let ((seed (reverse-collect-str-drop-ws seed))
-		     (attrs
-		      (attlist-fold
-		       (lambda (attr accum)
-			 (cons (list 
-				(if (symbol? (car attr)) (car attr)
-				    (RES-NAME->SXML (car attr)))
-				(cdr attr)) accum))
-		       '() attributes)))
+	       (let* ((seed (reverse-collect-str-drop-ws seed))
+		      (attrs
+		       (attlist-fold
+			(lambda (attr accum)
+			  (cons (list 
+				 (if (symbol? (car attr)) (car attr)
+				     (RES-NAME->SXML (car attr)))
+				 (cdr attr)) accum))
+			'() attributes))
+		      (ns-id-used	; namespace prefixes used by the elem
+		       (attlist-fold
+			(lambda (attr accum)
+			  (if (symbol? (car attr)) accum
+			      (cons  (caar attr) accum)))
+			(if (symbol? elem-gi) '()
+			    (list (car elem-gi))) ; ns-id of the element name
+			attributes))
+		      (local-namespaces
+		       (map
+			(lambda (ns-id)
+			  (let ((ns-elem 
+				 ; locate the ns-id among the namespaces
+				 (let loop ((namespaces namespaces))
+				   (cond
+				    ((null? namespaces)
+				     (assert #f ns-id))  ; can't happen
+				    ((eq? (cadar namespaces) ns-id)
+				     (car namespaces))
+				    (else (loop (cdr namespaces)))))))
+			    (list (cadr ns-elem) ; user prefix or URI-symbol
+				  (symbol->string (cddr ns-elem)) ; URI string
+				  (car ns-elem)) ; original prefix
+			    ))
+			ns-id-used))
+		      (elem-children
+		       (if (null? local-namespaces) seed
+			   (cons (list '@@
+				   (cons '*NAMESPACES* local-namespaces))
+				  seed)))
+		      (sxml-element	; newly created element
+		       (cons 
+			(if (symbol? elem-gi) elem-gi
+			    (RES-NAME->SXML elem-gi))
+			(if (null? attrs) elem-children
+			    (cons (cons '@ attrs) elem-children))))
+		      )
 		 (cons
-		  (cons 
-		   (if (symbol? elem-gi) elem-gi
-		       (RES-NAME->SXML elem-gi))
-		   (if (null? attrs) seed
-		       (cons (cons '@ attrs) seed)))
-		  parent-seed)))
+		  sxml-element parent-seed)
+		 ))
 
 	     CHAR-DATA-HANDLER
 	     (lambda (string1 string2 seed)
@@ -174,17 +230,14 @@
 		   seed))))
 	     )
 	    port '()))))
-      (cons '*TOP*
-	    (if (null? namespace-prefix-assig) result
-		(cons (cons '*NAMESPACES* 
-			    (map (lambda (ns) (list (car ns) (cdr ns)))
-				 namespace-prefix-assig))
-		      result)))
+      (cons '*TOP* result)
 )))
 
-(define daml-sxml
+; Parse a DAML file
+(define (parse-daml daml-file)
   (call-with-input-file daml-file
      (lambda (port) (SSAX:DAML->SXML port 
+	; Define the following user namespace shortcuts
 	 '((rdfs . "http://www.w3.org/2000/01/rdf-schema#")
 	  (rdf . "http://www.w3.org/1999/02/22-rdf-syntax-ns#")
 	  (daml . "http://www.daml.org/2001/03/daml+oil#")
@@ -192,17 +245,16 @@
 	  (log . "http://www.w3.org/2000/10/swap/log#")
 	  (service . "http://www.daml.org/services/daml-s/0.7/Service.daml")
 	  (grounding . "http://www.daml.org/services/daml-s/0.7/Grounding.daml")
-	  (congo_service . "http://www.daml.org/services/daml-s/0.7/CongoService.daml")
-	  (congo_profile . "http://www.daml.org/services/daml-s/0.7/CongoProfile.daml")
-	  (congo_process . "http://www.daml.org/services/daml-s/0.7/CongoProcess.daml")
-	  (congo_grounding . "http://www.daml.org/services/daml-s/0.7/CongoGrounding.daml")
-	  (congo_wsdl_grounding . "http://www.daml.org/services/daml-s/0.7/CongoGrounding.wsdl"))
+	  (congo-service . "http://www.daml.org/services/daml-s/0.7/CongoService.daml")
+	  (congo-profile . "http://www.daml.org/services/daml-s/0.7/CongoProfile.daml")
+	  (congo-process . "http://www.daml.org/services/daml-s/0.7/CongoProcess.daml")
+	  (congo-grounding . "http://www.daml.org/services/daml-s/0.7/CongoGrounding.daml")
+	  (congo-wsdl-grounding . "http://www.daml.org/services/daml-s/0.7/CongoGrounding.wsdl"))
 	 ))))
 
-(cout nl "Parsed result" nl)
-(pp daml-sxml)
-(newline)
 
+;------------------------------------------------------------------------
+;		Unparsing of an SXML file back into XML
 
 ; pretty-print the resulting SXML into XML, emitting the appropriate
 ; xmlns:xxx attributes
@@ -219,18 +271,20 @@
 	   (substring ge-str 0 last-colon)
 	   (substring ge-str (++ last-colon) (string-length ge-str)))
 	  (values #f ge-str))))
+
   (define (make-symbol . pieces)
     (string->symbol (apply string-append pieces)))
 
-  ; Find out the list of all namespaces 
+  ; Find out the list of all namespaces and
   ; design the translation from SXML names to XML names
   ; Return both values.
+  ;
   ; The list of all namespaces is a list of
   ;	(ns-id NS-URI prefix-str)
   ; The translation is an assoc list, a list of
   ;     (sxml-name prefix-str:local-name-str)
   ; A namespace association is converted into (ns-id NS-URI prefix)
-  ; by setting prefix to be ns-id.
+  ; by setting prefix to be ns-id, if it wasn't specified explicitly.
   ; If we come across an sxml name of the form ns-id1:local-name
   ; we check if we already know the translation for the name,
   ; if ns-id1 exists in the current list of namespaces,
@@ -240,6 +294,25 @@
   ; where prefix1 is derived from ns-id1. We make it unique.
 
   (define (ns-normalize sxml)
+    ; check to see if the aux node contains a namespace association
+    ; If so, process them and add to the 'namespaces'
+    (define (add-local-namespaces aux-nodes namespaces)
+      (let ((ns (assq '*NAMESPACES* aux-nodes)))
+	(if (not ns) namespaces
+	    (let loop ((nss (cdr ns)) (namespaces namespaces))
+	      (match-case nss
+		(((?ns-id ?uri . ?prefix-opt) . ?ns-rest)
+		 (if (assq ns-id namespaces) ; seen already. Check prefixes!
+		     (loop ns-rest namespaces)
+		     (loop ns-rest
+			   (cons
+			    (list ns-id uri
+				  (symbol->string
+				   (if (null? prefix-opt) ns-id
+				       (car prefix-opt))))
+			    namespaces))))
+		(else namespaces))))))
+
     (let loop ((node sxml) (todo '())
 	       (namespaces '()) (translation '()))
       (match-case node
@@ -247,29 +320,26 @@
 	 (if (null? todo)
 	     (values namespaces translation)  ; we're done
 	     (loop (car todo) (cdr todo) namespaces translation)))
-	((*NAMESPACES* . ?ns)
-	 (loop '() todo
-	       (append namespaces
-		  (map
-		   (lambda (ns-assoc)
-		     (let ((ns-id (car ns-assoc))
-			   (uri   (cadr ns-assoc))
-			   )
-		       (list ns-id uri (symbol->string ns-id))))
-		   ns))
-	      translation))
+	((@@ . ?-) (loop '() todo namespaces translation))
 	((*PI* . ?-) (loop '() todo namespaces translation))
 	(((and (? symbol?) ?ge) . ?children)  ; regular node
-	 (if (assq ge translation)  ; if we have seen ge
+	 (let ((namespaces
+		(match-case children
+		 (((@ . ?-) (@@ . ?aux-nodes) . ?-)
+		  (add-local-namespaces aux-nodes namespaces))
+		 (((@@ . ?aux-nodes) . ?-)
+		  (add-local-namespaces aux-nodes namespaces))
+		 (else namespaces))))
+	   (if (assq ge translation)  ; if we have seen ge
 	     (loop children todo namespaces translation)
-	     (let-values*
+	     (let*-values
 	      (((ns-part local-name) (split-ge ge))
-	       (ns-symbol (and ns-part (string->symbol ns-part))))
+	       ((ns-symbol) (and ns-part (string->symbol ns-part))))
 	      (cond
 	       ((not ns-part) ; ge is a local, non-expanded name
 		(loop children todo namespaces translation))
 	       ((let find-loop ((ns-assocs namespaces))
-		  (cond
+		  (cond       ; check if we have seen a namespace with ns-part
 		   ((null? ns-assocs) #f)
 		   ((eq? (caar ns-assocs) ns-symbol) (car ns-assocs))
 		   ((equal? (cadar ns-assocs) ns-part) (car ns-assocs))
@@ -282,37 +352,37 @@
 			 (list ge (make-symbol
 				   (caddr seen-assoc) ":" local-name))
 			 translation))))
-	       (else
-		(let 
+	       (else    ; come across a new namespace. If we used 
+		(let    ; SSAX:DAML->SXML above, this should not happen
 		    ((prefix (symbol->string (gensym)))) ; choose gensym
+		  (cerr nl "Namespace Previously not seen: " ns-symbol nl)
 		  (loop 
 		   children todo
 		   (cons
 		    (list ns-symbol ns-part prefix) namespaces)
 		   (cons
 		    (list ge (make-symbol prefix ":" local-name))
-		    translation))))))))
+		    translation)))))))))
 	((?hd . ?tl)	; list of nodes, break them up
 	 (loop hd (append tl todo) namespaces translation))
-	(else
+	(else		; atomic, primitive node. Ignore
 	 (loop '() todo namespaces translation))
 	)))
 
+  ; The stylesheet to do the pretty-printing of SXML
   (define (this-ss namespaces translation)
     (define (translate name)
       (cond
        ((assq name translation) => cadr)
        (else name)))
-    (define ns-attrs
+    (define ns-attrs	; make xmlns: attributes
       (map
        (lambda (ns-assoc)
 	 (list (make-symbol "xmlns:" (caddr ns-assoc))
 	       (cadr ns-assoc)))
        namespaces))
-;     (pp namespaces)
-;     (newline)
-;     (pp translation)
-;     (newline)
+;     (cerr namespaces nl)
+;     (cerr translation nl)
     `((@
       ((*default*       ; local override for attributes
         . ,(lambda (attr-key . value) ((enattr (translate attr-key)) value))))
@@ -321,7 +391,7 @@
 					  (entag (translate tag)) elems)))
      (*text* . ,(lambda (trigger str) 
 		  (if (string? str) (string->goodXML str) str)))
-     (*NAMESPACES* *preorder* . ,(lambda _ '())) ; handled already
+     (@@ *preorder* . ,(lambda _ '())) ; handled already
      (*PI*
       *preorder*
       . ,(lambda (tag target body)
@@ -329,7 +399,7 @@
      (*TOP*       ; check for the namespaces and add xmlns:xxx attributes
       *preorder*  ; to the root element
       . ,(lambda (tag . elems)
-	   (let-values*
+	   (let*-values
 	    (((pis root-elem)
 	      (let ((elems-rev (reverse elems)))
 		(values (reverse (cdr elems-rev)) (car elems-rev))))
@@ -382,10 +452,30 @@
      (#\' . "&apos;"))))
 
 
-(cout nl ">>>Here is the result of the pretty printing of the transformed "
-      "SXML tree into XML" nl nl)
-(SXML->XML daml-sxml)
-(cout nl nl "====================================" nl)
+;------------------------------------------------------------------------
+;				Main body
+
+(cout nl ">>>Step 1. Parsing the DAML file " daml-file " ..." nl)
+(define daml-sxml (parse-daml daml-file))
+(cout nl "Parsed result" nl)
+(pp daml-sxml)
+(newline)
+
+(cout nl ">>>Step 2. Parsing the resulting sxml into " unparsed-file " ..." nl)
+(with-output-to-file unparsed-file
+  (lambda ()
+    (SXML->XML daml-sxml)))
+(cout nl "Unparsing done. Check the file for the result." nl)
+
+(cout nl ">>>Step 3. Parsing the unparsed file " unparsed-file " ..." nl)
+(define daml-sxml-again (parse-daml unparsed-file))
+(cout nl "Parsed result" nl)
+(pp daml-sxml-again)
+(newline)
+
+(cout nl "verifying that PARSE . UNPARSE . PARSE === PARSE" nl)
+(cout (equal? daml-sxml-again daml-sxml) nl)
 
 (cout nl nl "Done" nl)
+
 

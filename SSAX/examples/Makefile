@@ -52,6 +52,10 @@ run-sxml-db-conv-i: sxml-db-conv.scm \
 		$(LIBDIR)/SSAX-code.scm
 	$(BIGLOO) $(BFLAGS) -i sxml-db-conv.scm
 
+run-daml-parse-unparse-i: daml-parse-unparse.scm \
+		$(LIBDIR)/SSAX-code.scm
+	$(BIGLOO) $(BFLAGS) -s -i daml-parse-unparse.scm
+
 
 # SCM-specific part
 
