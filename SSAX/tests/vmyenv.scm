@@ -45,6 +45,27 @@
   (assert (whennot (negative? x) (++ x)))
 )
 
+(cerr nl "Verifying assert..." nl)
+(let
+  ((x 1))
+
+  (assert (eq? (positive? x) (assert (positive? x))))
+  (assert (eq? x (assert x report: x)))
+  (assert (eq? x (assert 0 x)))
+
+  (assert (failed? (assert (zero? x))))
+  (assert (failed? (assert (zero? x) report: "failure")))
+  (assert (failed? (assert (zero? x) report: "failure" x (+ x 1) "!")))
+  (assert (failed? 
+	   (let ((y 2)) 
+	     (assert (let ((z x)) (positive? z)) (positive? y) (zero? x)
+		     report: "failure" x (+ x 1)))))
+  (assert (failed? 
+	   (let ((y 2)) 
+	     (assert (let ((z x)) (positive? z)) (positive? y) (zero? x)
+		     ))))
+)
+
 (cerr nl "Verifying values and let-values*" nl)
 (let
   ()
@@ -183,7 +204,6 @@
 
   (assert (= 1 (cadr (assq-def 'a alist #f))))
   (assert (= 2 (cadr (assq-def 'b alist))))
-;  (assert (failed? (assq-def "cde" alist)))	; would fail
   (assert (failed? (assq-def 'c alist)))	; would fail
   (assert (not (assq-def 'c alist #f)))
   (assq-def 'c alist (lambda () (cerr "message: key not found" nl)))
@@ -191,7 +211,6 @@
   (assert (= 1 (cadr (assv-def 'a alist #f))))
   (assert (= 2 (cadr (assv-def 'b alist))))
   (assert (= 4 (cadr (assv-def 3 alist))))
- ; (assert (failed? (assv-def "cde" alist)))	; would fail
   (assert (failed? (assv-def 'c alist)))	; would fail
   (assert (not (assv-def 456 alist #f)))
   (assv-def 'c alist (lambda () (cerr "message: key not found" nl)))
@@ -247,6 +266,34 @@
     (assert (equal? test-l-copy test-l))
     )
 )
+
+(cerr nl "Verifying any? ..." nl)
+(let ()
+  (define (test-driver pred? coll expected-result)
+    (let ((res (any? pred? coll)))
+      (if (not (eqv? res expected-result))
+	  (error "computed result " res "differs from the expected one "
+		 expected-result))))
+  (define (eq-a? x) (if (char=? x #\a) x #f))
+  (define (gt1? x) (if (> x 1) x #f))
+  
+  (cerr "   finding an element in a list" nl)
+  (test-driver gt1? '(1 2 3 4 5) 2)
+  (test-driver gt1? '(1 1 1 1 1) #f)
+  (test-driver gt1? '(4 1 1 1 1) 4)
+  (test-driver gt1? '(4 5 6 1 9) 4)
+  (test-driver gt1? '(-4 -5 -6 1 9) 9)
+  (test-driver eq-a? '(#\b #\c #\a #\k) #\a)
+  
+  (cerr "   finding an element in a vector" nl)
+  (test-driver gt1? '#(1 2 3 4 5) 2)
+  (test-driver gt1? '#(1 1 1 1 1) #f)
+  (test-driver gt1? '#(4 1 1 1 1) 4)
+  (test-driver gt1? '#(4 5 6 1 9) 4)
+  (test-driver gt1? '#(-4 -5 -6 1 9) 9)
+  (test-driver eq-a? '#(#\b #\c #\a #\k) #\a)
+)
+
 (cerr nl "Verifying our environments..." nl)
 (cerr nl nl "verifying environments")
 (env.print "Initial environment")

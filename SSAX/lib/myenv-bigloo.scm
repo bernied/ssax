@@ -1,16 +1,84 @@
 ; 			My Standard Scheme "Prelude"
 ; $Id$
 
-; assert truth of an expression (or a sequence of expressions)
-; if there is more than one expression, they're 'AND'ed
+; assert the truth of an expression (or of a sequence of expressions)
+;
+; syntax: assert ?expr ?expr ... [report: ?r-exp ?r-exp ...]
+;
+; If (and ?expr ?expr ...) evaluates to anything but #f, the result
+; is the value of that expression.
+; If (and ?expr ?expr ...) evaluates to #f, an error is reported.
+; The error message will show the failed expressions, as well
+; as the values of selected variables (or expressions, in general).
+; The user may explicitly specify the expressions whose
+; values are to be printed upon assertion failure -- as ?r-exp that
+; follow the identifier 'report:'
+; Typically, ?r-exp is either a variable or a string constant.
+; If the user specified no ?r-exp, the values of variables that are
+; referenced in ?expr will be printed upon the assertion failure.
 
-(define-macro (assert . x)
-                  (if (null? (cdr x))
-                    `(or ,@x (error "failed assertion" ',@x))
-                    `(or (and ,@x) (error "failed assertion" '(,@x)))))
+(define-macro (assert expr . others)
+			; given the list of expressions or vars,
+			; make the list appropriate for cerr
+  (define (make-print-list prefix lst)
+    (cond
+     ((null? lst) '())
+     ((symbol? (car lst))
+      (cons #\newline
+	(cons (list 'quote (car lst))
+	  (cons ": " (cons (car lst) (make-print-list #\newline (cdr lst)))))))
+     (else 
+      (cons prefix (cons (car lst) (make-print-list "" (cdr lst)))))))
 
-(define (assure exp error-msg)
-  (or exp (error error-msg)))
+			; return the list of all unique "interesting"
+			; variables in the expr. Variables that are certain
+			; to be bound to procedures are not interesting.
+			; We perform macro-expansion first to avoid tripping
+			; on user-defined macros
+  (define (vars-of expr)
+    (let loop ((expr (expand expr)) (vars '()))
+      (cond
+       ((not (pair? expr)) vars)	; not an application -- ignore
+       ((memq (car expr) 
+	      '(quote let let* letrec lambda cond quasiquote case define do))
+	vars)				; won't go there
+       (else				; ignore the head of the application
+	(let inner ((expr (cdr expr)) (vars vars))
+	  (cond 
+	   ((null? expr) vars)
+	   ((symbol? (car expr))
+	    (inner (cdr expr)
+		   (if (memq (car expr) vars) vars (cons (car expr) vars))))
+	   (else
+	    (inner (cdr expr) (loop (car expr) vars)))))))))
+
+  (cond
+   ((null? others)		; the most common case
+    `(or ,expr (begin (cerr "failed assertion: " ',expr nl "bindings"
+			    ,@(make-print-list #\newline (vars-of expr)) nl)
+		      (error "assertion failure"))))
+   ((eq? (car others) 'report:) ; another common case
+    `(or ,expr (begin (cerr "failed assertion: " ',expr
+			    ,@(make-print-list #\newline (cdr others)) nl)
+		      (error "assertion failure"))))
+   ((not (memq 'report: others))
+    `(or (and ,expr ,@others)
+	 (begin (cerr "failed assertion: " '(,expr ,@others) nl "bindings"
+		      ,@(make-print-list #\newline
+			 (vars-of (cons 'and (cons expr others)))) nl)
+		      (error "assertion failure"))))
+   (else			; report: occurs somewhere in 'others'
+    (let loop ((exprs (list expr)) (reported others))
+      (cond
+       ((eq? (car reported) 'report:)
+	`(or (and ,@(reverse exprs))
+	     (begin (cerr "failed assertion: " ',(reverse exprs)
+			  ,@(make-print-list #\newline (cdr reported)) nl)
+		    (error "assertion failure"))))
+       (else (loop (cons (car reported) exprs) (cdr reported)))))))
+)
+    
+(define-macro (assure exp error-msg) `(assert ,exp report: ,error-msg))
 
 (define (identify-error msg args . disposition-msgs)
   (let ((port (current-error-port)))
