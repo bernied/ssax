@@ -28,22 +28,34 @@
 ; order of call-by-value applications. This depth-first traversal mode
 ; fits the problem.
 ;
-; A Bigloo Scheme system is assumed. We extensively rely on the
-; match-case form provided by Bigloo.
+; IMPORT
+; The following is a Bigloo-specific module declaration.
+; Other Scheme systems have something similar.
+;
+; See the Makefile for the rules to run this example on Bigloo, SCM
+; and other systems
+; (module sxml-db-conversion
+; 	(include "myenv-bigloo.scm")
+;  	(include "srfi-13-local.scm") ; or import from SRFI-13 if available
+; 	(include "char-encoding.scm")
+; 	(include "util.scm")
+; 	(include "look-for-str.scm")
+; 	(include "input-parse.scm")
+; 	(include "SSAX-code.scm")
+; 	(include "SXML-tree-trans.scm")
+; 	)
 ;
 ; $Id$
 
-
-(module sxml-db-conversion
-	(include "myenv-bigloo.scm")
- 	(include "srfi-13-local.scm") ; or import from SRFI-13 if available
-	(include "char-encoding.scm")
-	(include "util.scm")
-	(include "look-for-str.scm")
-	(include "input-parse.scm")
-	(include "SSAX-code.scm")
-	(include "SXML-tree-trans.scm")
-	)
+; If the pretty-printer is available, use it. Otherwise, use 'display'
+(cond-expand
+  ((or scm bigloo gambit)
+    #f)					; pp is natively available
+  ((or petite-chez)
+    (define pp pretty-print))
+  (else
+    (define pp display)		         ; Fall-back to display
+    ))
 
 ; The following two definitions satisfy the import requirement of SSAX
 (define (parser-error port message . specialising-msgs)
@@ -101,22 +113,21 @@
        (lambda (count . args)  ; count can be #f: don't generate the attr
         (let ((att-list 
                (if count `((@ (acc:count ,count))) '())))
-          (match-case args
-           (() `(out:text ,@att-list ,str))
-           ((?arg)
-            `(out:text ,@att-list
-               ,(string-append str " and")
-               ,(arg #f)))
-           ((?arg . ?rest)
-            `(out:text ,@att-list ,(string-append str ",")
-                   ,(apply arg (cons #f rest)))))))))
+	  (if (null? args) `(out:text ,@att-list ,str)
+	    (let ((arg (car args)) (rest (cdr args)))
+	      (if (null? rest)
+		`(out:text ,@att-list
+		   ,(string-append str " and")
+		   ,(arg #f))
+		`(out:text ,@att-list ,(string-append str ",")
+                   ,(apply arg (cons #f rest))))))))))
 
      (http://internal.com/db:purchase . ,(lambda (tag . procs)
 	(if (null? procs) '()
 	    (apply (car procs) (cons (length (cdr procs)) (cdr procs))))))
      (*text* . ,(lambda (trigger str) str))
-     (*TOP* . ,(lambda x x))
-     (@@ . ,(lambda x x))
+     (*TOP*  . ,(lambda x x))
+     (@      . ,(lambda x x))
      (*NAMESPACES* *preorder*
 		   ; Replace namespace declarations of the source document
 		   ; with the namespace declarations of the target document.
@@ -140,36 +151,55 @@
      (*text* . ,(lambda (trigger str) 
 		  (if (string? str) (string->goodXML str) str)))
      (*TOP*       ; check for the namespaces and add xmlns:xxx attributes
-      *preorder*  ; to the root element
+      *macro*     ; to the root element
       . ,(lambda (tag . elems)
 	   (define (make-xmlns ns-assoc)
 	     (list (string->symbol
 		    (string-append "xmlns:" (symbol->string (car ns-assoc))))
 		   (cadr ns-assoc)))
-	   (pre-post-order
-	    (match-case elems
-			; the root element had its own attributes, add xmlns:
-	      (((@@ ??- (*NAMESPACES* . ?ns) . ?_)
-		 (?rootname (@ . ?attrs) . ?children))
-	       `(,rootname (@ ,@(map make-xmlns ns) . ,attrs) . ,children))
-			; the root element had no attr list: make one
-	      (((@@ ??- (*NAMESPACES* . ?ns) . ?-)
-		 (?rootname . ?children))
-	      `(,rootname (@ . ,(map make-xmlns ns)) . ,children))
-	      (else elems))
-	    this-ss)))
-     ))
+	   (let*
+	     ((namespaces ; extract from the annotations of *TOP*
+	       (apply append
+		 (pre-post-order elems
+		   `((@
+		       ((*NAMESPACES* *preorder*
+			  . ,(lambda (tag . ns) ns))
+			 (*default* *preorder* . ,(lambda x '())))
+		       . ,(lambda (tag . elems) (apply append elems)))
+		      (*default* *preorder* . ,(lambda x '()))))))
+	       ;(_ (cerr "namespaces: " namespaces nl))
+	       (xmlns-attrs (map make-xmlns namespaces)))
+	     (pre-post-order elems
+	       `((@ *preorder* . ,(lambda x '())) ; ignore *TOP* annotations
+		  (*default*		; would handle the root elem
+		    ((@ *preorder*	; attributes of the root element
+		       . ,(lambda (tag . attrs) ; add xmlnsn attrs
+			    (cons tag (append xmlns-attrs attrs))))
+		     (*default* *preorder*
+		       . ,(lambda x x))	; don't descend and don't transform
+		      )
+		    . ,(lambda (root-tag . children)
+			 (if (and (pair? children) (pair? (car children))
+			       (eq? '@ (caar children)))
+			   (cons root-tag children)
+			   ; root element had no attributes. Add xmlns ones
+			   (cons* root-tag
+			     `(@ ,xmlns-attrs) children))))))
+	     )))
+       ))
  (SRV:send-reply
   (pre-post-order sxml this-ss)
   ))
 
 (define (entag tag elems)
-  (match-case elems
-    (((@ . ?attrs) . ?children)
-      (list #\< tag attrs 
-	(if (null? children) "/>"
-	  (list #\> children "</" tag #\>))))
-    (() (list #\< tag "/>"))
+  (cond
+    ((and (pair? elems) (pair? (car elems))
+	(eq? '@ (caar elems)))
+      (let ((attrs (cdar elems)) (children (cdr elems)))
+	(list #\< tag attrs 
+	  (if (null? children) "/>"
+	    (list #\> children "</" tag #\>)))))
+    ((null? elems) (list #\< tag "/>"))
     (else
       (list #\< tag #\> elems "</" tag #\>))))
 
