@@ -38,7 +38,10 @@
    (plt promise?)
    (bigloo procedure?   ; ATTENTION: returns #t in more general situations
            )
-   (else promise?)))
+   (else
+    (lambda (obj) #f)   ; ATTENTION: just makes the approach applicable for
+                        ; conventional SXML documents
+   )))
 
 ;-------------------------------------------------
 ; Lazy analogues for common list operations
