@@ -138,7 +138,7 @@
 		    (newline output-port)
 		    (display "(require (lib \"" output-port)
 		    (display module output-port)
-		    (display "\"))" output-port)
+		    (display "\" \"ssax\"))" output-port)
 		    (newline output-port)
 		    (newline output-port)
 		    (extract-docs-from-file file output-port)
