@@ -22,12 +22,13 @@
 #       vSXML-tree-trans
 #	vSXML-to-HTML
 #	vSSAX
+#	vSSAX-exp		Use the macro-expanded code SSAX-expanded.scm 
 # 	all			All of the above
 #	clean			Clean the working files and other garbage
 #
 # Not all of the targets are useful with all platforms.
-# <target> may be omitted. In that case, all the above targets
-# are assumed.
+# <target> may be omitted. In that case, all the targets
+# relevant for the platform are assumed.
 #
 # $Id$
 
@@ -42,7 +43,7 @@ PLATFORM = biglooi	# Default platform
 
 # Bigloo-specific  part
 
-BFLAGS=-I $(LIBDIR) -call/cc -farithmetic -unsafea
+BFLAGS=-I $(LIBDIR) -eval "(set! *load-path* (cons \"$(LIBDIR)\" *load-path*))" -call/cc -farithmetic -unsafea
 BIGLOO=bigloo
 #BFLAGS=-I $(LIBDIR) -Obench -farithmetic -unsafe
 #BOPTFLAGS=-O3 -copt "-O3 -fomit-frame-pointer -mcpu=i686"
@@ -85,22 +86,22 @@ make-petite= echo "(exit 101)" | petite $(LIBDIR)/myenv-chez.scm \
 
 gambi-targets=vmyenv vsrfi-13 vinput-parse vsrfi-12  \
 	      vland \
-	      vSXML-tree-trans vSXML-to-HTML vSSAX 
+	      vSXML-tree-trans vSXML-to-HTML vSSAX-exp 
 biglooi-targets=vmyenv vsrfi-13 vinput-parse vsrfi-12  \
 	      vland \
-	      vSXML-tree-trans vSXML-to-HTML vSSAX  #vext-io vipc
+	      vSXML-tree-trans vSXML-to-HTML vSSAX-exp  #vext-io vipc
 
 biglooc-targets=vmyenv vsrfi-13 vinput-parse vsrfi-12  \
-	      vSXML-tree-trans vSXML-to-HTML vSSAX  #vext-io vipc
+	      vSXML-tree-trans vSXML-to-HTML vSSAX-exp  #vext-io vipc
 
 scmi-targets=vmyenv vsrfi-13 vinput-parse  \
 	      vSXML-tree-trans vSXML-to-HTML vSSAX  #vext-io vipc
 
 petite-targets=vmyenv vsrfi-13 vinput-parse  \
-	      vSXML-tree-trans vSXML-to-HTML #vSSAX  #vext-io vipc
+	      vSXML-tree-trans vSXML-to-HTML vSSAX  #vext-io vipc
 
+.PHONY: all $($(PLATFORM)-targets)
 all: $($(PLATFORM)-targets)
-.PHONY: $($(PLATFORM)-targets)
 
 clean:
 	rm -f *_.c *.o core a.out $(TMPSCM) \
@@ -187,6 +188,12 @@ vSSAX:
 	       catch-error.scm srfi-13-local.scm util.scm \
 	       look-for-str.scm char-encoding.scm input-parse.scm,\
 	       $(LIBDIR)/SSAX)
+
+vSSAX-exp:
+	$(call make-$(PLATFORM),\
+	       catch-error.scm srfi-13-local.scm util.scm \
+	       look-for-str.scm char-encoding.scm input-parse.scm,\
+	       $(LIBDIR)/SSAX-expanded)
 
 #------------------------------------------------------------------------
 
