@@ -635,6 +635,22 @@
         pred-id (sxml:context->node (car nodeset)))
        #f))))
 
+; Value that results from evaluating the absolute location path
+; The argument is named `pred-id' for the sake of mere unification with
+; deep predicates
+(define (ddo:get-abs-lpath-value pred-id)
+  (lambda (nodeset position+size var-binding)
+    (if
+     (or (null? var-binding)
+         (not (eq? (caar var-binding) '*var-vector*)))
+     (begin
+       (sxml:xpointer-runtime-error
+        "internal DDO SXPath error - "
+        "value for absolute location path not found: " pred-id)
+       '()  ; the value defaults to an empty nodeset
+       )     
+     (vector-ref (cdar var-binding) pred-id))))
+
 ;-------------------------------------------------
 ; Construct predicate values
 
@@ -797,13 +813,20 @@
        (if
         (null? deep-predicates)
         (cons-var-vector var-vector var-binding)
-        (let* ((context-set (ddo:all-contexts-in-doc doc))
-               (max-size (if
-                          ; position-required? for at least one deep predicate
-                          (not (null? (filter cadr deep-predicates)))
-                          (length context-set)
-                          1  ; dummy
-                          )))
+        (let* ((context-set
+                (if (null?  ; just absolute location paths
+                     (filter
+                      (lambda (triple)
+                        (not (eq? (cadr triple) 'absolute-location-path)))
+                      deep-predicates))
+                    '()  ; dummy
+                    (ddo:all-contexts-in-doc doc)))
+               (max-size
+                (if  ; position-required? for at least one deep predicate
+                 (not (null? (filter cadr deep-predicates)))
+                 (length context-set)
+                 1  ; dummy
+                 )))
           (let iter-preds ((deep-predicates deep-predicates)
                            (var-vector var-vector))
             (if
@@ -814,17 +837,23 @@
               (ddo:vector-copy-set
                var-vector
                (caar deep-predicates)  ; pred-id
-               (if
-                (cadar deep-predicates)  ; requires-position?
-                (ddo:construct-pred-values-pos 
-                 (caddar deep-predicates)  ; pred-impl
-                 context-set
-                 (cons-var-vector var-vector var-binding)
-                 max-size)
-                (ddo:construct-pred-values
-                 (caddar deep-predicates)  ; pred-impl
-                 context-set
-                 (cons-var-vector var-vector var-binding)))))))))))))
+               (cond
+                 ((eq? (cadar deep-predicates) 'absolute-location-path)
+                  ((caddar deep-predicates)  ; absolute lpath impl
+                   (as-nodeset doc)
+                   (cons 1 1)  ; dummy context position and size
+                   (cons-var-vector var-vector var-binding)))
+                 ((cadar deep-predicates)  ; requires-position?
+                  (ddo:construct-pred-values-pos 
+                   (caddar deep-predicates)  ; pred-impl
+                   context-set
+                   (cons-var-vector var-vector var-binding)
+                   max-size))
+                 (else
+                  (ddo:construct-pred-values
+                   (caddar deep-predicates)  ; pred-impl
+                   context-set
+                   (cons-var-vector var-vector var-binding))))))))))))))
 
 ;-------------------------------------------------
 ; Methods similar to radix sort for linear access time for all variables
@@ -1158,24 +1187,42 @@
      (and-let*
       ((steps-res (ddo:ast-step-list
                    (cdr op) num-anc #t pred-nesting vars2offsets)))
-      (cons
-       (if
-        (null? (cdar steps-res))  ; only a single step
-        (let ((step-impl (caar steps-res)))
-          (lambda (nodeset position+size var-binding)
-            (step-impl
-             (draft:reach-root nodeset) position+size var-binding)))
-        (let ((converters (car steps-res)))
-          (lambda (nodeset position+size var-binding)
-            (let rpt ((nset (draft:reach-root nodeset))
-                      (fs converters))
-              (if (null? fs)
-                  nset
-                  (rpt ((car fs) nset position+size var-binding)
-                       (cdr fs)))))))
-       (cons #f  ; all ancestors required
-             (cddr steps-res)   ; the remaining parameters
-             ))))))
+      (let ((impl  ; implementation of the absolute location path
+             (if
+              (null? (cdar steps-res))  ; only a single step
+              (let ((step-impl (caar steps-res)))
+                (lambda (nodeset position+size var-binding)
+                  (step-impl
+                   (draft:reach-root nodeset) position+size var-binding)))
+              (let ((converters (car steps-res)))
+                (lambda (nodeset position+size var-binding)
+                  (let rpt ((nset (draft:reach-root nodeset))
+                            (fs converters))
+                    (if (null? fs)
+                        nset
+                        (rpt ((car fs) nset position+size var-binding)
+                             (cdr fs)))))))))
+        (if
+         (> pred-nesting 0)  ; absolute location path inside a predicate
+         (let ((vars2offsets (list-ref steps-res 6)))
+           (list
+            (ddo:get-abs-lpath-value (car vars2offsets))
+            #f  ; all ancestors required
+            (caddr steps-res)  ; single-level
+            #f  ; doesn't require position
+            ddo:type-nodeset
+            (cons
+             (list (car vars2offsets)  ; identifier
+                   'absolute-location-path  ; flag to denote absolute lpath
+                   impl)
+             (list-ref steps-res 5)  ; deep-predicates
+             )
+            (cons (+ (car vars2offsets) 1)
+                  (cdr vars2offsets))))
+         (cons impl
+               (cons #f  ; all ancestors required
+                     (cddr steps-res)   ; the remaining parameters
+                     ))))))))
 
 ; {3} <RelativeLocationPath> ::= (relative-location-path  <Step>+ )
 (define (ddo:ast-relative-location-path
