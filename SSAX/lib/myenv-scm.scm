@@ -1,5 +1,5 @@
 ; 			My Standard Scheme "Prelude"
-; Version for SCM v5d2
+; Version for SCM v5d6
 ; $Id$
 
 		; Very SCM-specific definitions
@@ -71,7 +71,7 @@
       (cond
        ((not (pair? expr)) vars)	; not an application -- ignore
        ((memq (car expr) 
-	      '(quote let let* letrec let-values* lambda cond quasiquote
+	      '(quote let let* letrec let*-values lambda cond quasiquote
 		      case define do assert))
 	vars)				; won't go there
        (else				; ignore the head of the application
@@ -135,14 +135,9 @@
               (if (procedure? x) (x (current-error-port)) (display x (current-error-port))))
             args))
 
-;(##define-macro (nl) '(newline))
 (define nl (string #\newline))
 
 ; Some useful increment/decrement operators
-; Note, ##fixnum prefix is Gambit-specific, it means that the
-; operands assumed FIXNUM (as they ought to be anyway).
-; This perfix could be safely removed: it'll leave the code just as
-; correct, but more portable (and less efficient)
 
 				; Mutable increment
 (define-macro (++! x) `(set! ,x (+ 1 ,x)))
@@ -192,21 +187,18 @@
 			; See Olin Shiver's Underground String functions
 (define-macro (string-null? str) `(zero? (string-length ,str)))
 
-; Support for let-values* form
+; Support for let*-values form: SRFI-11
 
 (require 'values)
 
-; Like let* but allowing for multiple-value bindings
-(define-macro (let-values* bindings . body)
+(define-macro (let*-values bindings . body)
   (if (null? bindings) (cons 'begin body)
       (apply (lambda (vars initializer)
 	 (let ((cont 
-		(cons 'let-values* 
+		(cons 'let*-values
 		      (cons (cdr bindings) body))))
 	   (cond
-	    ((not (pair? vars))		; regular let case, a single var
-	     `(let ((,vars ,initializer)) ,cont))
-	    ((null? (cdr vars))		; single var, see the prev case
+	    ((and (pair? vars) (null? (cdr vars))) ; a single var optimization
 	     `(let ((,(car vars) ,initializer)) ,cont))
 	   (else			; the most generic case
 	    `(call-with-values (lambda () ,initializer)
@@ -222,12 +214,16 @@
 			; If the default action is not given, an error
 			; is signaled
 
+; Getting around a bug in SCM 5d6:
+; (if (procedure? #f) (#f) #f) reports an error!
 (define-macro (assq-def key alist . default-action-arg)
   (let ((default-action
         (if (null? default-action-arg)
           `(error "failed to assq key '" ,key "' in a list " ,alist)
           (let ((defact-symb (car default-action-arg)))
-            `(if (procedure? ,defact-symb) (,defact-symb) ,defact-symb)))))
+	    (if (or (symbol? defact-symb) (pair? defact-symb))
+		`(if (procedure? ,defact-symb) (,defact-symb) ,defact-symb)
+		defact-symb)))))
     `(or (assq ,key ,alist) ,default-action)))
 
 (define-macro (assv-def key alist . default-action-arg)
@@ -235,7 +231,9 @@
         (if (null? default-action-arg)
           `(error "failed to assv key '" ,key "' in a list " ,alist)
           (let ((defact-symb (car default-action-arg)))
-            `(if (procedure? ,defact-symb) (,defact-symb) ,defact-symb)))))
+	    (if (or (symbol? defact-symb) (pair? defact-symb))
+		`(if (procedure? ,defact-symb) (,defact-symb) ,defact-symb)
+		defact-symb)))))
     `(or (assv ,key ,alist) ,default-action)))
 
 (define-macro (assoc-def key alist . default-action-arg)
@@ -243,7 +241,9 @@
         (if (null? default-action-arg)
           `(error "failed to assoc key '" ,key "' in a list " ,alist)
           (let ((defact-symb (car default-action-arg)))
-            `(if (procedure? ,defact-symb) (,defact-symb) ,defact-symb)))))
+	    (if (or (symbol? defact-symb) (pair? defact-symb))
+		`(if (procedure? ,defact-symb) (,defact-symb) ,defact-symb)
+		defact-symb)))))
     `(or (assoc ,key ,alist) ,default-action)))
 
 
