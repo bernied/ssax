@@ -40,17 +40,17 @@
 ; 	<Node> ::= <Element> | <attributes-coll> | <attrib>
 ; 		   | "text string" | <PI>
 ; This production can also be described as
-;	<Node> ::= (name . <Nodeset>) | "text string"
+;	<Node> ::= (name . <Nodelist>) | "text string"
 ; An (ordered) set of nodes is just a list of the constituent nodes:
-; 	<Nodeset> ::= (<Node> ...)
-; Nodesets, and Nodes other than text strings are both lists. A
-; <Nodeset> however is either an empty list, or a list whose head is not
+; 	<Nodelist> ::= (<Node> ...)
+; Nodelists, and Nodes other than text strings are both lists. A
+; <Nodelist> however is either an empty list, or a list whose head is not
 ; a symbol.  A symbol at the head of a node is either an XML name (in
 ; which case it's a tag of an XML element), or an administrative name
 ; such as '@'.  This uniform list representation makes processing rather
 ; simple and elegant, while avoiding confusion. The multi-branch tree
 ; structure formed by the mutually-recursive datatypes <Node> and
-; <Nodeset> lends itself well to processing by functional languages.
+; <Nodelist> lends itself well to processing by functional languages.
 ;
 ; A location path is in fact a composite query over an XPath tree or
 ; its branch. A singe step is a combination of a projection, selection
@@ -58,14 +58,14 @@
 ; union operations. This insight allows us to _elegantly_ implement
 ; XPath as a sequence of projection and filtering primitives --
 ; converters -- joined by _combinators_. Each converter takes a node
-; and returns a nodeset which is the result of the corresponding query
+; and returns a nodelist which is the result of the corresponding query
 ; relative to that node. A converter can also be called on a set of
 ; nodes. In that case it returns a union of the corresponding queries over
 ; each node in the set. The union is easily implemented as a list
 ; append operation as all nodes in a SXML tree are considered
 ; distinct, by XPath conventions. We also preserve the order of the
 ; members in the union. Query combinators are high-order functions:
-; they take converter(s) (which is a Node|Nodeset -> Nodeset function)
+; they take converter(s) (which is a Node|Nodelist -> Nodelist function)
 ; and compose or otherwise combine them. We will be concerned with
 ; only relative location paths [XPath]: an absolute location path is a
 ; relative path applied to the root node.
@@ -86,17 +86,17 @@
 ;=============================================================================
 ; Basic converters and applicators
 ; A converter is a function
-;	type Converter = Node|Nodeset -> Nodeset
+;	type Converter = Node|Nodelist -> Nodelist
 ; A converter can also play a role of a predicate: in that case, if a
-; converter, applied to a node or a nodeset, yields a non-empty
-; nodeset, the converter-predicate is deemed satisfied. Throughout
-; this file a nil nodeset is equivalent to #f in denoting a failure.
+; converter, applied to a node or a nodelist, yields a non-empty
+; nodelist, the converter-predicate is deemed satisfied. Throughout
+; this file a nil nodelist is equivalent to #f in denoting a failure.
 
-; Returns #t if given object is a nodeset
+; Returns #t if given object is a nodelist
 (define (nodeset? x)
   (or (and (pair? x) (not (symbol? (car x)))) (null? x)))
 
-; If x is a nodeset - returns it as is, otherwise wrap it in a list.
+; If x is a nodelist - returns it as is, otherwise wrap it in a list.
 (define (as-nodeset x)
   (if (nodeset? x) x (list x)))
 
@@ -170,10 +170,10 @@
 	     (else (not ns-id)))))))
 ;^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-; This function takes a predicate and returns it inverted 
-; That is if the given predicate yelds #f or '() the inverted one  
+; This function takes a predicate and returns it complemented 
+; That is if the given predicate yelds #f or '() the complemented one  
 ; yields the given node (#t) and vice versa.
-(define (sxml:invert pred)
+(define (sxml:complement pred)
   (lambda(node)
     (case (pred node)
       ((#f '()) node)
@@ -188,34 +188,34 @@
   (lambda (node)
     (equal? other node)))
 
-; node-pos:: N -> Nodeset -> Nodeset, or
+; node-pos:: N -> Nodelist -> Nodelist, or
 ; node-pos:: N -> Converter
-; Select the N'th element of a Nodeset and return as a singular Nodeset;
-; Return an empty nodeset if the Nth element does not exist.
-; ((node-pos 1) Nodeset) selects the node at the head of the Nodeset,
-; if exists; ((node-pos 2) Nodeset) selects the Node after that, if
+; Select the N'th element of a Nodelist and return as a singular Nodelist;
+; Return an empty nodelist if the Nth element does not exist.
+; ((node-pos 1) Nodelist) selects the node at the head of the Nodelist,
+; if exists; ((node-pos 2) Nodelist) selects the Node after that, if
 ; exists.
 ; N can also be a negative number: in that case the node is picked from
 ; the tail of the list.
-; ((node-pos -1) Nodeset) selects the last node of a non-empty nodeset;
-; ((node-pos -2) Nodeset) selects the last but one node, if exists.
+; ((node-pos -1) Nodelist) selects the last node of a non-empty nodelist;
+; ((node-pos -2) Nodelist) selects the last but one node, if exists.
 (define (node-pos n)
-  (lambda (nodeset)
+  (lambda (nodelist)
     (cond
-     ((not (nodeset? nodeset)) '())
-     ((null? nodeset) nodeset)
-     ((eqv? n 1) (list (car nodeset)))
-     ((negative? n) ((node-pos (+ n 1 (length nodeset))) nodeset))
+     ((not (nodeset? nodelist)) '())
+     ((null? nodelist) nodelist)
+     ((eqv? n 1) (list (car nodelist)))
+     ((negative? n) ((node-pos (+ n 1 (length nodelist))) nodelist))
      (else
       (assert (positive? n))
-      ((node-pos (-- n)) (cdr nodeset))))))
+      ((node-pos (-- n)) (cdr nodelist))))))
 
 ; filter:: Converter -> Converter
 ; A filter applicator, which introduces a filtering context. The argument
 ; converter is considered a predicate, with either #f or nil result meaning
 ; failure.
 (define (sxml:filter pred?)
-  (lambda (lst)	; a nodeset or a node (will be converted to a singleton nset)
+  (lambda (lst)	; a nodelist or a node (will be converted to a singleton nset)
     (let loop ((lst (as-nodeset lst)) 
 	       (res '()))
       (if (null? lst)
@@ -227,19 +227,19 @@
 		      res)))))))
 
 ; take-until:: Converter -> Converter, or
-; take-until:: Pred -> Node|Nodeset -> Nodeset
-; Given a converter-predicate and a nodeset, apply the predicate to
-; each element of the nodeset, until the predicate yields anything but #f or
-; nil. Return the elements of the input nodeset that have been processed
+; take-until:: Pred -> Node|Nodelist -> Nodelist
+; Given a converter-predicate and a nodelist, apply the predicate to
+; each element of the nodelist, until the predicate yields anything but #f or
+; nil. Return the elements of the input nodelist that have been processed
 ; till that moment (that is, which fail the predicate).
 ; take-until is a variation of the filter above: take-until passes
 ; elements of an ordered input set till (but not including) the first
 ; element that satisfies the predicate.
-; The nodeset returned by ((take-until (not pred)) nset) is a subset -- 
-; to be more precise, a prefix -- of the nodeset returned by
+; The nodelist returned by ((take-until (not pred)) nset) is a subset -- 
+; to be more precise, a prefix -- of the nodelist returned by
 ; ((filter pred) nset)
 (define (take-until pred?)
-  (lambda (lst)	; a nodeset or a node (will be converted to a singleton nset)
+  (lambda (lst)	; a nodelist or a node (will be converted to a singleton nset)
     (let loop ((lst (as-nodeset lst)))
       (if (null? lst) lst
 	  (let ((pred-result (pred? (car lst))))
@@ -249,17 +249,17 @@
 	  ))))
 
 ; take-after:: Converter -> Converter, or
-; take-after:: Pred -> Node|Nodeset -> Nodeset
-; Given a converter-predicate and a nodeset, apply the predicate to
-; each element of the nodeset, until the predicate yields anything but #f or
-; nil. Return the elements of the input nodeset that have not been processed:
-; that is, return the elements of the input nodeset that follow the first
+; take-after:: Pred -> Node|Nodelist -> Nodelist
+; Given a converter-predicate and a nodelist, apply the predicate to
+; each element of the nodelist, until the predicate yields anything but #f or
+; nil. Return the elements of the input nodelist that have not been processed:
+; that is, return the elements of the input nodelist that follow the first
 ; element that satisfied the predicate.
-; take-after along with take-until partition an input nodeset into three
+; take-after along with take-until partition an input nodelist into three
 ; parts: the first element that satisfies a predicate, all preceding
 ; elements and all following elements.
 (define (take-after pred?)
-  (lambda (lst)	; a nodeset or a node (will be converted to a singleton nset)
+  (lambda (lst)	; a nodelist or a node (will be converted to a singleton nset)
     (let loop ((lst (as-nodeset lst)))
       (if (null? lst) lst
 	  (let ((pred-result (pred? (car lst))))
@@ -269,7 +269,7 @@
 	  ))))
 
 ; Apply proc to each element of lst and return the list of results.
-; if proc returns a nodeset, splice it into the result
+; if proc returns a nodelist, splice it into the result
 ;
 ; From another point of view, map-union is a function Converter->Converter,
 ; which places an argument-converter in a joining context.
@@ -280,24 +280,24 @@
 	 proc-res (map-union proc (cdr lst))))))
 
 ; node-reverse :: Converter, or
-; node-reverse:: Node|Nodeset -> Nodeset
-; Reverses the order of nodes in the nodeset
+; node-reverse:: Node|Nodelist -> Nodelist
+; Reverses the order of nodes in the nodelist
 ; This basic converter is needed to implement a reverse document order
 ; (see the XPath Recommendation).
 (define node-reverse 
-  (lambda (node-or-nodeset)
-    (if (not (nodeset? node-or-nodeset)) (list node-or-nodeset)
-	(reverse node-or-nodeset))))
+  (lambda (node-or-nodelist)
+    (if (not (nodeset? node-or-nodelist)) (list node-or-nodelist)
+	(reverse node-or-nodelist))))
 
 ; node-trace:: String -> Converter
 ; (node-trace title) is an identity converter. In addition it prints out
-; a node or nodeset it is applied to, prefixed with the 'title'.
+; a node or nodelist it is applied to, prefixed with the 'title'.
 ; This converter is very useful for debugging.
 (define (node-trace title)
-  (lambda (node-or-nodeset)
+  (lambda (node-or-nodelist)
     (cout nl "-->" title " :")
-    (pp node-or-nodeset)
-    node-or-nodeset))
+    (pp node-or-nodelist)
+    node-or-nodelist))
 
 
 ;------------------------------------------------------------------------------
@@ -313,16 +313,16 @@
 ; such patterns that together implement XPath location path
 ; specification. As it turns out, all these combinators can be built
 ; from a small number of basic blocks: regular functional composition,
-; map-union and filter applicators, and the nodeset union.
+; map-union and filter applicators, and the nodelist union.
 
 
 
-; select-kids:: Pred -> Node -> Nodeset
+; select-kids:: Pred -> Node -> Nodelist
 ; Given a Node, return an (ordered) subset its children that satisfy
 ; the Pred (a converter, actually)
-; select-kids:: Pred -> Nodeset -> Nodeset
+; select-kids:: Pred -> Nodelist -> Nodelist
 ; The same as above, but select among children of all the nodes in
-; the Nodeset
+; the Nodelist
 ;
 ; More succinctly, the signature of this function is
 ; select-kids:: Converter -> Converter
@@ -336,43 +336,43 @@
      (else (map-union (select-kids test-pred?) node)))))
 
 
-; node-self:: Pred -> Node -> Nodeset, or
+; node-self:: Pred -> Node -> Nodelist, or
 ; node-self:: Converter -> Converter
 ; Similar to select-kids but apply to the Node itself rather
-; than to its children. The resulting Nodeset will contain either one
+; than to its children. The resulting Nodelist will contain either one
 ; component, or will be empty (if the Node failed the Pred).
 (define node-self sxml:filter)
 
 
-; node-join:: [LocPath] -> Node|Nodeset -> Nodeset, or
+; node-join:: [LocPath] -> Node|Nodelist -> Nodelist, or
 ; node-join:: [Converter] -> Converter
 ; join the sequence of location steps or paths as described
 ; in the title comments above.
 (define (node-join . selectors)
-  (lambda (nodeset)		; Nodeset or node
-    (let loop ((nodeset nodeset) (selectors selectors))
-      (if (null? selectors) nodeset
+  (lambda (nodelist)		; Nodelist or node
+    (let loop ((nodelist nodelist) (selectors selectors))
+      (if (null? selectors) nodelist
 	  (loop 
-	   (if (nodeset? nodeset)
-	       (map-union (car selectors) nodeset)
-	       ((car selectors) nodeset))
+	   (if (nodeset? nodelist)
+	       (map-union (car selectors) nodelist)
+	       ((car selectors) nodelist))
 	   (cdr selectors))))))
 
 
-; node-reduce:: [LocPath] -> Node|Nodeset -> Nodeset, or
+; node-reduce:: [LocPath] -> Node|Nodelist -> Nodelist, or
 ; node-reduce:: [Converter] -> Converter
 ; A regular functional composition of converters.
 ; From a different point of view,
-;    ((apply node-reduce converters) nodeset)
+;    ((apply node-reduce converters) nodelist)
 ; is equivalent to
-;    (foldl apply nodeset converters)
-; i.e., folding, or reducing, a list of converters with the nodeset
+;    (foldl apply nodelist converters)
+; i.e., folding, or reducing, a list of converters with the nodelist
 ; as a seed.
 (define (node-reduce . converters)
-  (lambda (nodeset)		; Nodeset or node
-    (let loop ((nodeset nodeset) (converters converters))
-      (if (null? converters) nodeset
-	  (loop ((car converters) nodeset) (cdr converters))))))
+  (lambda (nodelist)		; Nodelist or node
+    (let loop ((nodelist nodelist) (converters converters))
+      (if (null? converters) nodelist
+	  (loop ((car converters) nodelist) (cdr converters))))))
 
 
 ; node-or:: [Converter] -> Converter
@@ -380,18 +380,11 @@
 ; produces the union of their results.
 ; This combinator corresponds to a union, '|' operation for XPath
 ; location paths.
-; (define (node-or . converters)
-;   (lambda (node-or-nodeset)
-;     (if (null? converters) node-or-nodeset
-; 	(append 
-; 	 ((car converters) node-or-nodeset)
-; 	 ((apply node-or (cdr converters)) node-or-nodeset)))))
-; More optimal implementation follows
 (define (node-or . converters)
-  (lambda (node-or-nodeset)
+  (lambda (node-or-nodelist)
     (let loop ((result '()) (converters converters))
       (if (null? converters) result
-	  (loop (append result (or ((car converters) node-or-nodeset) '()))
+	  (loop (append result (or ((car converters) node-or-nodelist) '()))
 		(cdr converters))))))
 
 
@@ -407,7 +400,7 @@
 ;	 (node-reduce (select-kids (ntype?? '*)) (node-closure f))))
 ; This definition, as written, looks somewhat like a fixpoint, and it
 ; will run forever. It is obvious however that sooner or later
-; (select-kids (ntype?? '*)) will return an empty nodeset. At
+; (select-kids (ntype?? '*)) will return an empty nodelist. At
 ; this point further iterations will no longer affect the result and
 ; can be stopped.
 (define (node-closure test-pred?)	    
@@ -475,14 +468,14 @@
 ; Thus, such a converter may be constructed using
 ;  ((sxml:parent test-pred) rootnode)
 ; and returns a parent of a node it is applied to.
-; If applied to a nodeset, it returns the 
-; list of parents of nodes in the nodeset. The rootnode does not have
+; If applied to a nodelist, it returns the 
+; list of parents of nodes in the nodelist. The rootnode does not have
 ; to be the root node of the whole SXML tree -- it may be a root node
 ; of a branch of interest.
 ; The parent:: axis can be used with any SXML node.
 (define (sxml:parent test-pred?)
-  (lambda (root-node)   ; node or nodeset
-    (lambda (node)   ; node or nodeset
+  (lambda (root-node)   ; node or nodelist
+    (lambda (node)   ; node or nodelist
       (if (nodeset? node)
 	(map-union ((sxml:parent test-pred?) root-node) node)
 	(let rpt ((pairs
@@ -516,8 +509,8 @@
 
 ; node-parent:: RootNode -> Converter
 ; (node-parent rootnode) yields a converter that returns a parent of a
-; node it is applied to. If applied to a nodeset, it returns the list
-; of parents of nodes in the nodeset.
+; node it is applied to. If applied to a nodelist, it returns the list
+; of parents of nodes in the nodelist.
 ; Given the notation of Philip Wadler's paper on semantics of XSLT,
 ;  parent(x) = { y | y=subnode*(root), x=subnode(y) }
 ; Therefore, node-parent is not the fundamental converter: it can be
