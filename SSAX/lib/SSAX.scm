@@ -174,6 +174,7 @@
 ; collection, with source location information
 
 ; $Id$
+;^^^^^^^^^
 
 
 	; See the Makefile in the ../tests directory
@@ -185,9 +186,12 @@
 
 
 ; The following macro runs built-in test cases -- or does not run,
-; depending on which of the two lines below you commented out
+; depending on which of the two cases below you commented out
+; Case 1: no tests:
 ;(define-macro run-test (lambda body '(begin #f)))
+;(define-syntax run-test (syntax-rules () ((run-test . args) (begin #f))))
 
+; Case 2: with tests.
 ; The following macro could've been defined just as
 ; (define-macro run-test (lambda body `(begin (display "\n-->Test\n") ,@body)))
 ;
@@ -204,19 +208,165 @@
 ; of (string->symbol "str"). We can do such a replacement at macro-expand
 ; time (rather than at run time).
 
-(define-macro run-test
-  (lambda body
-    (define (re-write body)
-      (cond
-       ((vector? body)
-	(list->vector (re-write (vector->list body))))
-       ((not (pair? body)) body)
-       ((and (eq? 'quote (car body)) (pair? (cdr body))
-	     (string? (cadr body)))
-	(string->symbol (cadr body)))
-       (else (cons (re-write (car body)) (re-write (cdr body))))))
-    (cons 'begin (re-write body))))
+; Here's the previous version of run-test, implemented as a low-level
+; macro. 
+; (define-macro run-test
+;   (lambda body
+;     (define (re-write body)
+;       (cond
+;        ((vector? body)
+; 	(list->vector (re-write (vector->list body))))
+;        ((not (pair? body)) body)
+;        ((and (eq? 'quote (car body)) (pair? (cdr body))
+; 	     (string? (cadr body)))
+; 	(string->symbol (cadr body)))
+;        (else (cons (re-write (car body)) (re-write (cdr body))))))
+;     (cons 'begin (re-write body))))
+;
+; For portability, it is re-written as syntax-rules. The syntax-rules
+; version is less powerful: for example, it can't handle
+; (case x (('"Foo") (do-on-Foo))) whereas the low-level macro
+; could correctly place a case-sensitive symbol at the right place.
+; We also do not scan vectors (because we don't use them here).
+; Twice-deep quasiquotes aren't handled either.
+; Still, the syntax-rules version satisfies our immediate needs.
+; Incidentally, I originally didn't believe that the macro below
+; was at all possible.
+; 
+; The macro is written in a continuation-passing style. A continuation
+; typically has the following structure: (k-head ! . args)
+; When the continuation is invoked, we expand into
+; (k-head <computed-result> . arg). That is, the dedicated symbol !
+; is the placeholder for the result.
+;
+; It seems that the most modular way to write the run-test macro would
+; be the following
+;
+; (define-syntax run-test
+;  (syntax-rules ()
+;   ((run-test . ?body)
+;     (letrec-syntax
+;       ((scan-exp			; (scan-exp body k)
+; 	 (syntax-rules (quote quasiquote !)
+; 	   ((scan-exp (quote (hd . tl)) k)
+; 	     (scan-lit-lst (hd . tl) (do-wrap ! quasiquote k)))
+; 	   ((scan-exp (quote x) (k-head ! . args))
+; 	     (k-head 
+; 	       (if (string? (quote x)) (string->symbol (quote x)) (quote x))
+; 	       . args))
+; 	   ((scan-exp (hd . tl) k)
+; 	     (scan-exp hd (do-tl ! scan-exp tl k)))
+; 	   ((scan-exp x (k-head ! . args))
+; 	     (k-head x . args))))
+; 	(do-tl
+; 	  (syntax-rules (!)
+; 	    ((do-tl processed-hd fn () (k-head ! . args))
+; 	      (k-head (processed-hd) . args))
+; 	    ((do-tl processed-hd fn old-tl k)
+; 	      (fn old-tl (do-cons ! processed-hd k)))))
+; 	...
+; 	(do-finish
+; 	  (syntax-rules ()
+; 	    ((do-finish (new-body)) new-body)
+; 	    ((do-finish new-body) (begin . new-body))))
+; 	...
+;       (scan-exp ?body (do-finish !))
+; ))))
+;
+; Alas, that doesn't work on all systems. We hit yet another dark
+; corner of the R5RS macros. The reason is that run-test is used in
+; the code below to introduce definitions. For example:
+; (run-test
+;  (define (ssax:warn port msg . other-msg)
+;    (apply cerr (cons* nl "Warning: " msg other-msg)))
+; )
+; This code expands to
+; (begin
+;    (define (ssax:warn port msg . other-msg) ...))
+; so the definition gets spliced in into the top level. Right?
+; Well, On Petite Chez Scheme it is so. However, many other systems
+; don't like this approach. The reason is that the invocation of
+; (run-test (define (ssax:warn port msg . other-msg) ...))
+; first expands into
+; (letrec-syntax (...) 
+;   (scan-exp ((define (ssax:warn port msg . other-msg) ...)) ...))
+; because of the presence of (letrec-syntax ...), the begin form that
+; is generated eventually is no longer at the top level! The begin
+; form in Scheme is an overloading of two distinct forms: top-level
+; begin and the other begin. The forms have different rules: for example,
+; (begin (define x 1)) is OK for a top-level begin but not OK for
+; the other begin. Some Scheme systems see the that the macro
+; (run-test ...) expands into (letrec-syntax ...) and decide right there
+; that any further (begin ...) forms are NOT top-level begin forms.
+; The only way out is to make sure all our macros are top-level.
+; The best approach <sigh> seems to be to make run-test one huge
+; top-level macro.
 
+
+(define-syntax run-test
+ (syntax-rules (define)
+   ((run-test "scan-exp" (define vars body))
+    (define vars (run-test "scan-exp" body)))
+   ((run-test "scan-exp" ?body)
+    (letrec-syntax
+      ((scan-exp			; (scan-exp body k)
+	 (syntax-rules (quote quasiquote !)
+	   ((scan-exp '() (k-head ! . args))
+	     (k-head '() . args))
+	   ((scan-exp (quote (hd . tl)) k)
+	     (scan-lit-lst (hd . tl) (do-wrap ! quasiquote k)))
+	   ((scan-exp (quasiquote (hd . tl)) k)
+	     (scan-lit-lst (hd . tl) (do-wrap ! quasiquote k)))
+	   ((scan-exp (quote x) (k-head ! . args))
+	     (k-head 
+	       (if (string? (quote x)) (string->symbol (quote x)) (quote x))
+	       . args))
+	   ((scan-exp (hd . tl) k)
+	     (scan-exp hd (do-tl ! scan-exp tl k)))
+	   ((scan-exp x (k-head ! . args))
+	     (k-head x . args))))
+	(do-tl
+	  (syntax-rules (!)
+	    ((do-tl processed-hd fn () (k-head ! . args))
+	      (k-head (processed-hd) . args))
+	    ((do-tl processed-hd fn old-tl k)
+	      (fn old-tl (do-cons ! processed-hd k)))))
+	(do-cons
+	  (syntax-rules (!)
+	    ((do-cons processed-tl processed-hd (k-head ! . args))
+	      (k-head (processed-hd . processed-tl) . args))))
+	(do-wrap
+	  (syntax-rules (!)
+	    ((do-wrap val fn (k-head ! . args))
+	      (k-head (fn val) . args))))
+	(do-finish
+	  (syntax-rules ()
+	    ((do-finish new-body) new-body)))
+
+	(scan-lit-lst			; scan literal list
+	  (syntax-rules (quote unquote unquote-splicing !)
+	   ((scan-lit-lst '() (k-head ! . args))
+	     (k-head '() . args))
+	   ((scan-lit-lst (quote (hd . tl)) k)
+	     (do-tl quote scan-lit-lst ((hd . tl)) k))
+	   ((scan-lit-lst (unquote x) k)
+	     (scan-exp x (do-wrap ! unquote k)))
+	   ((scan-lit-lst (unquote-splicing x) k)
+	     (scan-exp x (do-wrap ! unquote-splicing k)))
+	   ((scan-lit-lst (quote x) (k-head ! . args))
+	     (k-head 
+	       ,(if (string? (quote x)) (string->symbol (quote x)) (quote x))
+	       . args))
+	    ((scan-lit-lst (hd . tl) k)
+	      (scan-lit-lst hd (do-tl ! scan-lit-lst tl k)))
+	    ((scan-lit-lst x (k-head ! . args))
+	      (k-head x . args))))
+	)
+      (scan-exp ?body (do-finish !))))
+  ((run-test body ...)
+   (begin
+     (run-test "scan-exp" body) ...))
+))
 
 ;========================================================================
 ;				Data Types
@@ -310,9 +460,13 @@
 
 (define (make-xml-token kind head) (cons kind head))
 (define xml-token? pair?)
-(define-macro xml-token-kind (lambda (token) `(car ,token)))
-(define-macro xml-token-head (lambda (token) `(cdr ,token)))
+(define-syntax xml-token-kind 
+  (syntax-rules () ((xml-token-kind token) (car token))))
+(define-syntax xml-token-head 
+  (syntax-rules () ((xml-token-head token) (cdr token))))
 
+; (define-macro xml-token-kind (lambda (token) `(car ,token)))
+; (define-macro xml-token-head (lambda (token) `(cdr ,token)))
 
 ; This record represents a markup, which is, according to the XML
 ; Recommendation, "takes the form of start-tags, end-tags, empty-element tags,
@@ -730,7 +884,7 @@
 
 ; The current position is right after reading the PITarget. We read the
 ; body of PI and return is as a string. The port will point to the
-; character right sfter '?>' combination that terminates PI.
+; character right after '?>' combination that terminates PI.
 ; [16] PI ::= '<?' PITarget (S (Char* - (Char* '?>' Char*)))? '?>'
 
 (define (ssax:read-pi-body-as-string port)
@@ -878,7 +1032,7 @@
 ; Faults detected:
 ;	WFC: XML-Spec.html#wf-Legalchar
 ;
-; According to Secttion "4.1 Character and Entity References"
+; According to Section "4.1 Character and Entity References"
 ; of the XML Recommendation:
 ;  "[Definition: A character reference refers to a specific character
 ;   in the ISO/IEC 10646 character set, for example one not directly
@@ -1854,34 +2008,73 @@
 ;	The handler should read the rest of the PI up to and including
 ;	the combination '?>' that terminates the PI. The handler should
 ;	return a new seed.
-;	One of the PI-TAGs may be a symbol *DEFAULT*. The corresponding
+;	One of the PI-TAGs may be the symbol *DEFAULT*. The corresponding
 ;	handler will handle PIs that no other handler will. If the
-;	*DEFAULT* PI-TAG is not specified, ssax:make-pi-parser will make
-;	one, which skips the body of the PI
+;	*DEFAULT* PI-TAG is not specified, ssax:make-pi-parser will assume
+;	the default handler that skips the body of the PI
 ;	
 ; The output of the ssax:make-pi-parser is a procedure
 ;	PORT PI-TAG SEED
-; that will parse the current PI accoding to user-specified handlers.
+; that will parse the current PI according to the user-specified handlers.
+;
+; The previous version of ssax:make-pi-parser was a low-level macro:
+; (define-macro ssax:make-pi-parser
+;   (lambda (my-pi-handlers)
+;   `(lambda (port target seed)
+;     (case target
+; 	; Generate the body of the case statement
+;       ,@(let loop ((pi-handlers my-pi-handlers) (default #f))
+; 	 (cond
+; 	  ((null? pi-handlers)
+; 	   (if default `((else (,default port target seed)))
+; 	       '((else
+; 		  (ssax:warn port "Skipping PI: " target nl)
+; 		  (ssax:skip-pi port)
+; 		  seed))))
+; 	  ((eq? '*DEFAULT* (caar pi-handlers))
+; 	   (loop (cdr pi-handlers) (cdar pi-handlers)))
+; 	  (else
+; 	   (cons
+; 	    `((,(caar pi-handlers)) (,(cdar pi-handlers) port target seed))
+; 	    (loop (cdr pi-handlers) default)))))))))
 
-(define-macro ssax:make-pi-parser
-  (lambda (my-pi-handlers)
-  `(lambda (port target seed)
-    (case target
-	; Generate the body of the case statement
-      ,@(let loop ((pi-handlers my-pi-handlers) (default #f))
-	 (cond
-	  ((null? pi-handlers)
-	   (if default `((else (,default port target seed)))
-	       '((else
-		  (ssax:warn port "Skipping PI: " target nl)
-		  (ssax:skip-pi port)
-		  seed))))
-	  ((eq? '*DEFAULT* (caar pi-handlers))
-	   (loop (cdr pi-handlers) (cdar pi-handlers)))
-	  (else
-	   (cons
-	    `((,(caar pi-handlers)) (,(cdar pi-handlers) port target seed))
-	    (loop (cdr pi-handlers) default)))))))))
+(define-syntax ssax:make-pi-parser
+  (syntax-rules ()
+    ((ssax:make-pi-parser orig-handlers)
+     (letrec-syntax 
+	; Generate the clauses of the case statement
+      ((loop
+	 (syntax-rules (*DEFAULT*)
+	   ((loop () #f accum port target seed) 	; no default
+	    (make-case 
+	      ((else
+		 (ssax:warn port "Skipping PI: " target nl)
+		 (ssax:skip-pi port)
+		 seed)
+		. accum)
+	      () target))
+	   ((loop () default accum port target seed)
+	    (make-case 
+	      ((else (default port target seed)) . accum)
+	      () target))
+	   ((loop ((*DEFAULT* . default) . handlers) old-def accum
+	      port target seed)
+	    (loop handlers default accum port target seed))
+	   ((loop ((tag . handler) . handlers) default accum port target seed)
+	    (loop handlers default
+	      (((tag) (handler port target seed)) . accum)
+	      port target seed))
+	   ))
+	(make-case 			; Reverse the clauses, make the 'case'
+	  (syntax-rules ()
+	    ((make-case () clauses target)
+	     (case target . clauses))
+	    ((make-case (clause . clauses) accum target)
+	     (make-case clauses (clause . accum) target)))
+	  ))
+      (lambda (port target seed)
+	(loop orig-handlers #f () port target seed))
+       ))))
 
 (run-test
  (pp (ssax:make-pi-parser ()))
@@ -1940,11 +2133,12 @@
 ;	WFC: XML-Spec.html#GIMatch
 
 
-(define-macro ssax:make-elem-parser
-  (lambda (my-new-level-seed my-finish-element
-	   my-char-data-handler my-pi-handlers)
+(define-syntax ssax:make-elem-parser
+  (syntax-rules ()
+    ((ssax:make-elem-parser my-new-level-seed my-finish-element
+                            my-char-data-handler my-pi-handlers)
   
-  `(lambda (start-tag-head port elems entities namespaces
+   (lambda (start-tag-head port elems entities namespaces
 			   preserve-ws? seed)
 
      (define xml-space-gi (cons ssax:Prefix-XML
@@ -1959,11 +2153,11 @@
 	  (ssax:complete-start-tag start-tag-head port elems
 				   entities namespaces))
 	 ((seed)
-	  (,my-new-level-seed elem-gi attributes
+	  (my-new-level-seed elem-gi attributes
 			      namespaces expected-content parent-seed)))
 	(case expected-content
 	  ((EMPTY-TAG)
-	   (,my-finish-element
+	   (my-finish-element
 	    elem-gi attributes namespaces parent-seed seed))
 	  ((EMPTY)		; The end tag must immediately follow
 	   (ssax:assert-token 
@@ -1973,7 +2167,7 @@
 	      (parser-error port "[elementvalid] broken for " token 
 		     " while expecting "
 		     exp-kind exp-head)))
-	   (,my-finish-element
+	   (my-finish-element
 	    elem-gi attributes namespaces parent-seed seed))
 	  (else		; reading the content...
 	   (let ((preserve-ws?  ; inherit or set the preserve-ws? flag
@@ -1987,7 +2181,7 @@
 	       (let*-values
 		(((seed term-token)
 		  (ssax:read-char-data port expect-eof?
-				       ,my-char-data-handler seed)))
+				       my-char-data-handler seed)))
 		(if (eof-object? term-token)
 		    seed
 		    (case (xml-token-kind term-token)
@@ -1997,11 +2191,11 @@
 			    (parser-error port "[GIMatch] broken for "
 				   term-token " while expecting "
 				   exp-kind exp-head)))
-		       (,my-finish-element
+		       (my-finish-element
 			elem-gi attributes namespaces parent-seed seed))
 		      ((PI)
 		       (let ((seed 
-			  ((ssax:make-pi-parser ,my-pi-handlers)
+			  ((ssax:make-pi-parser my-pi-handlers)
 			   port (xml-token-head term-token) seed)))
 			 (loop port entities expect-eof? seed)))
 		      ((ENTITY-REF)
@@ -2011,7 +2205,7 @@
 			       entities
 			       (lambda (port entities seed)
 				 (loop port entities #t seed))
-			       ,my-char-data-handler
+			       my-char-data-handler
 			       seed))) ; keep on reading the content after ent
 			 (loop port entities expect-eof? seed)))
 		      ((START)		; Start of a child element
@@ -2031,7 +2225,7 @@
 		       (parser-error port "XML [43] broken for "
 				     term-token))))))))
 	  )))
-)))
+))))
 
 
 ; syntax: ssax:make-parser user-handler-tag user-handler-proc ...
@@ -2114,72 +2308,19 @@
 ;
 
 
-(define-macro ssax:make-parser
-  (lambda user-handlers
-
-  ; An assoc list of user-handler-tag and default handlers
-  (define all-handlers
-    '((DOCTYPE .
-        (lambda (port docname systemid internal-subset? seed)
-	  (when internal-subset?
-	      (ssax:warn port "Internal DTD subset is not currently handled ")
-	      (ssax:skip-internal-dtd port))
-	  (ssax:warn port "DOCTYPE DECL " docname " " 
-		systemid " found and skipped")
-	  (values #f '() '() seed)
-	  ))
-      (UNDECL-ROOT .
-	(lambda (elem-gi seed) (values #f '() '() seed)))
-      (DECL-ROOT .
-	(lambda (elem-gi seed) seed))
-      (NEW-LEVEL-SEED . REQD)	; required
-      (FINISH-ELEMENT . REQD)	; required
-      (CHAR-DATA-HANDLER . REQD)	; required
-      (PI . ())
-      ))
-
-  ; Delete an association with the tag from alist
-  ; exit to cont, passing the tag, tag-association, and the list
-  ; of remaining associations.
-  ; It's an error if the association with the tag does not exist
-  ; in alist
-  (define (delete-assoc alist tag cont)
-    (let loop ((alist alist) (scanned '()))
-      (cond
-       ((null? alist) (error "Unknown user-handler-tag: " tag))
-       ((eq? tag (caar alist))
-	(cont tag (cdar alist) (append scanned (cdr alist))))
-       (else (loop (cdr alist) (cons (car alist) scanned))))))
-
-  ; create an assoc list of tags and handlers
-  ; based on the defaults and on the given handlers
-  (define (merge-handlers declared-handlers given-handlers)
-    (cond
-     ((null? given-handlers)		; the arguments are exhausted...
-      (cond
-       ((null? declared-handlers) '())
-       ((not (eq? 'REQD (cdar declared-handlers))) ; default value was given:
-	(cons (car declared-handlers)		   ; use it
-	      (merge-handlers (cdr declared-handlers) given-handlers)))
-       (else (error "The handler for the tag " (caar declared-handlers)
-		    " must be specified"))))
-     ((null? (cdr given-handlers))
-      (error "Odd number of arguments to ssax:make-parser"))
-     (else
-      (delete-assoc declared-handlers (car given-handlers)
-	  (lambda (tag value alist)
-	    (cons (cons tag (cadr given-handlers))
-		  (merge-handlers alist (cddr given-handlers))))))))
-
-  (let ((user-handlers (merge-handlers all-handlers user-handlers)))
-
-    (define (get-handler tag)
-      (cond
-       ((assq tag user-handlers) => cdr)
-       (else (error "unknown tag: " tag))))
-
-
-  `(lambda (port seed)
+; This is ssax:make-parser with all the (specialization) handlers given
+; as positional arguments. It is called by ssax:make-parser, see below
+(define-syntax ssax:make-parser/positional-args
+  (syntax-rules ()
+    ((ssax:make-parser/positional-args
+       *handler-DOCTYPE
+       *handler-UNDECL-ROOT
+       *handler-DECL-ROOT
+       *handler-NEW-LEVEL-SEED
+       *handler-FINISH-ELEMENT
+       *handler-CHAR-DATA-HANDLER
+       *handler-PI)
+  (lambda (port seed)
 
      ; We must've just scanned the DOCTYPE token 
      ; Handle the doctype declaration and exit to
@@ -2201,7 +2342,7 @@
 	    (eqv? #\[ (assert-curr-char '(#\> #\[)
 					"XML [28], end-of-DOCTYPE" port))))
 	 ((elems entities namespaces seed)
-	  (,(get-handler 'DOCTYPE) port docname systemid
+	  (*handler-DOCTYPE port docname systemid
 			    internal-subset? seed))
 	 )
 	(scan-for-significant-prolog-token-2 port elems entities namespaces
@@ -2218,14 +2359,14 @@
 	     (case (xml-token-kind token)
 	       ((PI)
 		(let ((seed 
-		       ((ssax:make-pi-parser ,(get-handler 'PI))
+		       ((ssax:make-pi-parser *handler-PI)
 			port (xml-token-head token) seed)))
 		  (scan-for-significant-prolog-token-1 port seed)))
 	       ((DECL) (handle-decl port (xml-token-head token) seed))
 	       ((START)
 		(let*-values
 		 (((elems entities namespaces seed)
-		   (,(get-handler 'UNDECL-ROOT) (xml-token-head token) seed)))
+		   (*handler-UNDECL-ROOT (xml-token-head token) seed)))
 		 (element-parser (xml-token-head token) port elems
 				 entities namespaces #f seed)))
 	       (else (parser-error port "XML [22], unexpected markup "
@@ -2243,14 +2384,14 @@
 	     (case (xml-token-kind token)
 	       ((PI)
 		(let ((seed 
-		       ((ssax:make-pi-parser ,(get-handler 'PI))
+		       ((ssax:make-pi-parser *handler-PI)
 			port (xml-token-head token) seed)))
 		  (scan-for-significant-prolog-token-2 port elems entities
 						       namespaces seed)))
 	       ((START)
 		(element-parser (xml-token-head token) port elems
 		  entities namespaces #f
-		  (,(get-handler 'DECL-ROOT) (xml-token-head token) seed)))
+		  (*handler-DECL-ROOT (xml-token-head token) seed)))
 	       (else (parser-error port "XML [22], unexpected markup "
 				   token))))))
 
@@ -2258,15 +2399,99 @@
      ; A procedure start-tag-head port elems entities namespaces
      ;		 preserve-ws? seed
      (define element-parser
-       (ssax:make-elem-parser ,(get-handler 'NEW-LEVEL-SEED)
-			      ,(get-handler 'FINISH-ELEMENT)
-			      ,(get-handler 'CHAR-DATA-HANDLER)
-			      ,(get-handler 'PI)))
+       (ssax:make-elem-parser *handler-NEW-LEVEL-SEED
+			      *handler-FINISH-ELEMENT
+			      *handler-CHAR-DATA-HANDLER
+			      *handler-PI))
 
      ; Get the ball rolling ...
      (scan-for-significant-prolog-token-1 port seed)
 ))))
 
+
+
+; The following meta-macro turns a regular macro (with positional
+; arguments) into a form with keyword (labeled) arguments.  We later
+; use the meta-macro to convert ssax:make-parser/positional-args into
+; ssax:make-parser. The latter provides a prettier (with labeled
+; arguments and defaults) interface to
+; ssax:make-parser/positional-args
+;
+; ssax:define-labeled-arg-macro LABELED-ARG-MACRO-NAME 
+;		(POS-MACRO-NAME ARG-DESCRIPTOR ...)
+; expands into the definition of a macro
+;	LABELED-ARG-MACRO-NAME KW-NAME KW-VALUE KW-NAME1 KW-VALUE1 ...
+; which, in turn, expands into
+;	POS-MACRO-NAME ARG1 ARG2 ...
+; where each ARG1 etc. comes either from KW-VALUE or from
+; the deafult part of ARG-DESCRIPTOR. ARG1 corresponds to the first
+; ARG-DESCRIPTOR, ARG2 corresponds to the second descriptor, etc.
+; Here ARG-DESCRIPTOR describes one argument of the positional macro.
+; It has the form 
+;	(ARG-NAME DEFAULT-VALUE)
+; or
+;	(ARG-NAME)
+; In the latter form, the default value is not given, so that the invocation of
+; LABELED-ARG-MACRO-NAME must mention the corresponding parameter.
+; ARG-NAME can be anything: an identifier, a string, or even a number.
+
+
+(define-syntax ssax:define-labeled-arg-macro
+  (syntax-rules ()
+    ((ssax:define-labeled-arg-macro
+       labeled-arg-macro-name
+       (positional-macro-name
+	 (arg-name . arg-def) ...))
+      (define-syntax labeled-arg-macro-name
+	(syntax-rules ()
+	  ((labeled-arg-macro-name . kw-val-pairs)
+	    (letrec-syntax
+	      ((find 
+		 (syntax-rules (arg-name ...)
+		   ((find k-args (arg-name . default) arg-name
+		      val . others)	   ; found arg-name among kw-val-pairs
+		    (next val . k-args)) ...
+		   ((find k-args key arg-no-match-name val . others)
+		     (find k-args key . others))
+		   ((find k-args (arg-name default)) ; default must be here
+		     (next default . k-args)) ...
+		   ))
+		(next			; pack the continuation to find
+		  (syntax-rules ()
+		    ((next val vals key . keys)
+		      (find ((val . vals) . keys) key . kw-val-pairs))
+		    ((next val vals)	; processed all arg-descriptors
+		      (rev-apply (val) vals))))
+		(rev-apply
+		  (syntax-rules ()
+		    ((rev-apply form (x . xs))
+		      (rev-apply (x . form) xs))
+		    ((rev-apply form ()) form))))
+	      (next positional-macro-name () 
+		(arg-name . arg-def) ...))))))))
+
+
+; The definition of ssax:make-parser
+(ssax:define-labeled-arg-macro ssax:make-parser
+  (ssax:make-parser/positional-args
+    (DOCTYPE
+      (lambda (port docname systemid internal-subset? seed)
+	(when internal-subset?
+	  (ssax:warn port "Internal DTD subset is not currently handled ")
+	  (ssax:skip-internal-dtd port))
+	(ssax:warn port "DOCTYPE DECL " docname " " 
+	  systemid " found and skipped")
+	(values #f '() '() seed)
+	))
+    (UNDECL-ROOT
+      (lambda (elem-gi seed) (values #f '() '() seed)))
+    (DECL-ROOT
+      (lambda (elem-gi seed) seed))
+    (NEW-LEVEL-SEED)		; required
+    (FINISH-ELEMENT)		; required
+    (CHAR-DATA-HANDLER)		; required
+    (PI ())
+    ))
 
 (run-test
  (letrec ((simple-parser
