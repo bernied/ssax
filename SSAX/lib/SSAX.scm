@@ -532,29 +532,6 @@
 ;-------------------------
 ; Utilities
 
-;   ssax:warn PORT MESSAGE SPECIALISING-MSG*
-; to notify the user about warnings that are NOT errors but still
-; may alert the user.
-; Result is unspecified.
-; We need to define the function to allow the self-tests to run.
-; Normally the definition of ssax:warn is to be provided by the user.
-(run-test
- (define (ssax:warn port msg . other-msg)
-   (apply cerr (cons* nl "Warning: " msg other-msg)))
-)
-
-
-;   parser-error PORT MESSAGE SPECIALISING-MSG*
-; to let the user know of a syntax error or a violation of a
-; well-formedness or validation constraint.
-; Result is unspecified.
-; We need to define the function to allow the self-tests to run.
-; Normally the definition of parser-error is to be provided by the user.
-(run-test
- (define (parser-error port msg . specializing-msgs)
-   (apply error (cons msg specializing-msgs)))
-)
-
 ; The following is a function that is often used in validation tests,
 ; to make sure that the computed result matches the expected one.
 ; This function is a standard equal? predicate with one exception.
