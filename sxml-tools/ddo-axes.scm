@@ -170,78 +170,96 @@
   (let ((num-anc (if (null? num-ancestors) 0 (car num-ancestors)))
         (child (sxml:child sxml:node?)))
     (letrec
-        ((reordering
+        ((child4this
           ; Arguments
-          ;  res-candidates = (listof node) - candidates for the result, not
-          ; yet filtered with a node test
-          ;  res-ancestors - ancestors of res-candidates
+          ;  curr-node - current node (or context) to process
           ;  src - the remaining nodes of the input node-set
           ; Returns: (values res src)
-          (lambda (res-candidates res-ancestors src)            
-            (let loop ((res-candidates res-candidates)
-                       (src src)
-                       (res '()))
+          (lambda (curr-node src)
+            (let iter-attrs ((src src)
+                             (res '()))
               (cond
-                ((null? src)  ; this zoo is over
+                ((null? src)  ; the zoo is completely over
                  (values
-                  (append
-                   res
-                   (draft:siblings->context-set
-                    ((sxml:filter test-pred?) res-candidates)
-                    (draft:list-head res-ancestors num-anc)))
-                  src  ; always null
+                  (append res
+                          ((draft:child test-pred? num-anc) curr-node))
+                  src  ; null
                   ))
-                ((null? res-candidates)
-                 (values res src))
-                (else  ; processing the current res-candidate
-                 (let ((res-candidate (car res-candidates)))
-                   (let rpt ((more (list res-candidate))
-                             (next (sxml:context->node (car src)))
-                             (src src)
-                             (res (if (test-pred? res-candidate)
-                                      (append
-                                       res
-                                       (list
-                                        (draft:smart-make-context
-                                         res-candidate res-ancestors num-anc)))
-                                      res)))
+                ((memq (sxml:context->node (car src))
+                       (sxml:attr-list (sxml:context->node curr-node)))
+                 ; next in src is the attribute of the curr-node
+                 (iter-attrs
+                  (cdr src)
+                  (append res ((draft:child test-pred? num-anc) (car src)))))
+                (else   ; normal behaviour
+                 (let ((res-ancestors
+                        (sxml:context->content curr-node)))
+                   (let iter-cands ((res-candidates
+                                     (child (sxml:context->node curr-node)))
+                                    (src src)
+                                    (res res))
                      (cond
-                       ((null? more)
-                        ; no more src members among res-candidate descendants
-                        (loop (cdr res-candidates) src res))                      
-                       ((eq? (car more) next)
-                        ; next node is a descendant-or-self of res-candidate
-                        (let-values*
-                         (((add-res new-src)
-                           (reordering
-                            (child next)
-                            (sxml:context->content (car src))
-                            (cdr src))))
-                         (if
-                          (null? new-src)
-                          (loop (cdr res-candidates)
+                       ((null? src)  ; this zoo is over
+                        (values
+                         (append
+                          res
+                          (draft:siblings->context-set
+                           ((sxml:filter test-pred?) res-candidates)
+                           (draft:list-head res-ancestors num-anc)))
+                         src  ; always null
+                         ))
+                       ((null? res-candidates)
+                        (values res src))
+                       (else  ; processing the current res-candidate
+                        (let rpt ((more (list (car res-candidates)))
+                                  (next (sxml:context->node (car src)))
+                                  (src src)
+                                  (res
+                                   (if
+                                    (test-pred? (car res-candidates))
+                                    (append
+                                     res
+                                     (list
+                                      (draft:smart-make-context
+                                       (car res-candidates)
+                                       res-ancestors num-anc)))
+                                    res)))
+                          (cond
+                            ((null? more)
+                             ; no more src members
+                             (iter-cands (cdr res-candidates) src res))
+                            ((eq? (car more) next)
+                             ; next node is a descendant-or-self candidate
+                             ; or the attribute of its descendants
+                             (let-values*
+                              (((add-res new-src)
+                                (child4this (car src) (cdr src))))
+                              (if
+                               (null? new-src)
+                               (iter-cands   ; will exit there
+                                (cdr res-candidates)
                                 new-src
                                 (append res add-res))
-                          (rpt (cdr more)  ; kids processed by recursive
-                               (sxml:context->node (car new-src))
-                               new-src
-                               (append res add-res)))))
-                       (else
-                        (rpt (append (child (car more)) (cdr more))
-                             next src res)))))))))))
+                               (rpt
+                                (cdr more)  ; kids processed by recursive
+                                (sxml:context->node (car new-src))
+                                new-src
+                                (append res add-res)))))
+                            (else
+                             (rpt
+                              (append (ddo:attr-child (car more))
+                                      (cdr more))
+                              next src res))))))))))))))
       (lambda (node)   ; node or nodeset
         (if
-         (nodeset? node)        
+         (nodeset? node)
          (let iter ((nset node)
                     (res '()))
            (if
             (null? nset)
             res
             (let-values*
-             (((add-res new-nset)
-               (reordering (child (sxml:context->node (car nset)))
-                           (sxml:context->content (car nset))
-                           (cdr nset))))
+             (((add-res new-nset) (child4this (car nset) (cdr nset))))
              (iter new-nset (append res add-res)))))
          ((draft:child test-pred? num-anc) node))))))
         
@@ -1094,7 +1112,7 @@
           ; Returns: (values pos-result new-src new-order-num)
           (lambda (curr-node src order-num)
             (let ((curr-children
-                      (child (sxml:context->node curr-node))))
+                   (child (sxml:context->node curr-node))))
               (if
                (null? curr-children)  ; nothing to do for this curr-node
                (values '() src order-num)
@@ -1104,7 +1122,7 @@
                  (if
                   (null? src)  ; no searching for descendants required
                   (values (list (create-pos-nset
-                                 ((sxml:filter test-pred?) curr-node)
+                                 ((sxml:filter test-pred?) curr-children)
                                  curr-ancestors order-num))
                           src  ; always null
                           #f  ; nobody cares of order-num anymore
@@ -1119,7 +1137,7 @@
                                (list
                                 (cons
                                  (if (null? curr-ancestors)
-                                     (car curr-children)                              
+                                     (car curr-children)
                                      (draft:make-context
                                       (car curr-children) curr-ancestors))
                                  order-num))
