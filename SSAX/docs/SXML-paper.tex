@@ -2,6 +2,7 @@
 \documentclass[10pt]{article}
 \usepackage[T1]{fontenc}
 \usepackage[latin1]{inputenc}
+\usepackage{times}
 \pagestyle{empty}
 \makeatletter
 \makeatother
@@ -16,13 +17,13 @@
 
 \begin{document}
 \title{SXML Specification}
-\author{Oleg Kiselyov\\Software Engineering, Naval Postgraduate School, Monterey, CA 93943\\oleg@pobox.com, oleg@acm.org}
+\author{Oleg Kiselyov\\FNMOC, Monterey, CA 93943\\oleg@pobox.com, oleg@acm.org}
 \maketitle
 \begin{abstract}
 The present article specifies revision 2.5 of SXML. SXML is an abstract syntax tree of an XML document. SXML is also
 a concrete representation of the XML Infoset in the form of
 S-expressions. The generic tree structure of SXML lends itself to a
-compact library of combinators for querying and transforming SXML.\\The master SXML specification file is written in SXML itself. The present paper is the result of translating that SXML code into \LaTeX, using an appropriate "stylesheet". A different stylesheet converted the specification to HTML. The master file, the stylesheets and the corresponding HTML and \LaTeX documents are available at  \texttt{http://pobox.com/\textasciitilde{}oleg/ftp/Scheme/xml.html} .\\Keywords: XML, XML parsing, XML Infoset, XML Namespaces, AST, SXML, Scheme.\end{abstract}
+compact library of combinators for querying and transforming SXML.\\The master SXML specification file is written in SXML itself. The present paper is the result of translating that SXML code into \LaTeX, using an appropriate "stylesheet". A different stylesheet converted the specification to HTML. The master file, the stylesheets and the corresponding HTML and \LaTeX{} documents are available at  \texttt{http://pobox.com/\textasciitilde{}oleg/ftp/Scheme/xml.html} .\\Keywords: XML, XML parsing, XML Infoset, XML Namespaces, AST, SXML, Scheme.\end{abstract}
 \section{Introduction}
 An XML document is essentially a tree structure. The start and the end
 tags of the root element enclose the whole content of the document,
@@ -80,8 +81,8 @@ Recommendation \cite{XML}. The following table summarizes the notation.
 \item [\texttt{{\itshape thing}}] A literal Scheme symbol
 \item [\texttt{\textbf{(} <A> <B>* \textbf{)}}] An S-expression made of \texttt{<A>} followed by zero or more \texttt{<B>}
 \item [\texttt{\textbf{(} <A>\textbf{ . }<B> \textbf{)}}] An S-expression that is made by prepending \texttt{<A>} to an S-expression denoted by \texttt{<B>}
-\item [\texttt{\textbf{$MAKE-SYMBOL$(}<A>:<B>\textbf{)}}] A symbol whose string representation consists of all
-characters that spell \texttt{<A>} followed by the colon character and by the characters that spell \texttt{<B>}. The \texttt{\textbf{$MAKE-SYMBOL$(}\textbf{)}} notation can be regarded a meta-function that creates symbols.
+\item [\texttt{\textbf{$MAKE{-}SYMBOL$(}<A>:<B>\textbf{)}}] A symbol whose string representation consists of all
+characters that spell \texttt{<A>} followed by the colon character and by the characters that spell \texttt{<B>}. The \texttt{\textbf{$MAKE{-}SYMBOL$(}\textbf{)}} notation can be regarded a meta-function that creates symbols.
 \end{description}
 \section{Grammar}
 \begin{tabular}{rrcp{2.8in}}
@@ -127,8 +128,8 @@ document.
 \begin{tabular}{rrcp{2.8in}}
 {[}9{]} & \texttt{<name>} &  $::=$ & \texttt{<LocalName> | <ExpName> } \\
 {[}10{]} & \texttt{<LocalName>} &  $::=$ & \texttt{NCName } \\
-{[}11{]} & \texttt{<ExpName>} &  $::=$ & \texttt{\textbf{$MAKE-SYMBOL$(}<namespace-id>:<LocalName>\textbf{)} } \\
-{[}12{]} & \texttt{<namespace-id>} &  $::=$ & \texttt{\textbf{$MAKE-SYMBOL$(}"URI"\textbf{)} | user-ns-shortcut } \\
+{[}11{]} & \texttt{<ExpName>} &  $::=$ & \texttt{\textbf{$MAKE{-}SYMBOL$(}<namespace-id>:<LocalName>\textbf{)} } \\
+{[}12{]} & \texttt{<namespace-id>} &  $::=$ & \texttt{\textbf{$MAKE{-}SYMBOL$(}"URI"\textbf{)} | user-ns-shortcut } \\
 {[}13{]} & \texttt{<namespaces>} &  $::=$ & \texttt{\textbf{(} {\itshape *NAMESPACES*} <namespace-assoc>* \textbf{)} } \\
 {[}14{]} & \texttt{<namespace-assoc>} &  $::=$ & \texttt{\textbf{(} <namespace-id> "URI" {\itshape original-prefix}? \textbf{)} } \\
 \end{tabular}
@@ -140,7 +141,7 @@ case
 symbol whose spelling conforms to production [4] of the XML Namespaces
 Recommendation \cite{XML-Namespaces}. \texttt{<ExpName>} is also a Scheme symbol, whose string representation
 contains an embedded colon that joins the local and the namespace
-parts of the name. A \texttt{\textbf{$MAKE-SYMBOL$(}"URI"\textbf{)}} is a Namespace URI
+parts of the name. A \texttt{\textbf{$MAKE{-}SYMBOL$(}"URI"\textbf{)}} is a Namespace URI
 string converted to a Scheme symbol. Universal Resource Identifiers (URI)
 may contain characters (e.g., parentheses) that are prohibited
 in Scheme identifiers. Such characters must be \%-quoted during the
@@ -184,6 +185,20 @@ is an ordered sequence of element's children -- character data,
 processing instructions, and other elements. Every child is unique;
 items never share their children even if the latter have the identical
 content.
+
+A \texttt{parent} property of an Infoset information item
+might seem troublesome. The Infoset Recommendation \cite{XML
+Infoset} specifies that element, attribute and other kinds of
+information items have a property \texttt{parent}, whose value is
+an information item that contains the given item in its \texttt{children} property. The property parent thus is an upward link
+from a child to its parent. At first sight, S-expressions seem lacking
+in that respect: S-expressions represent directed trees and trees
+cannot have upward links. An article \cite{Parent-pointers}
+discusses and compares five different methods of determining the
+parent of an SXML node. The existence of these methods is a crucial
+step in a constructive proof that SXML is a complete model of the XML
+Information set and the SXML query language (SXPath) can fully
+implement the XPath Recommendation.
 
 Just as XPath does and the Infoset specification explicitly allows,
 we group character information items into maximal text strings.  The
@@ -309,7 +324,7 @@ the symbol table.
 
 
 
-We must note there is a 1-to-1 correspondence between \texttt{user-ns-shortcut}s and the corresponding namespace URIs. This is generally not true
+We must note a 1-to-1 correspondence between \texttt{user-ns-shortcut}s and the corresponding namespace URIs. This is generally not true
 for XML namespace prefixes and namespace URIs. A \texttt{user-ns-shortcut} uniquely represents the corresponding namespace
 URI within the document, but an XML namespace prefix does not. For
 example, different XML prefixes may specify the same namespace
@@ -435,8 +450,7 @@ The figure below shows progressively more complex examples.
 I am indebted to Kirill Lisovsky of MISA
 University, Moscow, for insightful discussions and suggestions. This
 work has been supported in part by the National Research Council
-Research Associateship Program, Naval Postgraduate School, and the
-Army Research Office under contracts 38690-MA and 40473-MA-SP.
+Research Associateship Program and Naval Postgraduate School.
 
 \begin{thebibliography}{}
 \bibitem{McCarthy} John McCarthy. Recursive Functions of Symbolic Expressions
@@ -451,12 +465,13 @@ and Their Computation by Machine, Part I. Comm. ACM, 3(4):184-195, April 1960. \
                       ACM SIGPLAN Notices, Vol. 33, No. 9, October, 1998. \texttt{http://www.schemers.org/Documents/Standards/R5RS/} 
 \bibitem{SSAX} Oleg Kiselyov. Functional XML parsing framework: SAX/DOM and
 SXML parsers with support for XML Namespaces and validation. September
-5, 2001. \texttt{http://pobox.com/\textasciitilde{}oleg/ftp/Scheme/SSAX.scm} 
+5, 2001. \texttt{http://pobox.com/\textasciitilde{}oleg/ftp/Scheme/xml.html\#XML-parser} 
 \bibitem{SXML-short-paper} Oleg Kiselyov. XML and Scheme. An introduction to SXML and SXPath;
 illustration of SXPath expressiveness and comparison with
 XPath. September 17, 2000. \texttt{http://pobox.com/\textasciitilde{}oleg/ftp/Scheme/SXML-short-paper.html} 
+\bibitem{Parent-pointers} Oleg Kiselyov. On parent pointers in SXML trees. February 12, 2003. \texttt{http://pobox.com/\textasciitilde{}oleg/ftp/Scheme/xml.html\#parent-ptr} 
 \bibitem{Scheme-case-sensitivity} Kirill Lisovsky. Case sensitivity of Scheme systems. \texttt{http://pair.com/lisovsky/scheme/case-sensitivity.html} 
-\bibitem{SXML-NS} Namespaces in SXML and (S)XPath. Discussion thread on the SSAX-SXML mailing list. May 28, 2002 and June 7, 2002. \texttt{http://www.geocrawler.com/archives/3/15235/2002/5/0/8785305/}  \texttt{http://www.geocrawler.com/archives/3/15235/2002/6/0/8877115/} 
+\bibitem{SXML-NS} Namespaces in SXML and (S)XPath. Discussion thread on the SSAX-SXML mailing list. May 28, 2002 and June 7, 2002. \texttt{http://sourceforge.net/mailarchive/forum.php?thread\_id=759249\&forum\_id=599}  \texttt{http://sourceforge.net/mailarchive/forum.php?thread\_id=789156\&forum\_id=599} 
 \bibitem{DOM} World Wide Web Consortium. Document Object Model (DOM) Level 1
 Specification. W3C Recommendation. \texttt{http://www.w3.org/TR/REC-DOM-Level-1} 
 \bibitem{XML} World Wide Web Consortium. Extensible Markup Language (XML)
