@@ -137,14 +137,19 @@
 ; $Id$
 
 
-	; To run this code under Gambit, just evaluate or compile it along
-	; with the IMPORT functions mentioned above.
+	; To run this code under Gambit, execute the following:
+	; gsi -e "(include \"../lib/myenv.scm\")" \
+	; -e "(include \"../lib/catch-error.scm\")" \
+	; -e "(include \"../lib/util.scm\")" \
+	; -e "(include \"../lib/look-for-str.scm\")" \
+	; -e "(include \"../lib/input-parse.scm\")" SSAX.scm
 
 	; To run this code under SCM, do
-	; scm myenv-scm.scm util.scm input-parse.scm look-for-str.scm SSAX.scm 
+	; scm myenv-scm.scm catch-error.scm util.scm input-parse.scm
+	; look-for-str.scm SSAX.scm 
 
 	; To run this code under MIT Scheme, do
-	; scheme -load myenv-mit.scm input-parse.scm util.scm \
+	; scheme -load myenv-mit.scm catch-error.scm input-parse.scm util.scm \
 	; look-for-str.scm SSAX.scm
 
 	; Current versions of SSAX ports to other Scheme systems
@@ -157,8 +162,6 @@
 	; See http://pobox.com/~oleg/ftp/Scheme/
 	; for myenv.scm and other input parsing functions used
 	; in the present code.
-; Move inside the run-test, just as catch-error.scm below???
-(include "myenv.scm")
 
 
 ; The following macro runs built-in test cases -- or does not run,
@@ -195,9 +198,6 @@
     (cons 'begin (re-write body))))
 
 
-(run-test
- (include "catch-error.scm")
-)
 ;========================================================================
 ;				Data Types
 
@@ -1199,7 +1199,7 @@
     ; Check to see decl-attr is not of use type REQUIRED. Add
     ; the association with the default value, if any declared
     (define (add-default-decl decl-attr result)
-      (let-values*
+      (let*-values
 	 (((attr-name content-type use-type default-value)
 	   (apply values decl-attr)))
 	 (and (eq? use-type 'REQUIRED)
@@ -1211,7 +1211,7 @@
     (let loop ((attlist attlist) (decl-attrs decl-attrs) (result '()))
       (if (attlist-null? attlist)
 	  (attlist-fold add-default-decl result decl-attrs)
-	  (let-values*
+	  (let*-values
 	   (((attr attr-others)
 	     (attlist-remove-top attlist))
 	    ((decl-attr other-decls)
@@ -1229,7 +1229,7 @@
 	      (loop attlist other-decls 
 		    (add-default-decl decl-attr result)))
 	     (else	; matched occurrence of an attr with its declaration
-	      (let-values*
+	      (let*-values
 	       (((attr-name content-type use-type default-value)
 		 (apply values decl-attr)))
 	       ; Run some tests on the content of the attribute
@@ -1286,9 +1286,9 @@
 
     ; The body of the function
  (lambda (tag-head port elems entities namespaces)
-  (let-values* 
-   ((attlist (SSAX:read-attributes port entities))
-    (empty-el-tag?
+  (let*-values
+   (((attlist) (SSAX:read-attributes port entities))
+    ((empty-el-tag?)
      (begin
        (SSAX:skip-S port)
        (and
@@ -1309,7 +1309,7 @@
 	  (if empty-el-tag? 'EMPTY-TAG 'ANY)
 	  #f)			; no attributes declared
 	 ))
-    (merged-attrs (if decl-attrs (validate-attrs port attlist decl-attrs)
+    ((merged-attrs) (if decl-attrs (validate-attrs port attlist decl-attrs)
 		      (attlist->alist attlist)))
     ((proper-attrs namespaces)
      (adjust-namespace-decl port merged-attrs namespaces))
@@ -1710,12 +1710,12 @@
 	 (cons* foll-fragment fragment seed))))
    (test (lambda (str expect-eof? expected-data expected-token)
 	   (display "\nbody: ") (write str) (display "\nResult: ")
-	  (let-values*
+	  (let*-values
 	   (((seed token)
 	     (call-with-input-string str
 		(lambda (port)
 		 (SSAX:read-char-data port expect-eof? str-handler '()))))
-	    (result (reverse seed)))
+	    ((result) (reverse seed)))
 	   (write result)
 	   (display " ")
 	   (display token)
@@ -1893,11 +1893,11 @@
 			    (port port) (entities entities)
 			    (namespaces namespaces)
 			    (preserve-ws? preserve-ws?) (parent-seed seed))
-       (let-values*
+       (let*-values
 	(((elem-gi attributes namespaces expected-content)
 	  (SSAX:complete-start-tag start-tag-head port elems
 				   entities namespaces))
-	 (seed
+	 ((seed)
 	  (,my-new-level-seed elem-gi attributes
 			      namespaces expected-content parent-seed)))
 	(case expected-content
@@ -1923,7 +1923,7 @@
 		   (else preserve-ws?))))
 	     (let loop ((port port) (entities entities)
 			(expect-eof? #f) (seed seed))
-	       (let-values*
+	       (let*-values
 		(((seed term-token)
 		  (SSAX:read-char-data port expect-eof?
 				       ,my-char-data-handler seed)))
@@ -2130,12 +2130,12 @@
 		  token-head))
        (assert-curr-char SSAX:S-chars "XML [28], space after DOCTYPE" port)
        (SSAX:skip-S port)
-       (let-values* 
-	((docname (SSAX:read-QName port))
-	 (systemid
+       (let*-values
+	(((docname) (SSAX:read-QName port))
+	 ((systemid)
 	  (and (SSAX:ncname-starting-char? (SSAX:skip-S port))
 	       (SSAX:read-external-ID port)))
-	 (internal-subset?
+	 ((internal-subset?)
 	  (begin (SSAX:skip-S port)
 	    (eqv? #\[ (assert-curr-char '(#\> #\[)
 					"XML [28], end-of-DOCTYPE" port))))
@@ -2162,7 +2162,7 @@
 		  (scan-for-significant-prolog-token-1 port seed)))
 	       ((DECL) (handle-decl port (xml-token-head token) seed))
 	       ((START)
-		(let-values*
+		(let*-values
 		 (((elems entities namespaces seed)
 		   (,(get-handler 'UNDECL-ROOT) (xml-token-head token) seed)))
 		 (element-parser (xml-token-head token) port elems

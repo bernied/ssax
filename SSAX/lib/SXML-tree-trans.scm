@@ -265,9 +265,9 @@
 	       ((not (pair? node))	; it's an atom, keep it
 		(loop (cdr forest) keep? (cons node new-forest)))
 	       (else
-		(let-values* 
-		 ((node? (symbol? (car node)))  ; or is it a nodeset?
-		  ((new-kids keep?)		; traverse its children
+		(let*-values
+		 (((node?) (symbol? (car node))) ; or is it a nodeset?
+		  ((new-kids keep?)		 ; traverse its children
 		   (loop (if node? (cdr node) node) #t '())))
 		 (loop (cdr forest) keep?
 		       (cons 
@@ -282,9 +282,9 @@
 	       ((not (pair? node))	; it's an atom, skip it
 		(loop (cdr forest) keep? new-forest))
 	       (else
-		(let-values* 
-		 ((node? (symbol? (car node)))  ; or is it a nodeset?
-		  ((new-kids keep?)		; traverse its children
+		(let*-values
+		 (((node?) (symbol? (car node)))  ; or is it a nodeset?
+		  ((new-kids keep?)		  ; traverse its children
 		   (loop (if node? (cdr node) node) #f '())))
 		 (loop (cdr forest) keep?
 		       (if (or keep? (pair? new-kids))
@@ -294,6 +294,6 @@
 			   new-forest)		; if all kids are skipped
 		       ))))))))			; skip the node too
   
-  (let-values* (((new-forest keep?) (loop forest #t '())))
+  (let*-values (((new-forest keep?) (loop forest #t '())))
      new-forest))
 
