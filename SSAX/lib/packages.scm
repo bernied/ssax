@@ -55,6 +55,9 @@
 	  char-tab
 	  char-newline))
 
+(define-interface lookup-defs-interface
+  (export (lookup-def :syntax)))
+
 ;; The Meat
 
 (define-interface sxml-tree-trans-interface
@@ -165,6 +168,12 @@
     (define char-tab (ascii->char 9))
     (define char-newline (ascii->char 10))))
 
+(define-structure lookup-defs lookup-defs-interface
+  (open scheme
+	coutputs
+	srfi-23) ; ERROR
+  (files lookup-def))
+
 (define-structure oleg-string-ports (export with-output-to-string
 					    call-with-input-string
 					    with-input-from-string)
@@ -228,6 +237,7 @@
 	coutputs
 	assertions
 	crementing
+	lookup-defs
 	sxml-to-html
 	sxml-tree-trans
 	posix-files)
