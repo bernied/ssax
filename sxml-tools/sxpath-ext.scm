@@ -79,6 +79,8 @@
              (else cddr))
            node))))))
 
+(define sxml:S-chars (map ascii->char '(32 10 9 13)))
+
 ; Select SXML element by its unique IDs
 ; XPath Rec. 4.1
 ;  object - a nodeset or a datatype which can be converted to a string by means
@@ -108,7 +110,7 @@
 	       (if (not node)
 		 (reverse res)
 		 (reverse (cons node res))))))
-	  ((member (car lst) '(#\space #\return #\newline #\tab))
+	  ((member (car lst) sxml:S-chars)
 	   (if (null? tmp)
 	     (rpt (cdr lst) tmp res)
 	     (let ((node (sxml:lookup (list->string (reverse tmp)) id-index)))
@@ -341,7 +343,7 @@
                                   (map sxml:string-value obj1)
                                   bool-op)))))
       (else  ; one of the objects is a nodeset, another is not
-       (let-values*
+       (let*-values
         (((nset elem)
           ; Equality operations are commutative
           (if (nodeset? obj1) (values obj1 obj2) (values obj2 obj1))))

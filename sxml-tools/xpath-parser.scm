@@ -80,7 +80,7 @@
 ; of chars
 
 ; A list of whitespace characters
-(define sxml:whitespace '(#\space #\return #\newline #\tab))
+(define sxml:whitespace (map ascii->char '(32 10 9 13)))
 
 ; A sxml:whitespace or () <> [] : / + * , = | ! " ' @ $
 (define sxml:delimiter (append sxml:whitespace

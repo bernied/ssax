@@ -81,12 +81,14 @@
 
 ; optimized (string-rindex name #\:)
 ; returns position of a separator between namespace-id and LocalName
-(define-macro (sxml:find-name-separator len)
-  `(let rpt ((pos (-- ,len))) 
-     (cond
-       ((negative? pos) #f) 	
-       ((char=? #\: (string-ref name pos)) pos)
-       (else (rpt (-- pos))))))
+(define-syntax sxml:find-name-separator
+  (syntax-rules ()
+    ((sxml:find-name-separator name len)
+     (let rpt ((pos (- len 1))) 
+       (cond
+	((negative? pos) #f) 	
+	((char=? #\: (string-ref name pos)) pos)
+	(else (rpt (- pos 1))))))))
   
 
 ; sxml error message
@@ -94,7 +96,7 @@
   (cerr nl "SXML ERROR: ")
   (apply cerr messages)
   (cerr nl)
-  (exit -1))
+  (apply error "SXML ERROR" messages))
 
 ;==============================================================================
 ; Predicates
@@ -196,7 +198,7 @@
   (let* ((name (symbol->string (car obj)))
 	 (len (string-length name)))
     (cond
-      ((sxml:find-name-separator len)
+      ((sxml:find-name-separator name len)
        => (lambda (pos) 
 	    (substring name (+ pos 1) len)))
       (else name))))
@@ -205,7 +207,7 @@
 (define (sxml:name->ns-id sxml-name)
   (let* ((name (symbol->string sxml-name)))
     (cond
-      ((sxml:find-name-separator (string-length name))
+      ((sxml:find-name-separator name (string-length name))
        => (lambda (pos) 
 	    (substring name  0 pos)))
       (else #f))))

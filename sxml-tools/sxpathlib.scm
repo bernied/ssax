@@ -208,7 +208,7 @@
      ((negative? n) ((node-pos (+ n 1 (length nodelist))) nodelist))
      (else
       (assert (positive? n))
-      ((node-pos (-- n)) (cdr nodelist))))))
+      ((node-pos (- n 1)) (cdr nodelist))))))
 
 ; filter:: Converter -> Converter
 ; A filter applicator, which introduces a filtering context. The argument
