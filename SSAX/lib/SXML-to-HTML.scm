@@ -49,6 +49,7 @@
 ;
 ; $Id$
 
+; procedure: SXML->HTML TREE
 
 ; The following procedure is the most generic transformation of SXML
 ; into the corresponding HTML document. The SXML tree is traversed
@@ -79,8 +80,10 @@
  
      )))
 
-; The following two functions create the HTML markup for tags and attributes.
-; They are being used in the node handlers for the post-order function, see
+
+; procedure: entag TAG ELEMS
+; Create the HTML markup for tags.
+; This is used in the node handlers for the post-order function, see
 ; above.
 
 (define (entag tag elems)
@@ -90,12 +93,18 @@
 	(list (cdr elems) "</" tag #\>)))
     (list #\newline #\< tag #\> (and (pair? elems) (list elems "</" tag #\>))
       )))
+
+; procedure: enattr ATTR-KEY VALUE
+; Create the HTML markup for attributes.
+; This and entag are being used in the node handlers for the post-order function, see
+; above.
  
 (define (enattr attr-key value)
   (if (null? value) (list #\space attr-key)
     (list #\space attr-key "=\"" value #\")))
 
 
+; procedure: string->goodHTML STRING
 ; Given a string, check to make sure it does not contain characters
 ; such as '<' or '&' that require encoding. Return either the original
 ; string, or a list of string fragments with special characters

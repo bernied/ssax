@@ -15,6 +15,8 @@
 ; $Id$
 
 
+; procedure: SRV:send-reply FRAGMENT ...
+;
 ; Output the 'fragments'
 ; The fragments are a list of strings, characters,
 ; numbers, thunks, #f, #t -- and other fragments.
@@ -44,7 +46,8 @@
 
 
 
-;------------------------------------------------------------------------
+; procedure: pre-post-order TREE BINDINGS
+;
 ;	          Traversal of an SXML tree or a grove:
 ;			a <Node> or a <Nodelist>
 ;
@@ -128,6 +131,7 @@
 		  (pre-post-order (cdr tree) (append (cadr binding) bindings)))
 		))))))))
 
+; procedure: post-order TREE BINDINGS
 ; post-order is a strict subset of pre-post-order without *preorder*
 ; (let alone *macro*) traversals. 
 ; Now pre-post-order is actually faster than the old post-order.
@@ -160,7 +164,7 @@
 	  (loop (foldts fdown fup fhere kid-seed (car kids))
 		(cdr kids)))))))
 
-;------------------------------------------------------------------------
+; procedure: replace-range:: BEG-PRED x END-PRED x FOREST -> FOREST
 ; Traverse a forest depth-first and cut/replace ranges of nodes.
 ;
 ; The nodes that define a range don't have to have the same immediate

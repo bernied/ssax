@@ -20,13 +20,15 @@
 ; IMPORT
 ; This package relies on a function parser-error, which must be defined
 ; by a user of the package. The function has the following signature:
-;	parser-error PORT MESSAGE SPECIALISING-MSG*
+; procedure: parser-error PORT MESSAGE SPECIALISING-MSG*
 ; Many procedures of this package call parser-error to report a parsing
 ; error.  The first argument is a port, which typically points to the
 ; offending character or its neighborhood. Most of the Scheme systems
 ; let the user query a PORT for the current position. MESSAGE is the
 ; description of the error. Other arguments supply more details about
 ; the problem.
+
+ ;
 ; myenv.scm, myenv-bigloo.scm or a similar prelude is assumed.
 ; From SRFI-13, string-concatenate-reverse
 ; If a particular implementation lacks SRFI-13 support, please

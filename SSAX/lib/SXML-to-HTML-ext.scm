@@ -34,7 +34,7 @@
        (if (signif? (car lst)) lst
 	   (signif-tail (cdr lst)))))
 
-; Procedure make-header HEAD-PARMS
+; procedure: make-header HEAD-PARMS
 ; Create the 'head' SXML/HTML tag. HEAD-PARMS is an assoc list of
 ; (h-key h-value), where h-value is a typically string;
 ; h-key is a symbol:
@@ -70,6 +70,7 @@
 	    '(start contents prev next)))))
 )
 
+; procedure: make-navbar: HEAD-PARMS
 ; Create a navigational bar. The argument head-parms is the same
 ; as the one passed to make-header. We're only concerned with the
 ; h-value Links
@@ -94,6 +95,7 @@
 ))
 			      
 
+; procedure: make-footer HEAD-PARMS
 ; Create a footer. The argument head-parms is the same
 ; as passed to make-header.
 (define (make-footer head-parms)
@@ -127,6 +129,7 @@
        (and rcs-id `(h4 ,rcs-id)))
     ))
 
+; value: universal-conversion-rules
 ; Bindings for the post-order function, which traverses the SXML tree
 ; and converts it to a tree of fragments
 
@@ -144,6 +147,7 @@
      . ,(lambda (tag . elems)
 	  (cons "&nbsp;" elems)))))
 
+; value: universal-protected-rules
 ; A variation of universal-conversion-rules which keeps '<', '>', '&'
 ; and similar characters intact. The universal-protected-rules are
 ; useful when the tree of fragments has to be traversed one more time.
@@ -159,6 +163,7 @@
      . ,(lambda (tag . elems)
 	  (cons "&nbsp;" elems)))))
 
+; value: alist-conv-rules
 ; The following rules define the identity transformation
 (define alist-conv-rules
   `((*default* . ,(lambda (tag . elems) (cons tag elems)))

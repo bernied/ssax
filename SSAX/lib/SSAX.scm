@@ -448,9 +448,9 @@
 ; In Gambit, you can use the following declaration:
 ; (define-structure xml-token kind head)
 ; The following declaration is "standard" as it follows SRFI-9:
-;;(define-record-type  xml-token  (make-xml-token kind head)  xml-token?
-;;  (kind  xml-token-kind)
-;;  (head  xml-token-head) )
+; (define-record-type  xml-token  (make-xml-token kind head)  xml-token?
+;   (kind  xml-token-kind)
+;   (head  xml-token-head) )
 ; No field mutators are declared as SSAX is a pure functional parser
 ;
 ; But to make the code more portable, we define xml-token simply as
@@ -458,10 +458,15 @@
 ; can be defined as simple procedures. However, they are declared as
 ; macros below for efficiency.
 
+; procedure: make-xml-token KIND HEAD
+; This creates an XML token.
 (define (make-xml-token kind head) (cons kind head))
+; procedure: xml-token? THING
 (define xml-token? pair?)
+; syntax: xml-token-kind XML-TOKEN
 (define-syntax xml-token-kind 
   (syntax-rules () ((xml-token-kind token) (car token))))
+; syntax: xml-token-head XML-TOKEN
 (define-syntax xml-token-head 
   (syntax-rules () ((xml-token-head token) (cdr token))))
 
@@ -788,7 +793,7 @@
 
 
 
-; procedure:	ssax:read-markup-token PORT
+; procedure: ssax:read-markup-token PORT
 ; This procedure starts parsing of a markup token. The current position
 ; in the stream must be #\<. This procedure scans enough of the input stream
 ; to figure out what kind of a markup token it is seeing. The procedure returns
@@ -859,6 +864,7 @@
     (parser-error port "Failed to find ?> terminating the PI")))
 
 
+; procedure: ssax:read-pi-body-as-string PORT
 ; The current position is right after reading the PITarget. We read the
 ; body of PI and return is as a string. The port will point to the
 ; character right after '?>' combination that terminates PI.
@@ -891,6 +897,7 @@
 
 ;(define (ssax:read-pi-body-as-name-values port)
 
+; procedure: ssax:skip-internal-dtd PORT
 ; The current pos in the port is inside an internal DTD subset
 ; (e.g., after reading #\[ that begins an internal DTD subset)
 ; Skip until the "]>" combination that terminates this DTD
@@ -900,7 +907,7 @@
 		  "Failed to find ]> terminating the internal DTD subset")))
 
 
-; procedure+: 	ssax:read-cdata-body PORT STR-HANDLER SEED
+; procedure+: ssax:read-cdata-body PORT STR-HANDLER SEED
 ;
 ; This procedure must be called after we have read a string "<![CDATA["
 ; that begins a CDATA section. The current position must be the first
@@ -996,7 +1003,7 @@
 ))
 
             
-; procedure+:	ssax:read-char-ref PORT
+; procedure+: ssax:read-char-ref PORT
 ;
 ; [66]  CharRef ::=  '&#' [0-9]+ ';' 
 ;                  | '&#x' [0-9a-fA-F]+ ';'
@@ -1029,7 +1036,7 @@
       (parser-error port "[wf-Legalchar] broken for '" name "'"))))
 
 
-; procedure+:	ssax:handle-parsed-entity PORT NAME ENTITIES 
+; procedure+: ssax:handle-parsed-entity PORT NAME ENTITIES 
 ;		CONTENT-HANDLER STR-HANDLER SEED
 ;
 ; Expand and handle a parsed-entity reference
@@ -1079,12 +1086,14 @@
 
 
 
+; procedure: make-empty-attlist
 ; The ATTLIST Abstract Data Type
 ; Currently is implemented as an assoc list sorted in the ascending
 ; order of NAMES.
 
 (define (make-empty-attlist) '())
 
+; procedure: attlist-add ATTLIST NAME-VALUE-PAIR
 ; Add a name-value pair to the existing attlist preserving the order
 ; Return the new list, in the sorted ascending order.
 ; Return #f if a pair with the same name already exists in the attlist
@@ -1097,13 +1106,17 @@
 	(else (cons (car attlist) (attlist-add (cdr attlist) name-value)))
 	)))
 
+; procedure: attlist-null? ATTLIST
 (define attlist-null? null?)
 
+; procedure: attlist-remove-top ATTLIST
 ; Given an non-null attlist, return a pair of values: the top and the rest
 (define (attlist-remove-top attlist)
   (values (car attlist) (cdr attlist)))
 
+; procedure: attliast->alist
 (define (attlist->alist attlist) attlist)
+; procedure: attlist-fold
 (define attlist-fold fold)
 
 ; procedure+:	ssax:read-attributes PORT ENTITIES
@@ -1335,12 +1348,12 @@
 ))
 
 
-; procedure+:	ssax:uri-string->symbol URI-STR
+; procedure+: ssax:uri-string->symbol URI-STR
 ; Convert a URI-STR to an appropriate symbol
 (define (ssax:uri-string->symbol uri-str)
   (string->symbol uri-str))
 
-; procedure+:	ssax:complete-start-tag TAG PORT ELEMS ENTITIES NAMESPACES
+; procedure+: ssax:complete-start-tag TAG PORT ELEMS ENTITIES NAMESPACES
 ;
 ; This procedure is to complete parsing of a start-tag markup. The
 ; procedure must be called after the start tag token has been
@@ -1690,7 +1703,7 @@
 	     "B:HREF='b' xmlns:B='urn:b'>")))
 ))
 
-; procedure+:	ssax:read-external-id PORT
+; procedure+: ssax:read-external-id PORT
 ;
 ; This procedure parses an ExternalID production:
 ; [75] ExternalID ::= 'SYSTEM' S SystemLiteral
@@ -1766,7 +1779,7 @@
 		     (xml-token-kind token)
 		     ))))))))
 
-; procedure+:	ssax:read-char-data PORT EXPECT-EOF? STR-HANDLER SEED
+; procedure+: ssax:read-char-data PORT EXPECT-EOF? STR-HANDLER SEED
 ;
 ; This procedure is to read the character content of an XML document
 ; or an XML element.
@@ -1951,7 +1964,7 @@
 
 
 
-; procedure+:	ssax:assert-token TOKEN KIND GI
+; procedure+: ssax:assert-token TOKEN KIND GI
 ; Make sure that TOKEN is of anticipated KIND and has anticipated GI
 ; Note GI argument may actually be a pair of two symbols, Namespace
 ; URI or the prefix, and of the localname.
@@ -2728,7 +2741,7 @@
 
 ; First, a few utility procedures that turned out useful
 
-;     ssax:reverse-collect-str LIST-OF-FRAGS -> LIST-OF-FRAGS
+; procedure: ssax:reverse-collect-str LIST-OF-FRAGS -> LIST-OF-FRAGS
 ; given the list of fragments (some of which are text strings)
 ; reverse the list and concatenate adjacent text strings.
 ; We can prove from the general case below that if LIST-OF-FRAGS
