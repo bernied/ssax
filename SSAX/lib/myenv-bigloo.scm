@@ -183,19 +183,18 @@
 ; Often-used OS-specific function
 (define OS:file-length file-size)
 
-; Support for let-values* form
+; Support for let*-values form: SRFI-11
+; We rely on a 'receive' form in the general case. In Bigloo,
+; receive can handle both proper and improper 'arglists'
 
-; Like let* but allowing for multiple-value bindings
-(define-macro (let-values* bindings . body)
+(define-macro (let*-values bindings . body)
   (if (null? bindings) (cons 'begin body)
       (apply (lambda (vars initializer)
 	 (let ((cont 
-		(cons 'let-values* 
+		(cons 'let*-values
 		      (cons (cdr bindings) body))))
 	   (cond
-	    ((not (pair? vars))		; regular let case, a single var
-	     `(let ((,vars ,initializer)) ,cont))
-	    ((null? (cdr vars))		; single var, see the prev case
+	    ((and (pair? vars) (null? (cdr vars))) ; a single var optimization
 	     `(let ((,(car vars) ,initializer)) ,cont))
 	   (else			; the most generic case
 	    `(receive ,vars ,initializer ,cont)))))

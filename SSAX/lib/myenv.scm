@@ -45,7 +45,7 @@
       (cond
        ((not (pair? expr)) vars)	; not an application -- ignore
        ((memq (car expr) 
-	      '(quote let let* letrec let-values* lambda cond quasiquote
+	      '(quote let let* letrec let*-values lambda cond quasiquote
 		      case define do assert))
 	vars)				; won't go there
        (else				; ignore the head of the application
@@ -165,38 +165,37 @@
 
 
 
-; Support for multiple-values and let-values* form
+; Support for multiple-values and let*-values form (SRFI-11)
 ; Multiple values are not present natively in Gambit.
 ; What follows is an _approximation_: it is not very good in case
 ; of continuations captured while evaluating an argument expression of
-; values. Note that the only meaningful way to use 'values' procedure is
-; in conjunction with call-with-values or let-values*
+; values. Note that the only meaningful way to use this 'values'
+; procedure is in conjunction with call-with-values or let*-values
 
 (define values list)
 
 (define (call-with-values producer consumer)
   (apply consumer (producer)))
 
-; Like let* but allowing for multiple-value bindings
-(define-macro (let-values* bindings . body)
+; Like let* but allowing for multiple-value bindings: SRFI-11
+(define-macro (let*-values bindings . body)
   (if (null? bindings) (cons 'begin body)
-      (apply (lambda (vars initializer)
-	 (let ((cont 
-		(cons 'let-values* 
-		      (cons (cdr bindings) body))))
-	   (cond
-	    ((not (pair? vars))		; regular let case, a single var
-	     `(let ((,vars ,initializer)) ,cont))
-	    ((null? (cdr vars))		; single var, see the prev case
-	     `(let ((,(car vars) ,initializer)) ,cont))
-	    ((null? (cddr vars))	; two variables
-	     (let ((val (gensym)))
-	       `(let* ((,val ,initializer)
-		       (,(car vars) (car ,val))
-		       (,(cadr vars) (cadr ,val))) ,cont)))
-	   (else			; the most generic case
-	    `(apply (lambda ,vars ,cont) ,initializer)))))
-       (car bindings))))
+      (let
+	  ((vars (caar bindings))
+	   (binding-rest (cdar bindings))
+	   (cont 
+	    (cons 'let*-values 
+		  (cons (cdr bindings) body))))
+	(cond				; single var, treat like let*
+	 ((and (pair? vars) (null? (cdr vars))) 
+	  `(let ((,(car vars) . ,binding-rest)) ,cont))
+	 ((and (pair? vars) (null? (cddr vars)))	; two variables
+	  (let ((val (gensym)))
+	    `(let* ((,val . ,binding-rest)
+		    (,(car vars) (car ,val))
+		    (,(cadr vars) (cadr ,val))) ,cont)))
+	 (else			; the most generic case
+	  `(apply (lambda ,vars ,cont) . ,binding-rest))))))
 
 
 
