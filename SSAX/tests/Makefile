@@ -11,6 +11,7 @@
 #       biglooi		Bigloo interpreter
 #       biglooc		Bigloo compiler
 #       scmi		SCM interpreter
+#       petite		Petite Chez interpreter
 # 
 # and <target> is one of the following:
 #       vmyenv
@@ -76,6 +77,10 @@ make-scmi= scm -b -r5 -l $(LIBDIR)/myenv-scm.scm \
 	   $(foreach file,$(1),-l $(LIBDIR)/$(file)) \
 	   -l $(2).scm
 
+make-petite= echo "(exit 101)" | petite $(LIBDIR)/myenv-chez.scm \
+	   $(foreach file,$(1), $(LIBDIR)/$(file)) \
+	   $(2).scm; test $$? -eq "101"
+
 #------------------------------------------------------------------------
 
 gambi-targets=vmyenv vsrfi-13 vinput-parse vsrfi-12  \
@@ -90,6 +95,9 @@ biglooc-targets=vmyenv vsrfi-13 vinput-parse vsrfi-12  \
 
 scmi-targets=vmyenv vsrfi-13 vinput-parse  \
 	      vSXML-tree-trans vSXML-to-HTML vSSAX  #vext-io vipc
+
+petite-targets=vmyenv vsrfi-13 vinput-parse  \
+	      vSXML-tree-trans vSXML-to-HTML #vSSAX  #vext-io vipc
 
 all: $($(PLATFORM)-targets)
 .PHONY: $($(PLATFORM)-targets)
@@ -155,6 +163,7 @@ vland:
 
 vext-io:
 	$(call make-$(PLATFORM),\
+	       catch-error.scm,\
 	       ,\
 	       $@)
 
