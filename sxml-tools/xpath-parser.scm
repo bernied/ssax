@@ -104,6 +104,18 @@
     path
     (sxml:skip-ws (cdr path))))
 
+; Asserts that the path is over, possibly with trailing whitespace symbols at
+; the end. Returns the boolean value - whether assertion passes. If assertion
+; fails, signals an error message
+(define (sxml:assert-end-of-path path)
+  (let ((path (sxml:skip-ws path)))
+    (or 
+     (null? path)
+     (begin
+       (sxml:xpointer-parse-error "unexpected - \"" (list->string path) "\"")
+       #f))))
+
+
 ;------------------------------------------------
 ; These two functions read expected information from the path
 
@@ -353,11 +365,14 @@
 ; The function returns an associative list:
 ; (list  (list  'xpath     xpath-implementation-res)
 ;        (list  'xpointer  xpointer-implementation-res)
+;        (list  'expr      xpath-expression-implementation-res))
 ; xpath-implementation-res - XPath implementation produced, as was conducted
 ;  by 'txp-params'
 ; xpointer-implementation-res - XPointer implementation produced (for XPointer
 ;  grammar from W3C Candidate Recommendation 11 September 2001), as was
 ;  conducted by 'txp-params'
+; xpath-expression-implementation-res - implementation for XPath Expr grammar
+;  production
 ;
 ; NOTE: Future versions of this function may include additional members to the
 ; associative list which is returned as the result
@@ -1491,17 +1506,12 @@
        ;  path is a string here
        (txp:parse-xpath
         (lambda (path-string ns-binding add-on)
-          (and-let*
-           ((res (txp:parse-location-path
-                  (string->list path-string) ns-binding add-on))
-            (path (sxml:skip-ws (cadr res))))
-           (if
-            (not (null? path))
-            (begin
-              (sxml:xpointer-parse-error
-               "unexpected - \"" (list->string path) "\"")
-              'txp:parser-error)
-            (car res)))))
+          (let ((res (txp:parse-location-path
+                      (string->list path-string) ns-binding add-on)))
+            (if (and res  ; no parser errors
+                     (sxml:assert-end-of-path (cadr res)))
+                (car res)
+                'txp:parser-error))))
        
        ; Parses an XPointer production ([1] in XPointer specification)
        ; [1]    XPointer    ::=    Name | ChildSeq | FullXPtr 
@@ -1517,8 +1527,20 @@
                      (txp:parse-full-xptr path ns-binding add-on)
                      (txp:parse-child-seq path ns-binding add-on)))))))
        
+       ; Parses XPath Expression
+       ; [14]    Expr    ::=    OrExpr
+       (txp:parse-xpath-expression
+        (lambda (path-string ns-binding add-on)
+          (let ((res (txp:parse-expr
+                      (string->list path-string) ns-binding add-on)))
+            (if (and res  ; no parser errors
+                     (sxml:assert-end-of-path (cadr res)))
+                (car res)
+                'txp:parser-error))))
+       
        )
         
     `((xpath ,txp:parse-xpath)
-      (xpointer ,txp:parse-xpointer))
+      (xpointer ,txp:parse-xpointer)
+      (expr ,txp:parse-xpath-expression))
     ))

@@ -28,17 +28,7 @@
 
 (define txp:ast-params
   `(
-    ; For XPath axes, the result is returned in the form of the pair
-    ; (cons  (lambda ...)  root-node-required)  
-    ;  (lambda ...) - one of the axis functions
-    ;  root-node-required - a boolean value
-    ; If root-node-required = #t, lambda's signature is
-    ;  (lambda (test-pred?)
-    ;   (lambda (root-node)
-    ;    (lambda (nodeset) ... )))
-    ; otherwise
-    ;  (lambda (test-pred?)
-    ;   (lambda (nodeset) ... ))
+    ; Axes
     (axis
      ((ancestor
        ,(lambda (add-on) 'ancestor))
@@ -67,49 +57,40 @@
       (self
        ,(lambda (add-on) 'self))))
         
+    ; Node test
     (node-test
      ((star
-       ,(lambda (add-on) '(*)))
+       ,(lambda (add-on) '((*))))
       (uri+star
        ,(lambda (uri add-on)
-          `((namespace-uri ,uri) (local-name *))))
+          `((namespace-uri ,uri))))
       (qname
        ,(lambda (uri local-name add-on)
           (if (not uri)
               `((local-name ,local-name))
               `((namespace-uri ,uri) (local-name ,local-name)))))      
       (comment
-       ,(lambda (add-on) '(comment)))
+       ,(lambda (add-on) '((comment))))
       (text
-       ,(lambda (add-on) '(text)))
+       ,(lambda (add-on) '((text))))
       (processing-instruction
        ,(lambda (literal-string add-on)
           (if (not literal-string)  ; no literal provided
-              '(pi)
-              `((pi ,literal-string)))))              
+              '((pi))
+              `((pi ,literal-string)))))
       (node
-       ,(lambda (add-on) '(node)))
+       ,(lambda (add-on) '((node))))
       (point
-       ,(lambda (add-on) '(point)))
+       ,(lambda (add-on) '((point))))
       (range
-       ,(lambda (add-on) '(range)))))
-    
-    ;-------------
-    ; The remaining parameter values return the following
-    ; (lambda (nodeset root-node context var-binding) - an SXPath-like
-    ; function (it transforms a nodeset into a new nodeset)
-    ;  nodeset - a current set of nodes
-    ;  root-node - the root of a document (a singleton nodeset)
-    ;  context - the context of the node; list of two elements - (position size)
-    ;  position - context position (a number)
-    ;  size - context size (a number)
-    
-    ; Parse step implementation
+       ,(lambda (add-on) '((range))))))
+            
+    ; Location step
     (step
      ((common
        ,(lambda (axis-res node-test-res predicate-res-lst add-on)
           `(step
-            (axis-specifier ,axis-res)
+            (axis-specifier (,axis-res))
             (node-test ,@node-test-res)
             ,@predicate-res-lst)))
       (range-to
@@ -118,12 +99,12 @@
             (expr ,expr-res)
             ,@predicate-res-lst)))))
     
-    ; Relative location path implementation
+    ; Relative location path
     (relative-lpath
      ,(lambda (step-res-lst add-on)
         (cons 'relative-location-path step-res-lst)))
     
-    ; Location path implementation
+    ; Location path
     (location-path
      ((bare-slash
        ,(lambda (add-on) '(absolute-location-path)))
@@ -134,21 +115,21 @@
        ,(lambda (relative-lpath-res add-on)
           `(absolute-location-path
             (step
-             (axis-specifier descendant-or-self)
-             (node-test node))
+             (axis-specifier (descendant-or-self))
+             (node-test (node)))
             ,@(cdr relative-lpath-res))))))
     
-    ; Predicate implementation    
+    ; Predicate
     (predicate
      ,(lambda (expr-res add-on)
         (list 'predicate expr-res)))
     
-    ; Variable reference implementation
+    ; Variable reference
     (variable-ref
      ,(lambda (var-name-string add-on)
-        `(variable-reference ,(string->symbol var-name-string))))        
+        `(variable-reference ,var-name-string)))
     
-    ; Function call implementation
+    ; Function call
     (function-call
      ,(lambda (fun-name-string arg-res-lst add-on)
         `(function-call
@@ -171,24 +152,27 @@
      ,(lambda (primary-expr-res predicate-res-lst add-on)
         `(filter-expr
           (primary-expr ,primary-expr-res)
-          ,@predicate-expr-lst)))        
+          ,@predicate-res-lst)))
     
     ; Path expression
     (path-expr
      ((slash
        ,(lambda (filter-expr-res relative-lpath-res add-on)
           `(path-expr
-            ,filter-expr-res
-            ,relative-lpath-res)))          
+            ,(if (eq? (car filter-expr-res) 'filter-expr)
+                 filter-expr-res
+                 `(filter-expr (primary-expr ,filter-expr-res)))
+            ,@(cdr relative-lpath-res))))
       (double-slash
        ,(lambda (filter-expr-res relative-lpath-res add-on)
           `(path-expr
-            ,filter-expr-res
-            (relative-location-path
-             (step
-              (axis-specifier descendant-or-self)
-              (node-test node))
-             ,@(cdr relative-lpath-res)))))))          
+            ,(if (eq? (car filter-expr-res) 'filter-expr)
+                 filter-expr-res
+                 `(filter-expr (primary-expr ,filter-expr-res)))
+            (step
+             (axis-specifier (descendant-or-self))
+             (node-test (node)))
+            ,@(cdr relative-lpath-res))))))
     
     ; Union expression
     (union-expr
@@ -208,6 +192,7 @@
      ((* ,(lambda (add-on) '*))
       (div ,(lambda (add-on) 'div))
       (mod ,(lambda (add-on) 'mod))
+      
       (+ ,(lambda (add-on) '+))
       (- ,(lambda (add-on) '-))
       (< ,(lambda (add-on) '<))
@@ -240,10 +225,7 @@
     ; Full XPointer
     (full-xptr
      ,(lambda (expr-res-lst add-on)
-        (cons 'full-xptr
-              (map
-               (lambda (expr-res) (list 'xptr-part expr-res))
-               expr-res-lst))))
+        (cons 'full-xptr expr-res-lst)))
     
     ; XPointer child sequence
     (child-seq
@@ -294,3 +276,5 @@
   (txp:ast-api-helper (cadr (assq 'xpath txp:ast-res))))
 (define txp:xpointer->ast
   (txp:ast-api-helper (cadr (assq 'xpointer txp:ast-res))))
+(define txp:expr->ast
+  (txp:ast-api-helper (cadr (assq 'expr txp:ast-res))))
