@@ -7,7 +7,7 @@
     (title "SXML")
     (description "Definition of SXML: an instance of XML Infoset as
 S-expressions, an Abstract Syntax Tree of an XML document.")
-    (Date-Revision-yyyymmdd "20040205")
+    (Date-Revision-yyyymmdd "20040219")
     (Date-Creation-yyyymmdd "20010207")
     (keywords "XML, XML parsing, XML Infoset, XML Namespaces, AST, SXML, Scheme")
     (AuthorAddress "oleg-at-pobox.com")
@@ -36,8 +36,6 @@ compact library of combinators for querying and transforming SXML."
 
    (TOC)
 
-; introduce { <a> <b> <c>}
-; where <a> is at the head but the order of <b> and <c> may vary
 
    (Section 2 "Introduction")
    (p
@@ -117,9 +115,15 @@ Recommendation " (cite "XML") ". The following table summarizes the notation.")
     (dt (term-lit "thing"))
     (dd "A literal Scheme symbol")
 
-    (dt (sexp (nonterm "A") (ebnf-* (nonterm "B"))))
+    (dt (sexp (nonterm "A") (ebnf-* (nonterm "B")) (ebnf-opt (nonterm "C"))))
     (dd "An S-expression made of " (nonterm "A")
-	" followed by zero or more " (nonterm "B"))
+	" followed by zero or more " (nonterm "B")
+      " and, afterwards, optionally by " (nonterm "C"))
+
+    (dt (sset (term-lit "A") (ebnf-* (nonterm "B"))))
+    (dd "A tagged set: an S-expression made of " (term-lit "A")
+	" followed by zero or more instances of " (nonterm "B")
+        " in any order")
 
     (dt (sexp-cons (nonterm "A") (nonterm "B")))
     (dd "An S-expression that is made by prepending " (nonterm "A")
@@ -160,15 +164,17 @@ the root element of the XML document.")
 	(ebnf-* (nonterm "child-of-element")))))
     (production 3
       (nonterm "annot-attributes")
-      ((sexp
+      ((sset
 	(term-lit "@")
 	(ebnf-* (nonterm "attribute"))
 	(ebnf-opt (nonterm "annotations")))))
     (production 4
       (nonterm "attribute")
       ((sexp (nonterm "name")
-	     (ebnf-opt (term-str "value")) ; make several values?
-	     (ebnf-opt (nonterm "annotations"))))) ; make sublist first?
+	     (ebnf-opt (term-str "value")) ; make several values? No!
+	     (ebnf-opt (nonterm "annotations"))))) ; make sublist first? NO!
+                                             ; see communication with Kirill,
+					     ; Feb 2004.
     (production 5
       (nonterm "child-of-element")
       ((ebnf-choice 
@@ -234,7 +240,7 @@ document.")
 	(sexp-symb (term-str "URI")) (term-id "user-ns-shortcut"))))
     (production 13
       (nonterm "namespaces")
-      ((sexp
+      ((sset
 	(term-lit "*NAMESPACES*")
 	(ebnf-* (nonterm "namespace-assoc")))))
     (production 14
@@ -264,15 +270,15 @@ may be retained as an optional member " (term-lit
 association. A " (term-id "user-ns-shortcut") " is a Scheme
 symbol chosen by an application programmer to represent a namespace
 URI in the application program. The SSAX parser lets the programmer
-define (short and mnemonic) unique shortcuts for Namespace URIs,
-which are are often long and unwieldy strings.")
+define (short and mnemonic) unique shortcuts for often long and unwieldy
+Namespace URIs.")
 
    (Section 2 "Annotations")
 
    (productions
     (production 15
       (nonterm "annotations")
-      ((sexp
+      ((sset
 	(term-lit "@")
 	(ebnf-opt (nonterm "namespaces"))
 	(ebnf-* (nonterm "annotation")))))
@@ -283,7 +289,7 @@ which are are often long and unwieldy strings.")
     )
 
    (p "The XML Recommendation and related standards are not firmly
-fixed, as the long list of errata and the proposed version 1.1 of XML
+fixed, as the long list of errata and version 1.1 of XML
 clearly show. Therefore, SXML has to be able to accommodate future
 changes while guaranteeing backwards compatibility. SXML also ought to
 permit applications to store various processing information (e.g.,
@@ -321,13 +327,13 @@ distinguishes auxiliary attributes by their prefix
       "XML attributes are treated as a dust bin. For example, the XSLT
 Recommendation allows extra attributes in " (code
 "xslt:template") ", provided these attributes are in a non-XSLT
-namespace. A user may therefore may annotate an XSLT template with his
+namespace. A user may therefore annotate an XSLT template with his
 own attributes, which will be silently disregarded by an XSLT
 processor because the processor never looks for them. RELAX/NG
 explicitly lets a schema author specify that an element may have more
 attributes than given in the schema, provided those attributes come
 from a particular namespace. The presence of these extra attributes
-should not affect XML processing applications that do not specifically
+should not affect the XML processing applications that do not specifically
 look for them. Annotations such as parent pointers and the source
 location information are similarly targeted at specific
 applications. The other applications should not be affected by the
@@ -598,8 +604,8 @@ happen that one namespace URI is associated in the source XML document
 with several namespace prefixes. There will be then several
 corresponding " (nonterm "namespace-assoc") " differing only in
 the " (term-lit "original-prefix") " part.")
-   (p "The topic of namespaces in SXML and (S)XPath is discussed in
-more detail in " (cite "SXML-NS") ".")
+   (p "The topic of namespaces in (S)XML and (S)XPath is thoroughly
+discussed in " (cite "Lisovsky-NS") " and " (cite "SXML-NS") ".")
 
 
 ;--------------------------------------------------
@@ -659,20 +665,21 @@ form N is also in normal form M for any M<N. The higher normal forms
 impose more constraints on the structure of SXML expressions but in
 return permit faster access.")
 
-; several attrib lists?
+; several attrib lists in 0NF?
+
    (p
-    "The most permissive 0NF does not mandate the presence or the
-relative order of " (nonterm "annot-attributes") " and " (nonterm
-"annotations") ". The attribute list, if present, may be inter-mixed
-with " (nonterm "child-of-element") ". SGML provides two equal forms
-for boolean attributes: minimized, e.g., " (code "<OPTION checked>") "
-and full, " (code "<OPTION checked=\"checked\">") ". XML mandates the
-full form only, whereas HTML allows both, favoring the former. 0NF
-SXML supports the minimized form along with the full one: " (code
-"(OPTION (@ (checked)))") " and " (code "(OPTION (@ (checked
+    "The most permissive 0NF may be considered a relaxation of the
+SXML grammar. The form does not mandate the relative order of " (nonterm
+"annot-attributes") ". The attribute list, if present, may be
+inter-mixed with " (nonterm "child-of-element") ". SGML provides two
+equal forms for boolean attributes: minimized, e.g., " (code "<OPTION
+checked>") " and full, " (code "<OPTION checked=\"checked\">") ". XML
+mandates the full form only, whereas HTML allows both, favoring the
+former. 0NF SXML supports the minimized form along with the full one:
+" (code "(OPTION (@ (checked)))") " and " (code "(OPTION (@ (checked
 \"checked\")))") ".")
 
-; should annotations appear at the beginning of the annot-attributes?
+; should annotations appear at the beginning of the annot-attributes? NO
     (p "In the 1NF, optional " (nonterm "annot-attributes") " if
 present must precede all other components of an " (nonterm "Element")
 " SXML node. This is the order reflected in Production [2].  Boolean
@@ -687,19 +694,8 @@ component of an SXML element node. If an element has no attributes nor annotatio
 " nodes must be absent. Parsed entities should be expanded, even if
 they are external.")
 
-; annotations mandatory in 3NF? Their position?
-; If annotations mandatory, should each attribute be annotated too?
    (p
-    "The third normal form 3NF makes " (nonterm "annotations") "
-mandatory as well. "
-
-; This list is always the third member of an SXML
-; element node, after " (nonterm "name") 
-; " and " (nonterm "attr-aux-list") ". If an node has
-; no annotations, the " (nonterm "aux-list") " must
-; be specified as " (code "(@)") ". " 
-
-"In addition, all text strings must be
+    "In the third normal form 3NF all text strings must be
 joined into maximal text strings: no " (nonterm "Nodelist") " shall
 contain two adjacent text-string nodes.")
 
@@ -712,8 +708,8 @@ contain two adjacent text-string nodes.")
     "The normal forms make it possible to access SXML items in
 efficient ways. If an SXML document is known to be in the 3NF, for
 example, an application never has to check for the existence of
- " (nonterm "annot-attributes") " or " (nonterm "annotations")
-". Checking for child nodes and retrieving text data are simplified as well.")
+ " (nonterm "annot-attributes") ". Checking for child nodes and
+retrieving text data are simplified as well.")
 
 
 ;--------------------------------------------------
@@ -888,13 +884,16 @@ XPath. September 17, 2000."
 
     (bibitem "Lisovsky" "Scheme-case-sensitivity"
        "Kirill Lisovsky. Case sensitivity of Scheme systems."
-       (URL "http://pair.com/lisovsky/scheme/case-sensitivity.html"))
+       (URL "http://pair.com/lisovsky/scheme/casesens/index.html"))
+
+    (bibitem "Lisovsky-NS" "Lisovsky-NS"
+      "Kirill Lisovsky. Namespaces in XML and SXML. "
+      (URL "http://pair.com/lisovsky/xml/ns/"))
 
     (bibitem "SXML-NS" "SXML-NS"
        "Namespaces in SXML and (S)XPath. Discussion thread on the SSAX-SXML mailing list. May 28, 2002 and June 7, 2002."
       (URL "http://sourceforge.net/mailarchive/forum.php?thread_id=759249&forum_id=599")
       (URL "http://sourceforge.net/mailarchive/forum.php?thread_id=789156&forum_id=599"))
-
 
     (bibitem "Annotations" "Annotations"
       "An alternative syntax for aux-list. "
@@ -934,11 +933,16 @@ Version 1.0. W3C Recommendation. November 16, 1999."
 " (nonterm "attribute-list") " is now " (nonterm "annot-attributes")
 ".")
   (p
-    "Jim Bender suggested to permit annotations in " (nonterm "PI") "
-nodes, for example, to record the location of the processing
-instruction in the document source.")
+    "Jim Bender suggested annotations in " (nonterm "PI") " nodes, for
+example, to record the location of the processing instruction in the
+document source.")
   (p "We have added a detailed discussion of annotations on a single
 attribute, and of " (nonterm "TOP") " annotations.")
+
+  (p "We have introduced the notation for a tagged set "
+    (sset (term-lit "a") (nonterm "B") (nonterm "C")) 
+    " to precisely specify the syntax of " (nonterm
+"annot-attributes") " and " (nonterm "annotations") ".")
 
   (p
     "Previously SXML defined an attributes list and an aux-list as:")
@@ -967,7 +971,7 @@ attributes-list had to be coded as " (code "(@)") " and the empty
 aux-list had to be coded as " (code "(@@)") ".")
 
     (p "In the present version, " (nonterm "attributes-list") " is renamed into
-" (nonterm "annot-attributes") " and " (nonterm "aux-list") " into
+" (nonterm "annot-attributes") ", and " (nonterm "aux-list") " into
 " (nonterm "annotations") ".  Both " (nonterm "annot-attributes") " and
 " (nonterm "annotations") " are tagged with the same symbol: " (code "@")
 ". Annotations may no longer appear among the children of an
@@ -981,7 +985,7 @@ example reads now as follows:")
 
    (p
       "The new format for annotations makes it easier to skip them
-when not needed. If an SXML application only looks up attributes by
+when they are not needed. If an SXML application only looks up attributes by
 their names, the change in syntax is transparent.  The transparency of
 annotation nodes in SXPath is one reason for using the same symbol
 " (code "@") " to tag both " (nonterm
@@ -999,18 +1003,31 @@ following 3NF form:")
     (verbatim
       "(tag (@) (@@) data)"
       )
-    "Now, the same node is realized as"
-    (verbatim
-      "(tag (@) data) or (tag (@ (@)) data)"
-      )
-    (p "That representation saves space because " (code "(@)") " and
-" (code "(@ (@))") " can all be shared. A detailed discussion is given
-in " (cite "Annotations") ". ")
+    "Now, the same node is realized as " (code "(tag (@) data)")
+    (p "A detailed discussion is given in " (cite "Annotations") ". ")
+
+
+   (p "Previously, annotations were mandatory in 3NF. If a node had
+no annotations, its aux-list had to be specified as " (code
+"(@@)") ". The aux-list had to appear at the fixed position, as
+the third member of an SXML element node, so that we could easily
+locate the proper children of a node without extra tests. In the
+present version of SXML, " (nonterm "annotations") " are included in
+" (nonterm "annot-attributes") ". Attribute lists are considered
+unordered and are typically handled with the help of " (code "assq")
+". Specifying a fixed position for annotations or making them
+mandatory in the 3NF no longer seems reasonable nor would it
+noticeably speed up SXML processing. Thus, if an element has no
+annotations, " (nonterm "annotations") " is absent. If the
+element also has no attributes, the empty " (code
+"annot-attributes") " list " (code "(@)") " must still be present, in 2NF
+and higher.")
 
   (footer)
 
 
 )))
+
 
 ;(pp Content)
 
@@ -1272,6 +1289,14 @@ stylesheets are available at " ,master-url "."))))
 	   `((code (strong (em "make-symbol") "(")) ,terms
 	     (code (strong ")")))))
 
+     (sset		; A tagged unordered S-expression (i.e., a set)
+      *macro*
+      . ,(lambda (tag set-tag . terms)
+	   `((code (strong "{")) ,(list-intersperse
+					(cons set-tag terms) " ")
+	      (code " " (strong "}")))))
+
+
      (production
       *macro*
       . ,(lambda (tag number lhs rhs . comment)
@@ -1298,3 +1323,4 @@ stylesheets are available at " ,master-url "."))))
 
 
 ; LocalWords:  Infoset XPath LocalName ExpName NCName QName XSLT Nodelist CDATA
+; LocalWords:  SXML SXPath SSAX

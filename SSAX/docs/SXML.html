@@ -1,7 +1,7 @@
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN""http://www.w3.org/TR/REC-html40/loose.dtd">
 <html>
 <head><title>SXML</title><meta name="description" content="Definition of SXML: an instance of XML Infoset as
-S-expressions, an Abstract Syntax Tree of an XML document."><meta name="AuthorAddress" content="oleg-at-pobox.com"><meta name="keywords" content="XML, XML parsing, XML Infoset, XML Namespaces, AST, SXML, Scheme"><meta name="Date-Revision-yyyymmdd" content="20040205"><meta name="Date-Creation-yyyymmdd" content="20010207"><link rel="start" href="index.html" title="Scheme Hash"><link rel="contents" href="../README.html"><link rel="prev" href="xml.html"><link rel="next" href="web.html"></head><body bgcolor="#FFFFFF">
+S-expressions, an Abstract Syntax Tree of an XML document."><meta name="AuthorAddress" content="oleg-at-pobox.com"><meta name="keywords" content="XML, XML parsing, XML Infoset, XML Namespaces, AST, SXML, Scheme"><meta name="Date-Revision-yyyymmdd" content="20040219"><meta name="Date-Creation-yyyymmdd" content="20010207"><link rel="start" href="index.html" title="Scheme Hash"><link rel="contents" href="../README.html"><link rel="prev" href="xml.html"><link rel="next" href="web.html"></head><body bgcolor="#FFFFFF">
 
 <div align="center" class="navbar">  <a href="xml.html">previous</a> &nbsp; <a href="web.html">next</a> &nbsp; <a href="../README.html">contents</a> &nbsp; <a href="index.html">top</a>
 <hr></div>
@@ -119,9 +119,13 @@ Recommendation [<a href="#XML">XML</a>]. The following table summarizes the nota
 
 <dd>A literal Scheme symbol</dd>
 
-<dt><code><strong>(</strong> </code><code>&lt;A&gt;</code> <code>&lt;B&gt;</code><code>*</code><code> <strong>)</strong></code></dt>
+<dt><code><strong>(</strong> </code><code>&lt;A&gt;</code> <code>&lt;B&gt;</code><code>*</code> <code>&lt;C&gt;</code><code>?</code><code> <strong>)</strong></code></dt>
 
-<dd>An S-expression made of <code>&lt;A&gt;</code> followed by zero or more <code>&lt;B&gt;</code></dd>
+<dd>An S-expression made of <code>&lt;A&gt;</code> followed by zero or more <code>&lt;B&gt;</code> and, afterwards, optionally by <code>&lt;C&gt;</code></dd>
+
+<dt><code><strong>{</strong></code><code><em>A</em></code> <code>&lt;B&gt;</code><code>*</code><code> <strong>}</strong></code></dt>
+
+<dd>A tagged set: an S-expression made of <code><em>A</em></code> followed by zero or more instances of <code>&lt;B&gt;</code> in any order</dd>
 
 <dt><code><strong>(</strong> </code><code>&lt;A&gt;</code><code><strong> . </strong></code><code>&lt;B&gt;</code><code> <strong>)</strong></code></dt>
 
@@ -172,7 +176,7 @@ the root element of the XML document.</p>
 
 <td align="center"><code> ::= </code></td>
 
-<td align="left"><code><strong>(</strong> </code><code><em>@</em></code> <code>&lt;attribute&gt;</code><code>*</code> <code>&lt;annotations&gt;</code><code>?</code><code> <strong>)</strong></code> </td>
+<td align="left"><code><strong>{</strong></code><code><em>@</em></code> <code>&lt;attribute&gt;</code><code>*</code> <code>&lt;annotations&gt;</code><code>?</code><code> <strong>}</strong></code> </td>
 </tr>
 
 <tr valign="top">
@@ -296,7 +300,7 @@ document.</p>
 
 <td align="center"><code> ::= </code></td>
 
-<td align="left"><code><strong>(</strong> </code><code><em>*NAMESPACES*</em></code> <code>&lt;namespace-assoc&gt;</code><code>*</code><code> <strong>)</strong></code> </td>
+<td align="left"><code><strong>{</strong></code><code><em>*NAMESPACES*</em></code> <code>&lt;namespace-assoc&gt;</code><code>*</code><code> <strong>}</strong></code> </td>
 </tr>
 
 <tr valign="top">
@@ -326,8 +330,8 @@ may be retained as an optional member <code><em>original-prefix</em></code> of a
 association. A <code>user-ns-shortcut</code> is a Scheme
 symbol chosen by an application programmer to represent a namespace
 URI in the application program. The SSAX parser lets the programmer
-define (short and mnemonic) unique shortcuts for Namespace URIs,
-which are are often long and unwieldy strings.</p>
+define (short and mnemonic) unique shortcuts for often long and unwieldy
+Namespace URIs.</p>
 
 <br>&nbsp;<a name="Annotations">&nbsp;</a>
 <h2>Annotations</h2>
@@ -340,7 +344,7 @@ which are are often long and unwieldy strings.</p>
 
 <td align="center"><code> ::= </code></td>
 
-<td align="left"><code><strong>(</strong> </code><code><em>@</em></code> <code>&lt;namespaces&gt;</code><code>?</code> <code>&lt;annotation&gt;</code><code>*</code><code> <strong>)</strong></code> </td>
+<td align="left"><code><strong>{</strong></code><code><em>@</em></code> <code>&lt;namespaces&gt;</code><code>?</code> <code>&lt;annotation&gt;</code><code>*</code><code> <strong>}</strong></code> </td>
 </tr>
 
 <tr valign="top">
@@ -355,7 +359,7 @@ which are are often long and unwieldy strings.</p>
 </table>
 
 <p>The XML Recommendation and related standards are not firmly
-fixed, as the long list of errata and the proposed version 1.1 of XML
+fixed, as the long list of errata and version 1.1 of XML
 clearly show. Therefore, SXML has to be able to accommodate future
 changes while guaranteeing backwards compatibility. SXML also ought to
 permit applications to store various processing information (e.g.,
@@ -391,13 +395,13 @@ distinguishes auxiliary attributes by their prefix
 
 <p>XML attributes are treated as a dust bin. For example, the XSLT
 Recommendation allows extra attributes in <code>xslt:template</code>, provided these attributes are in a non-XSLT
-namespace. A user may therefore may annotate an XSLT template with his
+namespace. A user may therefore annotate an XSLT template with his
 own attributes, which will be silently disregarded by an XSLT
 processor because the processor never looks for them. RELAX/NG
 explicitly lets a schema author specify that an element may have more
 attributes than given in the schema, provided those attributes come
 from a particular namespace. The presence of these extra attributes
-should not affect XML processing applications that do not specifically
+should not affect the XML processing applications that do not specifically
 look for them. Annotations such as parent pointers and the source
 location information are similarly targeted at specific
 applications. The other applications should not be affected by the
@@ -651,8 +655,8 @@ with several namespace prefixes. There will be then several
 corresponding <code>&lt;namespace-assoc&gt;</code> differing only in
 the <code><em>original-prefix</em></code> part.</p>
 
-<p>The topic of namespaces in SXML and (S)XPath is discussed in
-more detail in [<a href="#SXML-NS">SXML-NS</a>].</p>
+<p>The topic of namespaces in (S)XML and (S)XPath is thoroughly
+discussed in [<a href="#Lisovsky-NS">Lisovsky-NS</a>] and [<a href="#SXML-NS">SXML-NS</a>].</p>
 
 <br>&nbsp;<a name="Case-sensitivity of SXML names">&nbsp;</a>
 <h2>Case-sensitivity of SXML names</h2>
@@ -703,13 +707,14 @@ form N is also in normal form M for any M&lt;N. The higher normal forms
 impose more constraints on the structure of SXML expressions but in
 return permit faster access.</p>
 
-<p>The most permissive 0NF does not mandate the presence or the
-relative order of <code>&lt;annot-attributes&gt;</code> and <code>&lt;annotations&gt;</code>. The attribute list, if present, may be inter-mixed
-with <code>&lt;child-of-element&gt;</code>. SGML provides two equal forms
-for boolean attributes: minimized, e.g., <code>&lt;OPTION checked&gt;</code>
-and full, <code>&lt;OPTION checked=&quot;checked&quot;&gt;</code>. XML mandates the
-full form only, whereas HTML allows both, favoring the former. 0NF
-SXML supports the minimized form along with the full one: <code>(OPTION (@ (checked)))</code> and <code>(OPTION (@ (checked
+<p>The most permissive 0NF may be considered a relaxation of the
+SXML grammar. The form does not mandate the relative order of <code>&lt;annot-attributes&gt;</code>. The attribute list, if present, may be
+inter-mixed with <code>&lt;child-of-element&gt;</code>. SGML provides two
+equal forms for boolean attributes: minimized, e.g., <code>&lt;OPTION
+checked&gt;</code> and full, <code>&lt;OPTION checked=&quot;checked&quot;&gt;</code>. XML
+mandates the full form only, whereas HTML allows both, favoring the
+former. 0NF SXML supports the minimized form along with the full one:
+<code>(OPTION (@ (checked)))</code> and <code>(OPTION (@ (checked
 &quot;checked&quot;)))</code>.</p>
 
 <p>In the 1NF, optional <code>&lt;annot-attributes&gt;</code> if
@@ -722,15 +727,15 @@ form.</p>
 component of an SXML element node. If an element has no attributes nor annotations, <code>&lt;annot-attributes&gt;</code> shall be specified as <code>(@)</code>. In the 2NF, <code>&lt;comment&gt;</code> and <code>&lt;entity&gt;</code> nodes must be absent. Parsed entities should be expanded, even if
 they are external.</p>
 
-<p>The third normal form 3NF makes <code>&lt;annotations&gt;</code>
-mandatory as well. In addition, all text strings must be
+<p>In the third normal form 3NF all text strings must be
 joined into maximal text strings: no <code>&lt;Nodelist&gt;</code> shall
 contain two adjacent text-string nodes.</p>
 
 <p>The normal forms make it possible to access SXML items in
 efficient ways. If an SXML document is known to be in the 3NF, for
 example, an application never has to check for the existence of
- <code>&lt;annot-attributes&gt;</code> or <code>&lt;annotations&gt;</code>. Checking for child nodes and retrieving text data are simplified as well.</p>
+ <code>&lt;annot-attributes&gt;</code>. Checking for child nodes and
+retrieving text data are simplified as well.</p>
 
 <br>&nbsp;<a name="Examples">&nbsp;</a>
 <h2>Examples</h2>
@@ -929,7 +934,10 @@ XPath. September 17, 2000.
 <br>&lt;<a href="http://pobox.com/~oleg/ftp/Scheme/xml.html#parent-ptr">http://pobox.com/~oleg/ftp/Scheme/xml.html#parent-ptr</a>&gt;</p>
 
 <p><a name="Scheme-case-sensitivity">[Lisovsky] </a>Kirill Lisovsky. Case sensitivity of Scheme systems.
-<br>&lt;<a href="http://pair.com/lisovsky/scheme/case-sensitivity.html">http://pair.com/lisovsky/scheme/case-sensitivity.html</a>&gt;</p>
+<br>&lt;<a href="http://pair.com/lisovsky/scheme/casesens/index.html">http://pair.com/lisovsky/scheme/casesens/index.html</a>&gt;</p>
+
+<p><a name="Lisovsky-NS">[Lisovsky-NS] </a>Kirill Lisovsky. Namespaces in XML and SXML. 
+<br>&lt;<a href="http://pair.com/lisovsky/xml/ns/">http://pair.com/lisovsky/xml/ns/</a>&gt;</p>
 
 <p><a name="SXML-NS">[SXML-NS] </a>Namespaces in SXML and (S)XPath. Discussion thread on the SSAX-SXML mailing list. May 28, 2002 and June 7, 2002.
 <br>&lt;<a href="http://sourceforge.net/mailarchive/forum.php?thread_id=759249&amp;forum_id=599">http://sourceforge.net/mailarchive/forum.php?thread_id=759249&amp;forum_id=599</a>&gt;
@@ -962,12 +970,14 @@ Version 1.0. W3C Recommendation. November 16, 1999.
 <p>Following the suggestion by Matthias Radestock, <code>&lt;aux-list&gt;</code> is renamed into <code>&lt;annotations&gt;</code>, and <code>&lt;aux-node&gt;</code> into <code>&lt;annotation&gt;</code>. What used to be called
 <code>&lt;attribute-list&gt;</code> is now <code>&lt;annot-attributes&gt;</code>.</p>
 
-<p>Jim Bender suggested to permit annotations in <code>&lt;PI&gt;</code>
-nodes, for example, to record the location of the processing
-instruction in the document source.</p>
+<p>Jim Bender suggested annotations in <code>&lt;PI&gt;</code> nodes, for
+example, to record the location of the processing instruction in the
+document source.</p>
 
 <p>We have added a detailed discussion of annotations on a single
 attribute, and of <code>&lt;TOP&gt;</code> annotations.</p>
+
+<p>We have introduced the notation for a tagged set <code><strong>{</strong></code><code><em>a</em></code> <code>&lt;B&gt;</code> <code>&lt;C&gt;</code><code> <strong>}</strong></code> to precisely specify the syntax of <code>&lt;annot-attributes&gt;</code> and <code>&lt;annotations&gt;</code>.</p>
 
 <p>Previously SXML defined an attributes list and an aux-list as:</p>
 
@@ -992,7 +1002,7 @@ attributes-list had to be coded as <code>(@)</code> and the empty
 aux-list had to be coded as <code>(@@)</code>.</p>
 
 <p>In the present version, <code>&lt;attributes-list&gt;</code> is renamed into
-<code>&lt;annot-attributes&gt;</code> and <code>&lt;aux-list&gt;</code> into
+<code>&lt;annot-attributes&gt;</code>, and <code>&lt;aux-list&gt;</code> into
 <code>&lt;annotations&gt;</code>.  Both <code>&lt;annot-attributes&gt;</code> and
 <code>&lt;annotations&gt;</code> are tagged with the same symbol: <code>@</code>. Annotations may no longer appear among the children of an
 element. Rather, annotations may only appear inside
@@ -1003,7 +1013,7 @@ example reads now as follows:</p>
 </pre>
 
 <p>The new format for annotations makes it easier to skip them
-when not needed. If an SXML application only looks up attributes by
+when they are not needed. If an SXML application only looks up attributes by
 their names, the change in syntax is transparent.  The transparency of
 annotation nodes in SXPath is one reason for using the same symbol
 <code>@</code> to tag both <code>&lt;annot-attributes&gt;</code> and <code>&lt;annotations&gt;</code>. In more detail,
@@ -1020,19 +1030,27 @@ following 3NF form:</p>
 
 <pre>     (tag (@) (@@) data)
 </pre>
-Now, the same node is realized as
-<pre>     (tag (@) data) or (tag (@ (@)) data)
-</pre>
+Now, the same node is realized as <code>(tag (@) data)</code>
+<p>A detailed discussion is given in [<a href="#Annotations">Annotations</a>]. </p>
 
-<p>That representation saves space because <code>(@)</code> and
-<code>(@ (@))</code> can all be shared. A detailed discussion is given
-in [<a href="#Annotations">Annotations</a>]. </p>
+<p>Previously, annotations were mandatory in 3NF. If a node had
+no annotations, its aux-list had to be specified as <code>(@@)</code>. The aux-list had to appear at the fixed position, as
+the third member of an SXML element node, so that we could easily
+locate the proper children of a node without extra tests. In the
+present version of SXML, <code>&lt;annotations&gt;</code> are included in
+<code>&lt;annot-attributes&gt;</code>. Attribute lists are considered
+unordered and are typically handled with the help of <code>assq</code>. Specifying a fixed position for annotations or making them
+mandatory in the 3NF no longer seems reasonable nor would it
+noticeably speed up SXML processing. Thus, if an element has no
+annotations, <code>&lt;annotations&gt;</code> is absent. If the
+element also has no attributes, the empty <code>annot-attributes</code> list <code>(@)</code> must still be present, in 2NF
+and higher.</p>
 
 <br>
 <p>
 <hr></p>
 
-<h3>Last updated February 5, 2004</h3>
+<h3>Last updated February 19, 2004</h3>
 
 <p>This site's top page is <a href="http://pobox.com/~oleg/ftp/"><strong>http://pobox.com/~oleg/ftp/</strong></a></p>
 
