@@ -57,14 +57,14 @@
  
 (define (SXML->HTML tree)
  (SRV:send-reply
-   (post-order tree
+   (pre-post-order tree
                 ; Universal transformation rules. Work for every HTML,
                 ; present and future
     `((@
       ((*default*       ; local override for attributes
-        . ,(lambda (attr-key . value) ((enattr attr-key) value))))
-      . ,(lambda (trigger . value) (list '@ value)))
-     (*default* . ,(lambda (tag . elems) (apply (entag tag) elems)))
+        . ,(lambda (attr-key . value) (enattr attr-key value))))
+      . ,(lambda (trigger . value) (cons '@ value)))
+     (*default* . ,(lambda (tag . elems) (entag tag elems)))
      (*text* . ,(lambda (trigger str) 
 		  (if (string? str) (string->goodHTML str) str)))
  
@@ -73,7 +73,7 @@
      (html:begin . ,(lambda (tag title . elems)
         (list "Content-type: text/html"         ; HTTP headers
               nl nl                            ; two nl end the headers
-              "<HTML><HEAD><TITLE>" title "</TITLE></HEAD>" nl
+              "<HTML><HEAD><TITLE>" title "</TITLE></HEAD>"
 	      elems
               "</HTML>"))))
  
@@ -83,19 +83,17 @@
 ; They are being used in the node handlers for the post-order function, see
 ; above.
 
-(define (entag tag)
-  (lambda elems
-    (if (and (pair? elems) (pair? (car elems)) (eq? '@ (caar elems)))
-        (list #\< tag (cdar elems) #\>
-              (and (pair? (cdr elems))
-                   (list (cdr elems) "</" tag #\>)) #\newline)
-        (list #\< tag #\> (and (pair? elems) (list elems "</" tag #\>))
-                               #\newline))))
+(define (entag tag elems)
+  (if (and (pair? elems) (pair? (car elems)) (eq? '@ (caar elems)))
+    (list #\newline #\< tag (cdar elems) #\>
+      (and (pair? (cdr elems))
+	(list (cdr elems) "</" tag #\>)))
+    (list #\newline #\< tag #\> (and (pair? elems) (list elems "</" tag #\>))
+      )))
  
-(define (enattr attr-key)
-  (lambda (value)
-    (if (null? value) (list #\space attr-key)
-        (list #\space attr-key "=\"" value #\"))))
+(define (enattr attr-key value)
+  (if (null? value) (list #\space attr-key)
+    (list #\space attr-key "=\"" value #\")))
 
 
 ; Given a string, check to make sure it does not contain characters
