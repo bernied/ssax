@@ -23,42 +23,85 @@
 
 		; make sure that the 'FORM' gave upon evaluation the
 		; EXPECTED-RESULT
-(define-macro (expect form expected-result)
-  `(begin
-    (display "evaluating ")
-    (write ',form)
-    (let ((real-result ,form))
-     (if (equal? real-result ,expected-result)
-       (cout "... gave the expected result: "
-         (lambda () (write real-result)) nl)
-       (error "... yielded: " real-result
-        " which differs from the expected result: " ,expected-result)
-      ))))
+(cond-expand
+  ((or bigloo gambit)
+    (define-macro (expect form expected-result)
+      `(begin
+	 (display "evaluating ")
+	 (write ',form)
+	 (let ((real-result ,form))
+	   (if (equal? real-result ,expected-result)
+	     (cout "... gave the expected result: "
+	       (lambda () (write real-result)) nl)
+	     (error "... yielded: " real-result
+	       " which differs from the expected result: " ,expected-result)
+	     )))))
+  (else
+    (define-syntax expect
+      (syntax-rules ()
+	((expect form expected-result)
+	  (begin
+	    (display "evaluating ")
+	    (write 'form)
+	    (let ((real-result form))
+	      (if (equal? real-result expected-result)
+		(cout "... gave the expected result: "
+		  (lambda () (write real-result)) nl)
+		(error "... yielded: " real-result
+		  " which differs from the expected result: " expected-result)
+		))))))))
+
 
 		; apply FORM to parse the input from the STR
 		; and compare the result with the EXPECTED-RESULT
 		; EXPECTED-RESULT is a pair: expected result from the
 		; form and the expected next character from the stream
-(define-macro (expect-parse-result str form expected-result)
-  `(begin
-    (display "applying ")
-    (write ',form)
-    (display " to the string ")
-    (write ,str)
-    (newline)
-    (with-input-from-string ,str
-      (lambda ()
-        (let* ((real-result ,form) (real-next-char
-				    (read-char (current-input-port))))
-          (if (equal? (cons real-result real-next-char) ,expected-result)
-            (cout "... gave the expected result: " real-result nl
-              "    the next read character, " real-next-char
-              " was expected as well" nl)
-            (error "... yielded: " real-result " and the next char "
-            real-next-char 
-            " which differ from the expected result: " ,expected-result))
-      )))))
-
+(cond-expand
+  ((or bigloo gambit)
+    (define-macro (expect-parse-result str form expected-result)
+      `(begin
+	 (display "applying ")
+	 (write ',form)
+	 (display " to the string ")
+	 (write ,str)
+	 (newline)
+	 (with-input-from-string ,str
+	   (lambda ()
+	     (let* ((real-result ,form) (real-next-char
+					  (read-char (current-input-port))))
+	       (if (equal? (cons real-result real-next-char) ,expected-result)
+		 (cout "... gave the expected result: " real-result nl
+		   "    the next read character, " real-next-char
+		   " was expected as well" nl)
+		 (error "... yielded: " real-result " and the next char "
+		   real-next-char 
+		   " which differ from the expected result: "
+		   ,expected-result))
+	       ))))))
+  (else
+    (define-syntax expect-parse-result
+      (syntax-rules ()
+	((expect-parse-result str form expected-result)
+	  (begin
+	    (display "applying ")
+	    (write 'form)
+	    (display " to the string ")
+	    (write str)
+	    (newline)
+	    (with-input-from-string str
+	      (lambda ()
+		(let* ((real-result form) (real-next-char
+					    (read-char (current-input-port))))
+		  (if (equal? (cons real-result real-next-char)
+			expected-result)
+		    (cout "... gave the expected result: " real-result nl
+		      "    the next read character, " real-next-char
+		      " was expected as well" nl)
+		    (error "... yielded: " real-result " and the next char "
+		      real-next-char 
+		      " which differ from the expected result: "
+		      expected-result))
+		  )))))))))
 
 ; Build a string out of components
 ; A component can be a string, a character, a number

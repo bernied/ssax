@@ -16,17 +16,34 @@
 
 		; make sure that the 'FORM' gave upon evaluation the
 		; EXPECTED-RESULT
-(define-macro (expect form expected-result)
-  `(begin
-    (display "evaluating ")
-    (write ',form)
-    (let ((real-result ,form))
-     (if (equal? real-result ,expected-result)
-       (cout "... gave the expected result: "
-         (lambda () (write real-result)) nl)
-       (error "... yielded: " real-result
-        " which differs from the expected result: " ,expected-result)
-      ))))
+(cond-expand
+  ((or bigloo gambit)
+    (define-macro (expect form expected-result)
+      `(begin
+	 (display "evaluating ")
+	 (write ',form)
+	 (let ((real-result ,form))
+	   (if (equal? real-result ,expected-result)
+	     (cout "... gave the expected result: "
+	       (lambda () (write real-result)) nl)
+	     (error "... yielded: " real-result
+	       " which differs from the expected result: " ,expected-result)
+	     )))))
+  (else
+    (define-syntax expect
+      (syntax-rules ()
+	((expect form expected-result)
+	  (begin
+	    (display "evaluating ")
+	    (write 'form)
+	    (let ((real-result form))
+	      (if (equal? real-result expected-result)
+		(cout "... gave the expected result: "
+		  (lambda () (write real-result)) nl)
+		(error "... yielded: " real-result
+		  " which differs from the expected result: " expected-result)
+		))))))))
+
 
 
 ; Build a string out of components
