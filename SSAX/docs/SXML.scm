@@ -7,7 +7,7 @@
     (title "SXML")
     (description "Definition of SXML: an instance of XML Infoset as
 S-expressions, an Abstract Syntax Tree of an XML document.")
-    (Date-Revision-yyyymmdd "20020218")
+    (Date-Revision-yyyymmdd "20020301")
     (Date-Creation-yyyymmdd "20010207")
     (keywords "XML, XML parsing, XML Infoset, XML Namespaces, AST, SXML, Scheme")
     (AuthorAddress "oleg@pobox.com")
@@ -764,10 +764,10 @@ Version 1.0. W3C Recommendation. November 16, 1999."
       . ,(lambda (tag . elems)
 	   (list
 	     "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0 Transitional//EN\""
-	     "\"http://www.w3.org/TR/REC-html40/loose.dtd\">\n"
-	     "<html>\n"
+	     "\"http://www.w3.org/TR/REC-html40/loose.dtd\">" nl
+	     "<html>" nl
 	     elems
-	     "</html>\n")))
+	     "</html>" nl)))
 
      (Header
       ,alist-conv-rules
@@ -777,7 +777,7 @@ Version 1.0. W3C Recommendation. November 16, 1999."
 
      (body
       . ,(lambda (tag . elems)
-	   (list "<body bgcolor=\"#FFFFFF\">\n" elems "</body>")))
+	   (list "<body bgcolor=\"#FFFFFF\">" nl elems "</body>")))
 
      (navbar			; Find the Header in the Content
       . ,(lambda (tag)		; and create the navigation bar
@@ -807,7 +807,7 @@ Version 1.0. W3C Recommendation. November 16, 1999."
 						search-Header-rules))
 			      #f)))
 	     (list "<h1 align=center>" 
-		   (lookup-def 'long-title header-parms #f) "</h1>\n"))))
+		   (lookup-def 'long-title header-parms #f) "</h1>" nl))))
 
 
      (abstract			; The abstract of the document
@@ -833,19 +833,19 @@ corresponding stylesheets are available at " master-url ".</font></blockquote>")
        (keywords . ,(lambda (tag) '()))
        )
       . ,(lambda (tag . abstract-body)
-	   (list "<div>" abstract-body "</div>\n"))
+	   (list "<div>" abstract-body "</div>" nl))
       )
 		 
      (Section	; (Section level "content ...")
       . ,(lambda (tag level head-word . elems)
-	   (list "<br>&nbsp;<a name=\"" head-word "\">&nbsp;</a>\n"
-		 "<h" level ">"  head-word elems "</h" level ">\n")))
+	   (list "<br>&nbsp;<a name=\"" head-word "\">&nbsp;</a>" nl
+		 "<h" level ">"  head-word elems "</h" level ">" nl)))
 
      (References	; (References bibitem ...)
       . ,(lambda (tag . bib-items)
 	   (let ((level 2) (head-word "References"))
-	     (list "<br>&nbsp;<a name=\"" head-word "\">&nbsp;</a>\n"
-		   "<h" level ">"  head-word "</h" level ">\n"
+	     (list "<br>&nbsp;<a name=\"" head-word "\">&nbsp;</a>" nl
+		   "<h" level ">"  head-word "</h" level ">" nl
 		   bib-items))))
 
 
@@ -859,23 +859,23 @@ corresponding stylesheets are available at " master-url ".</font></blockquote>")
 		       ((*text* . ,(lambda (tag str) str)))
 		       . ,(lambda (tag level head-word . elems)
 			    (list "<li><a href=\"#" head-word
-				  "\">" head-word elems "</a>\n" )))
+				  "\">" head-word elems "</a>" nl )))
 		      (References ; (References bibitem ...)
 		       . ,(lambda (tag . bib-items)
 			    (let ((head-word "References"))
 			      (list "<li><a href=\"#" head-word
-				    "\">" head-word "</a>\n" ))))
+				    "\">" head-word "</a>" nl ))))
 		      (*default*
 		       . ,(lambda (attr-key . elems) elems))
 		      (*text* . ,(lambda (trigger str) '()))))))
 					;(write sections ##stderr)
-	     (list "<div><ol>" sections "</ol></div>\n"))))
+	     (list "<div><ol>" sections "</ol></div>" nl))))
 
 
      (verbatim	; set off pieces of code: one or several lines
       . ,(lambda (tag . lines)
 	   (list "<pre>"
-		 (map (lambda (line) (list "     " line "\n"))
+		 (map (lambda (line) (list "     " line nl))
 		      lines)
 		 "</pre>")))
      (URL 
@@ -884,7 +884,7 @@ corresponding stylesheets are available at " master-url ".</font></blockquote>")
 
      (bibitem
       . ,(lambda (tag label key . text)
-	   (list "\n<p><a name=\"" key "\">[" label "]</a> " text)))
+	   (list nl "<p><a name=\"" key "\">[" label "]</a> " text)))
 
      (cite		; ought to locate the label and use the label!
       . ,(lambda (tag key)
@@ -949,12 +949,12 @@ corresponding stylesheets are available at " master-url ".</font></blockquote>")
 		     (list-intersperse rhs " ")
 		     rhs)
 		 "</code> " comment
-		 "</td></tr>\n")))
+		 "</td></tr>" nl)))
 
      (productions
       . ,(lambda (tag . prods)
-	   (list "<table border=0 bgcolor=\"#f5dcb3\">\n" prods
-		 "</table>\n")))
+	   (list "<table border=0 bgcolor=\"#f5dcb3\">" nl prods
+		 "</table>" nl)))
 )))))
 
 (generate-HTML Content)
