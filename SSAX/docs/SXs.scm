@@ -6,7 +6,7 @@
    (Header
     (title "(S)XML tools")
     (description "W3C-compliant XML processing in Scheme. Submitted to the International LISP conference.")
-    (Date-Revision-yyyymmdd "20020816")
+    (Date-Revision-yyyymmdd "20021031")
     (Date-Creation-yyyymmdd "20020718")
     (keywords "XML, SXML, SXPath, SXSLT, SXPointer, STX, Scheme")
     (AuthorAddress ("oleg@okmij.org" "lisovsky@acm.org"))
@@ -304,15 +304,15 @@ booking record in Fig. " (xref "Example-NS") " we can select the names
 of the passengers with confirmed reservations as follows:")
 
    (verbatim
-    "((sxpath"
-    "   `(// RESERVATION ("
-    "     ,(lambda (res-node)"
-    "        (run-check-status"
-    "             ; URL of the confirmation script"
-    "         (car ((sxpath '(HTML:A @ HREF *text)) res-node))"
-    "         ((select-kids (node-typeof? '(NAME SEAT DEPARTURE)))"
-    "          res-node)))"
-    "     )) NAME *text*) document)"
+     "((sxpath"
+     "  `(// (RESERVATION ("
+     "    ,(lambda (res-node)"
+     "       (run-check-status"
+     "            ; URL of the confirmation script"
+     "        (car ((sxpath '(HTML:A @ HREF *text*)) res-node))"
+     "        ((select-kids (node-typeof? '(NAME SEAT DEPARTURE)))"
+     "         res-node)))"
+     "    )) NAME *text*)) document)"
     )
 
    (p
@@ -878,7 +878,7 @@ XPath. September 17, 2000."
 
      (bibitem "SXPointer" "SXPointer"
 	"Kirill Lisovsky. SXPath and SXPointer. "
-	(URL "http://pair.com/sxml/sxpath/"))
+	(URL "http://pair.com/lisovsky/sxml/sxpath/"))
 
     (bibitem "LAML" "LAML"
       "Kurt Normark. Programming World Wide Web Pages in Scheme. "

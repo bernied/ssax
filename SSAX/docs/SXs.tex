@@ -226,14 +226,14 @@ of the passengers with confirmed reservations as follows:
 
 \begin{verbatim}
      ((sxpath
-        `(// RESERVATION (
-          ,(lambda (res-node)
-             (run-check-status
-                  ; URL of the confirmation script
-              (car ((sxpath '(HTML:A @ HREF *text)) res-node))
-              ((select-kids (node-typeof? '(NAME SEAT DEPARTURE)))
-               res-node)))
-          )) NAME *text*) document)
+       `(// (RESERVATION (
+         ,(lambda (res-node)
+            (run-check-status
+                 ; URL of the confirmation script
+             (car ((sxpath '(HTML:A @ HREF *text*)) res-node))
+             ((select-kids (node-typeof? '(NAME SEAT DEPARTURE)))
+              res-node)))
+         )) NAME *text*)) document)
 \end{verbatim}
 We have seen that full-form or abbreviated SXPath expressions are
 S-expressions. The full-form SXPath is actually a library of primitive
@@ -599,7 +599,7 @@ XPath. September 17, 2000. \texttt{http://pobox.com/\textasciitilde{}oleg/ftp/Sc
 \bibitem{SXML} Oleg Kiselyov. SXML Specification. Revision 2.1. March 1, 2002. \texttt{http://pobox.com/\textasciitilde{}oleg/ftp/Scheme/SXML.html} 
 \bibitem{XT3D} Shriram Krishnamurthi, Gray, K.E. and Graunke, P.T.: Transformation-by-Example for XML. Practical Aspects of Declarative Languages, 2000.
 \bibitem{STX} Kirill Lisovsky. STX: Scheme-enabled Transformation of XML data.  \texttt{http://pair.com/lisovsky/STX/} 
-\bibitem{SXPointer} Kirill Lisovsky. SXPath and SXPointer.  \texttt{http://pair.com/sxml/sxpath/} 
+\bibitem{SXPointer} Kirill Lisovsky. SXPath and SXPointer.  \texttt{http://pair.com/lisovsky/sxml/sxpath/} 
 \bibitem{LAML} Kurt Normark. Programming World Wide Web Pages in Scheme. ACM SIGPLAN Notices, vol. 34, No. 12 - December 1999, pp. 37-46. \texttt{http://www.cs.auc.dk/\textasciitilde{}normark/laml/} 
 \bibitem{Slashdot} Black Parrot: Re:Scheme as an XML Translation Language. 
 October 12, 2001. A comment in the thread "Ask Kent M. Pitman About Lisp, Scheme And More" \texttt{http://slashdot.org/comments.pl?sid=22519\&cid=2422286} 
