@@ -19,6 +19,7 @@
       (ddo:list-last (cdr lst))))
 
 ; Selects all attribute and child nodes of a given 'node'
+; Node is not supposed to be a context
 (define (ddo:attr-child node)
   (cond
     ((or (not (pair? node))  ; Leaf node
@@ -34,16 +35,22 @@
     (else  ; no attributes
      (filter sxml:node? (cdr node)))))
 
+; For a given node, returns its attribute nodes and attribute value nodes in
+; document order
+; Node is not supposed to be a context
+(define (ddo:attrs-and-values node)
+  (apply append
+         (map  ; attribute and its content
+          (lambda (a) (cons a (cdr a)))
+          (sxml:attr-list node))))
+
 ; Removes those members of the input 'nodeset' that are attributes or
 ; attribute values of a given 'node'. Nodeset is supposed to be in distinct
 ; document order. The order of attribute nodes in the 'nodeset' is supposed
 ; to be the same as in the original SXML document
 ; Works for ordinary nodes are well as for contexts
 (define (ddo:discard-attributes node nodeset)
-  (let loop ((attrs (apply append
-                           (map  ; attribute and its content
-                            (lambda (a) (cons a (cdr a)))
-                            (sxml:attr-list (sxml:context->node node)))))
+  (let loop ((attrs (ddo:attrs-and-values (sxml:context->node node)))
              (nset nodeset))
     (if (or (null? attrs) (null? nset))
         nset
@@ -397,7 +404,7 @@
           (let loop ((candidate (car node))
                      (next (sxml:context->node (cadr node)))
                      (more (cdr node))
-                     (descendants (child (sxml:context->node (car node)))))
+                     (descendants (list (sxml:context->node (car node)))))
             (cond
               ((null? descendants)
                ; none of the node-set members are descendants of the candidate
@@ -410,7 +417,10 @@
                    (loop (car more)
                          (sxml:context->node (cadr more))
                          (cdr more)
-                         (child next))))
+                         (list next))))
+              ((memq next (ddo:attrs-and-values (car descendants)))
+               ; next node in src is an attribute node or attribute value node
+               (foll (car more)))
               (else  ; proceed deeper in a tree
                (loop candidate next more
                      (append (child (car descendants)) (cdr descendants))))))))
@@ -423,19 +433,18 @@
         (child (sxml:child sxml:node?))
         (all-following-siblings
          (lambda (node)  ; not a nodeset
-           ;(pp node)
-            (if
-             (and (sxml:context? node)                  
-                  (not (null? (sxml:context->ancestors-u node))))
-             (cond
-               ((memq (sxml:context->node-u node)
-                      (cdr  ; parent is an element => cdr gives its children
-                       (car (sxml:context->ancestors-u node))))
-                => (lambda (x) x))
-               (else  ; no following siblings
-                '()))
-             '()  ; no parent => no siblings
-             ))))
+           (if
+            (and (sxml:context? node)                  
+                 (not (null? (sxml:context->ancestors-u node))))
+            (cond
+              ((memq (sxml:context->node-u node)
+                     (cdr  ; parent is an element => cdr gives its children
+                      (car (sxml:context->ancestors-u node))))
+               => (lambda (x) x))
+              (else  ; no following siblings
+               '()))
+            '()  ; no parent => no siblings
+            ))))
     (letrec
         ((reordering
           ; Arguments
@@ -465,10 +474,10 @@
                   src  ; always null
                   ))
                 ((eq? (car res-candidates) (sxml:context->node (car src)))
-                 (loop res-candidates (cdr src) res nonself?))                
+                 (loop res-candidates (cdr src) res nonself?))
                 (else  ; processing the current res-candidate
                  (let ((res-candidate (car res-candidates)))
-                   (let rpt ((more (child res-candidate))
+                   (let rpt ((more (list res-candidate))
                              (next (sxml:context->node (car src)))
                              (src src)
                              (res (if
@@ -501,6 +510,19 @@
                                (sxml:context->node (car new-src))
                                new-src
                                (append res add-res)))))
+                       ((memq next (ddo:attrs-and-values (car more)))
+                        ; the next node is the attribute node or
+                        ; attribute value node => it has no siblings
+                        (if
+                          (null? (cdr src))
+                          (loop (cdr res-candidates)
+                                (cdr src)  ; null
+                                res
+                                #t)
+                          (rpt more  ; check for the other attributes
+                               (sxml:context->node (car src))
+                               (cdr src)
+                               res)))
                        (else
                         (rpt (append (child (car more)) (cdr more))
                              next src res)))))))))))
@@ -566,8 +588,7 @@
 ; that is, it is sufficient to calculate preceding for the last_dmin member
 ; of the input nodeset
 (define (ddo:preceding test-pred? . num-ancestors)
-  (let ((child (sxml:child sxml:node?))
-        (prec (apply draft:preceding (cons test-pred? num-ancestors))))
+  (let ((prec (apply draft:preceding (cons test-pred? num-ancestors))))
     (lambda (node)   ; node or nodeset
       (cond
         ((null? node)  ; empty nodeset - nothing to do
@@ -582,7 +603,7 @@
                        (more (cdr node))
                        (descendants
                         (reverse
-                         (child (sxml:context->node (car node))))))
+                         (ddo:attr-child (sxml:context->node (car node))))))
               (cond
                 ((null? descendants)
                  ; none of the node-set members are descendants of the candidate
@@ -595,10 +616,10 @@
                      (loop (car more)
                            (sxml:context->node (cadr more))
                            (cdr more)
-                           (reverse (child next)))))
+                           (reverse (ddo:attr-child next)))))
                 (else  ; proceed deeper in a tree
                  (loop candidate next more
-                       (append (reverse (child (car descendants)))
+                       (append (reverse (ddo:attr-child (car descendants)))
                                (cdr descendants)))))))))
          (else  ; a single node
           (reverse (prec node)))))))
@@ -687,7 +708,7 @@
                             (loop (cdr res-candidates)
                                   new-src
                                   (if
-                                   (test-pred? res-candidate)                                
+                                   (test-pred? res-candidate)
                                    (append
                                     res
                                     add-res                                 
