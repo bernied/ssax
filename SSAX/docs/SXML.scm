@@ -7,11 +7,11 @@
     (title "SXML")
     (description "Definition of SXML: an instance of XML Infoset as
 S-expressions, an Abstract Syntax Tree of an XML document.")
-    (Date-Revision-yyyymmdd "20030601")
+    (Date-Revision-yyyymmdd "20040205")
     (Date-Creation-yyyymmdd "20010207")
     (keywords "XML, XML parsing, XML Infoset, XML Namespaces, AST, SXML, Scheme")
     (AuthorAddress "oleg-at-pobox.com")
-    (Revision "2.5")
+    (Revision "3.0")
     (long-title "SXML")
     (Links
      (start "index.html" (title "Scheme Hash"))
@@ -21,25 +21,6 @@ S-expressions, an Abstract Syntax Tree of an XML document.")
      (top "index.html")
      (home "http://pobox.com/~oleg/ftp/")))
 
-; > > In a similar vein, I wonder why aux-lists are not possible in a *PI*
-; > > node. For example, I might use this to record the source location of
-; > > that "PI".
-; > 
-; > It's a good question. There doesn't seem to be a reason why
-; > not. Should it be added?
-
-; In PLT Scheme's XML structures, the source location (precise begining/ending) 
-; of a PI is recorded. I have created a version of a source location-recording 
-; SSAX parser- which creates a pseudo-SXML. In part it is "fake", in that it 
-; uses an aux-list for PI nodes to record source location. The more serious 
-; deviation is that character data is "wrapped" as a *pcdata* node, with an 
-; aux-list recording source location information.
-; Jim Bender's message
-
-; Would "annotation-list" be a better name than "aux-list", or, just 
-; "annotations"?
-; In the same vein, I'd prefer "attributes" over "attributes-list".
-; Matthias Radestock
 
   (body
    (navbar)
@@ -55,10 +36,13 @@ compact library of combinators for querying and transforming SXML."
 
    (TOC)
 
+; introduce { <a> <b> <c>}
+; where <a> is at the head but the order of <b> and <c> may vary
+
    (Section 2 "Introduction")
    (p
     "An XML document is essentially a tree structure. The start and the end
-tags of the root element enclose the whole content of the document,
+tags of the root element enclose the document content,
 which may include other elements or arbitrary character data.  Text
 with familiar angular brackets is an external representation of an XML
 document. Applications ought to deal with an internalized form:
@@ -73,21 +57,22 @@ which denote elements, attributes, character data, processing
 instructions, and other components of the document. Each information
 item has a number of associated properties, e.g., name, namespace
 URI. Some properties -- for example, 'children' and 'attributes' --
-are collections of other information items. Infoset describes
-only the information in an XML document that is relevant to
-applications. The default value of attributes declared in the DTD, parameter
-entities, the order of attributes within a start-tag, and other data used merely for parsing or validation are not included. Although technically 
-Infoset is specified for XML it largely applies to other semi-structured data formats, in particular, HTML.")
-   (p
-    "The hierarchy of containers comprised of text strings and other
+are collections of other information items. Infoset describes only the
+information in an XML document that is relevant to applications. The
+default value of attributes declared in the DTD, parameter entities,
+the order of attributes within a start-tag, and other data used merely
+for parsing or validation are not included. Although technically
+Infoset is specified for XML it largely applies to other
+semi-structured data formats, in particular, HTML.")
+   (p "The hierarchy of containers comprised of text strings and other
 containers greatly lends itself to be described by
-S-expressions. S-expressions " (cite "McCarthy") " are easy to parse into an internal
-representation suitable for traversal.  They have a simple external
-notation (albeit with many a parentheses), which is relatively easy to
-compose even by hand.  S-expressions have another advantage: "
-    (em "provided") 
-    " an appropriate design, they can represent Scheme code to be evaluated.
- This code-data dualism is a distinguished feature of Lisp and Scheme. ")
+S-expressions. S-expressions " (cite "McCarthy") " are easy to parse
+into an internal representation suitable for traversal.  They have a
+simple external notation (albeit with many a parentheses), which is
+relatively easy to compose even by hand.  S-expressions have another
+advantage: " (em "provided") " an appropriate design, they can
+represent Scheme code to be evaluated.  This code-data dualism is a
+distinguished feature of Lisp and Scheme. ")
    (p
     "SXML is a concrete instance of the XML Infoset. Infoset's goal is
 to present in some form all relevant pieces of data and their " (em
@@ -108,42 +93,44 @@ document.")
     "We will use an Extended BNF Notation (EBNF) employed in the XML
 Recommendation " (cite "XML") ". The following table summarizes the notation.")
    (dl
-    (dt (code (ebnf-opt "thing")))
+    (dt (ebnf-opt "thing"))
     (dd "An optional " (em "thing"))
 
-    (dt (code (ebnf-* "thing")))
+    (dt (ebnf-* "thing"))
     (dd "Zero or more " (em "thing") "s")
 
-    (dt (code (ebnf-+ "thing")))
+    (dt (ebnf-+ "thing"))
     (dd "One or more " (em "thing") "s")
 
-    (dt (code (ebnf-choice "thing1" "thing2" "thing3")))
+    (dt (ebnf-choice "thing1" "thing2" "thing3"))
     (dd "Choice of " (em "thing") "s")
 
-    (dt (code (nonterm "thing")))
+    (dt (nonterm "thing"))
     (dd "A non-terminal of a grammar")
 
-    (dt (code (term-id "thing")))
+    (dt (term-id "thing"))
     (dd "A terminal of the grammar that is a Scheme identifier")
 
-    (dt (code (term-str "thing")))
+    (dt (term-str "thing"))
     (dd "A terminal of the grammar that is a Scheme string")
 
-    (dt (code (term-lit "thing")))
+    (dt (term-lit "thing"))
     (dd "A literal Scheme symbol")
 
-    (dt (code (sexp (nonterm "A") (ebnf-* (nonterm "B")))))
-    (dd "An S-expression made of " (code (nonterm "A"))
-	" followed by zero or more " (code (nonterm "B")))
+    (dt (sexp (nonterm "A") (ebnf-* (nonterm "B"))))
+    (dd "An S-expression made of " (nonterm "A")
+	" followed by zero or more " (nonterm "B"))
 
-    (dt (code (sexp-cons (nonterm "A") (nonterm "B"))))
-    (dd "An S-expression that is made by prepending " (code (nonterm "A"))
-	" to an S-expression denoted by " (code (nonterm "B")))
+    (dt (sexp-cons (nonterm "A") (nonterm "B")))
+    (dd "An S-expression that is made by prepending " (nonterm "A")
+	" to an S-expression denoted by " (nonterm "B"))
 
-    (dt (code (sexp-symb (nonterm "A") ":" (nonterm "B"))))
+    (dt (sexp-symb (nonterm "A") ":" (nonterm "B")))
     (dd "A symbol whose string representation consists of all
-characters that spell "
-	(code (nonterm "A")) " followed by the colon character and by the characters that spell " (code (nonterm "B")) ". The " (code (sexp-symb "" )) " notation can be regarded a meta-function that creates symbols." )
+characters that spell " (nonterm "A") " followed by the colon
+character and by the characters that spell " (nonterm "B")
+". The " (sexp-symb "" ) " notation can be regarded a
+meta-function that creates symbols." )
     )
 
    
@@ -155,7 +142,7 @@ characters that spell "
        (nonterm "TOP")
        ((sexp
 	 (term-lit "*TOP*")
-	 (ebnf-opt (nonterm "aux-list"))
+	 (ebnf-opt (nonterm "annotations"))
 	 (ebnf-* (nonterm "PI"))
 	 (ebnf-* (nonterm "comment"))
 	 (nonterm "Element")))))
@@ -169,19 +156,19 @@ the root element of the XML document.")
       (nonterm "Element")
       ((sexp
 	(nonterm "name")
-	(ebnf-opt (nonterm "attributes-list"))
-	(ebnf-opt (nonterm "aux-list"))
+	(ebnf-opt (nonterm "annot-attributes"))
 	(ebnf-* (nonterm "child-of-element")))))
     (production 3
-      (nonterm "attributes-list")
+      (nonterm "annot-attributes")
       ((sexp
 	(term-lit "@")
-	(ebnf-* (nonterm "attribute")))))
+	(ebnf-* (nonterm "attribute"))
+	(ebnf-opt (nonterm "annotations")))))
     (production 4
       (nonterm "attribute")
       ((sexp (nonterm "name")
-	     (ebnf-opt (term-str "value"))
-	     (ebnf-opt (nonterm "aux-list")))))
+	     (ebnf-opt (term-str "value")) ; make several values?
+	     (ebnf-opt (nonterm "annotations"))))) ; make sublist first?
     (production 5
       (nonterm "child-of-element")
       ((ebnf-choice 
@@ -199,8 +186,10 @@ the root element of the XML document.")
       (nonterm "PI")
       ((sexp (term-lit "*PI*")
        (term-id "pi-target")
+       (ebnf-opt (nonterm "annotations"))
        (term-str "processing instruction content string")))))
-   (p "The XML Recommendation specifies that processing instructions (PI) are distinct from elements and character data; processing
+   (p "The XML Recommendation specifies that processing instructions
+\(PI) are distinct from elements and character data; processing
 instructions must be passed through to applications. In SXML, PIs are
 therefore represented by nodes of a dedicated type " (code "*PI*")
 ". DOM Level 2 treats processing instructions in a similar way.")
@@ -220,7 +209,7 @@ therefore represented by nodes of a dedicated type " (code "*PI*")
 The XML Recommendation permits the parser to pass the comments to
 an application or to completely disregard them. The present SXML grammar
 admits comment nodes but does not mandate them by any means." (br)
-"An " (code (nonterm "entity")) " node represents a reference to an
+"An " (nonterm "entity") " node represents a reference to an
 unexpanded external entity. This node corresponds to an unexpanded
 entity reference information item, defined in Section 2.5 of " (cite
 "XML Infoset") ". Internal parsed entities are always expanded by the
@@ -256,37 +245,39 @@ document.")
 
     )
 
-   (p "An SXML " (code (nonterm "name")) " is a single symbol. It is generally an expanded name " (cite "XML-Namespaces") ", which conceptually consists of a
-local name and a namespace URI. The latter part may be empty, in which
-case
-" (code (nonterm "name")) " is a " (code (term-id "NCName")) ": a Scheme
-symbol whose spelling conforms to production [4] of the XML Namespaces
-Recommendation " (cite "XML-Namespaces") ". " (code (nonterm
-"ExpName")) " is also a Scheme symbol, whose string representation
-contains an embedded colon that joins the local and the namespace
-parts of the name. A " (code (sexp-symb (term-str "URI"))) " is a Namespace URI
-string converted to a Scheme symbol. Universal Resource Identifiers (URI)
-may contain characters (e.g., parentheses) that are prohibited
-in Scheme identifiers. Such characters must be %-quoted during the
-conversion from a URI string to " (code (nonterm "namespace-id"))
+   (p "An SXML " (nonterm "name") " is a single symbol. It is
+generally an expanded name " (cite "XML-Namespaces") ", which
+conceptually consists of a local name and a namespace URI. The latter
+part may be empty, in which case " (nonterm "name") " is a " (term-id
+"NCName") ": a Scheme symbol whose spelling conforms to production [4]
+of the XML Namespaces Recommendation " (cite "XML-Namespaces") ".
+"(nonterm "ExpName") " is also a Scheme symbol, whose string
+representation contains an embedded colon that joins the local and the
+namespace parts of the name. A " (sexp-symb (term-str "URI")) " is a
+Namespace URI string converted to a Scheme symbol. Universal Resource
+Identifiers (URI) may contain characters (e.g., parentheses) that are
+prohibited in Scheme identifiers. Such characters must be %-quoted
+during the conversion from a URI string to " (nonterm "namespace-id")
 ". The original XML Namespace prefix of a QName " (cite "XML-Namespaces") " 
-may be retained as an optional member " (code (term-lit
-"original-prefix")) " of a " (code (nonterm "namespace-assoc")) "
-association. A " (code (term-id "user-ns-shortcut")) " is a Scheme
+may be retained as an optional member " (term-lit
+"original-prefix") " of a " (nonterm "namespace-assoc") "
+association. A " (term-id "user-ns-shortcut") " is a Scheme
 symbol chosen by an application programmer to represent a namespace
 URI in the application program. The SSAX parser lets the programmer
 define (short and mnemonic) unique shortcuts for Namespace URIs,
 which are are often long and unwieldy strings.")
 
+   (Section 2 "Annotations")
+
    (productions
     (production 15
-      (nonterm "aux-list")
+      (nonterm "annotations")
       ((sexp
-	(term-lit "@@")
+	(term-lit "@")
 	(ebnf-opt (nonterm "namespaces"))
-	(ebnf-* (nonterm "aux-node")))))
+	(ebnf-* (nonterm "annotation")))))
     (production 16
-      (nonterm "aux-node")
+      (nonterm "annotation")
       ((n_))
       (em "To be defined in the future"))
     )
@@ -299,13 +290,83 @@ permit applications to store various processing information (e.g.,
 cached resolved IDREFs) in an SXML tree. A hash of ID-type attributes
 would, for instance, let us implement efficient lookups in (SOAP-)
 encoded arrays. To allow such extensibility, we introduce two new node
-types, " (code (nonterm
-"aux-list")) " and " (code (nonterm "aux-node")) ". The semantics of
-the latter is to be established in future versions of SXML. Other
-candidates for " (code (nonterm "aux-node")) " are the unique id of an
-element or the reference to element's parent. The structure and the
-semantics of an " (code (nonterm "aux-list")) " node is similar to those of an attribute list. Applications that do not specifically look for auxiliary
-nodes can transparently ignore any present and future extensions."  )
+types: " (nonterm "annotations") " and " (nonterm "annotation") ". The
+semantics of the latter is to be established in future versions of
+SXML. Possible examples of an " (nonterm "annotation") " are the unique
+id of an element or the reference to element's parent.")
+
+    (p
+      "The structure and the semantics of " (nonterm "annotations") "
+is similar to those of an attribute list. In a manner of speaking,
+annotations are ``attributes'' of an attribute list. The tag
+" (code "@") " marks a collection of ancillary data associated
+with an SXML node. For an element SXML node, the ancillary collection
+is that of attributes. A nested " (code "@") " list is therefore a
+collection of ``second-level'' attributes -- annotations -- such as
+namespace nodes, parent pointers, etc. This design seems to be in
+accord with the spirit of the XML Recommendation, which uses XML
+attributes for two distinct purposes. Genuine, semantic attributes
+provide ancillary description of the corresponding XML element,
+e.g.,")
+    (verbatim
+      "<weight units='kg'>16</weight>"
+      )
+    (p "On the other hand, attributes such as " (code "xmlns") ", " (code
+"xml:prefix") ", " (code "xml:lang") " and " (code "xml:space") " are
+auxiliary, or being used by XML itself.  The XML Recommendation
+distinguishes auxiliary attributes by their prefix
+" (code "xml") ". SXML groups all such auxiliary attributes into a
+" (code "@") "-tagged list inside the attribute list.")
+    (p 
+      "XML attributes are treated as a dust bin. For example, the XSLT
+Recommendation allows extra attributes in " (code
+"xslt:template") ", provided these attributes are in a non-XSLT
+namespace. A user may therefore may annotate an XSLT template with his
+own attributes, which will be silently disregarded by an XSLT
+processor because the processor never looks for them. RELAX/NG
+explicitly lets a schema author specify that an element may have more
+attributes than given in the schema, provided those attributes come
+from a particular namespace. The presence of these extra attributes
+should not affect XML processing applications that do not specifically
+look for them. Annotations such as parent pointers and the source
+location information are similarly targeted at specific
+applications. The other applications should not be affected by the
+presence or absence of annotations. Placing the collection of
+annotations inside the attribute list accomplishes that goal.")
+
+    (p
+      "Annotations can be assigned to an element and to an attribute
+of an element. The following example illustrates the difference
+between the two annotations, which, in the example, contain only one
+annotation: a pointer to the parent of a node.")
+    (verbatim
+      "(a (@ "
+      "     (href \"http://somewhere/\" "
+      "       (@ (*parent* a-node))       ; <annotations> of the attribute 'href'"
+      "       )"
+      "     (@ (*parent* a-parent-node))) ; <annotations> of the element 'a'"
+      "   \"link\")"
+      )
+
+    (p
+      "The " (nonterm "TOP") " node may also contain annotations: for
+example, " (nonterm "namespaces") " for the entire document or an
+index of ID-type attributes.")
+    (verbatim
+      "(*TOP* (@ (id-collection id-hash)) (p (@ (id \"id1\")) \"par1\"))"
+      )
+    (p
+      "Annotations of the " (nonterm "TOP") " element look exactly
+like `attributes' of the element. That should not cause any confusion
+because " (nonterm "TOP") " cannot have genuine attributes. The SXML
+element " (nonterm "TOP") " is an abstract representation of the whole
+document and does not correspond to any single XML element. Assigning
+annotations, which look and feel like an attribute list, to the
+" (nonterm "TOP") " element does not contradict the Infoset
+Recommendation, which specifically states that it is not intended to
+be exhaustive. Attributes in general are not considered children of
+their parents, therefore, even with our annotations the " (nonterm "TOP")
+" element has only one child -- the root element.")
 
 
 ;--------------------------------------------------
@@ -316,8 +377,8 @@ a list a particularly suitable data structure to represent an
 item. The head of the list, a Scheme identifier, " (em "names") " the
 item. For many items this is their (expanded) name. For an information
 item that denotes an XML element, the corresponding list starts with
-element's expanded name, optionally followed by collections of
-attributes and of auxiliary data. The rest of the element item list
+element's expanded name, optionally followed by a collection of
+attributes and annotations. The rest of the element item list
 is an ordered sequence of element's children -- character data,
 processing instructions, and other elements. Every child is unique;
 items never share their children even if the latter have the identical
@@ -345,8 +406,7 @@ case of HTML) for a boolean attribute, e.g., " (code "<option checked>") ".")
    (p
     "We consider a collection of attributes an information item in its
 own right, tagged with a special name " (code "@") ". The character '@'
-may not occur in a valid XML name; therefore
-an " (code (nonterm "attributes-list"))
+may not occur in a valid XML name; therefore " (nonterm "annot-attributes")
 " cannot be mistaken for a list that represents an element. An XML
 document renders attributes, processing instructions, namespace
 specifications and other meta-data differently from the element
@@ -372,7 +432,7 @@ itself is an instance of the Infoset.")
       (nonterm "Node")
       ((ebnf-choice
 	(nonterm "Element")
-	(nonterm "attributes-list")
+	(nonterm "annot-attributes")
 	(nonterm "attribute")
 	(term-str "character data: text string")
 	(nonterm "namespaces")
@@ -380,11 +440,12 @@ itself is an instance of the Infoset.")
 	(nonterm "PI")
 	(nonterm "comment")
 	(nonterm "entity")
-	(nonterm "aux-list")
-	(nonterm "aux-node")))))
+	(nonterm "annotations")
+	(nonterm "annotation")))))
    (p
     "or as a set of two mutually-recursive datatypes, 
-" (code "Node") " and " (code "Nodelist") ", where the latter is a list of " (code "Node") "s: ")
+" (code "Node") " and " (code "Nodelist") ", where the latter is a
+list of " (code "Node") "s: ")
 
    (productions
     (production "N1"
@@ -406,8 +467,7 @@ itself is an instance of the Infoset.")
 	(term-lit "*PI*")
 	(term-lit "*COMMENT*")
 	(term-lit "*ENTITY*")
-	(term-lit "*NAMESPACES*")
-	(term-lit "@@")))))
+	(term-lit "*NAMESPACES*")))))
 
    (p
     "The uniformity of the SXML representation for elements,
@@ -468,7 +528,7 @@ attribute. So, for example"
 precisely that tree where element type names and attribute names can
 be universal names.  According to productions [N3] and [9-12], a
 universal name, "
-    (code (nonterm "name")) ", is either a local name or an expanded
+    (nonterm "name") ", is either a local name or an expanded
 name. Both kinds of names are Scheme identifiers. A local name has no
 colon characters in its spelling. An expanded name is spelled with at
 least one colon, which may make the identifier look rather odd. In
@@ -477,8 +537,8 @@ SXML, James Clark's example will appear as follows:"
      "(http://www.cars.com/xml:part)")
     "or, somewhat redundantly, "
     (verbatim
-     "(http://www.cars.com/xml:part (@)"
-     "   (@@ (*NAMESPACES* (cars \"http://www.cars.com/xml\"))))"))
+     "(http://www.cars.com/xml:part"
+     "  (@ (@ (*NAMESPACES* (http://www.cars.com/xml \"http://www.cars.com/xml\" cars)))))"))
 
    (p
     "Such a representation also agrees with the Namespaces Recommendation "
@@ -490,9 +550,9 @@ whose scope extends beyond the containing document.\"")
    (div "It may be unwieldy to deal with identifiers such as "
 	(code "http://www.cars.com/xml:part") ". Therefore, an application that
 invokes the SSAX parser may tell the parser to map the URI "
-	(code "http://www.cars.com/xml") " to an application-specific namespace shortcut " (code (term-id "user-ns-shortcut")) ", e.g., " (code "c") ". The parser will then produce"
+	(code "http://www.cars.com/xml") " to an application-specific namespace shortcut " (term-id "user-ns-shortcut") ", e.g., " (code "c") ". The parser will then produce"
 	(verbatim
-	 "(c:part (@@ (*NAMESPACES* (c \"http://www.cars.com/xml\"))))")
+	 "(c:part (@ (@ (*NAMESPACES* (c \"http://www.cars.com/xml\")))))")
 
 ; (term-lit "original-prefix")
 	"To be more precise, the parser will return just"
@@ -508,28 +568,36 @@ is fully spelled only once, in the symbol table. All other occurrences
 of the symbol are short references to the corresponding slot in
 the symbol table."))
 
-   (p "We must note a 1-to-1 correspondence between " (code (term-id "user-ns-shortcut"))
-"s and the corresponding namespace URIs. This is generally not true
-for XML namespace prefixes and namespace URIs. A " (code (term-id
-"user-ns-shortcut")) " uniquely represents the corresponding namespace
-URI within the document, but an XML namespace prefix does not. For
-example, different XML prefixes may specify the same namespace
-URI; XML namespace prefixes may be redefined in children elements. The
-other difference between " (code (term-id "user-ns-shortcut")) "s and
-XML namespace prefixes is that the latter are at the whims of the author
-of the document whereas the namespace shortcuts are defined by an
-XML processing application. The shortcuts are syntactic sugar for namespace URIs.")
+   (p "We must note a 1-to-1 correspondence between " (term-id
+"user-ns-shortcut") "s and the corresponding namespace URIs. This is
+generally not true for XML namespace prefixes and namespace URIs. A
+" (term-id "user-ns-shortcut") " uniquely represents the
+corresponding namespace URI within the document, but an XML namespace
+prefix does not. For example, different XML prefixes may specify the
+same namespace URI; XML namespace prefixes may be redefined in
+children elements. The other difference between " (term-id
+"user-ns-shortcut") "s and XML namespace prefixes is that the latter
+are at the whims of the author of the document whereas the namespace
+shortcuts are defined by an XML processing application. The shortcuts
+are syntactic sugar for namespace URIs.")
 
    (p 
-    "The list of associations between namespace IDs and namespace URIs (and, optionally, original XML Namespace prefixes) is an optional member of an " (code (nonterm "aux-list")) ". For regular elements, " (code (nonterm "namespaces")) " will contain only those namespace declarations that are relevant for that element. Most of the time however " (code (nonterm "namespaces")) " in the " (code (nonterm "aux-list")) " will be absent.")
+     "The list of associations between namespace IDs and namespace
+URIs (and, optionally, original XML Namespace prefixes) is an optional
+member of an " (nonterm "annotations") ". For regular elements,
+" (nonterm "namespaces") " will contain only those namespace
+declarations that are relevant for that element. Most of the time
+however " (nonterm "namespaces") " in the " (nonterm
+"annotations") " will be absent.")
 
    (p
-    "The node " (code (nonterm "namespaces")) ", if present in the auxiliary list of the " (code (nonterm "TOP")) " element, must contain " (code (nonterm 
-"namespace-assoc")) " for the whole document. It may happen that one
-namespace URI is associated in the source XML document with several
-namespace prefixes. There will be then several corresponding " (code (nonterm 
-"namespace-assoc")) " differing only in the " (code (term-lit "original-prefix")) " part.")
- 
+    "The node " (nonterm "namespaces") ", if present as an annotation
+of the " (nonterm "TOP") " element, must contain
+" (nonterm "namespace-assoc") " for the whole document. It may
+happen that one namespace URI is associated in the source XML document
+with several namespace prefixes. There will be then several
+corresponding " (nonterm "namespace-assoc") " differing only in
+the " (term-lit "original-prefix") " part.")
    (p "The topic of namespaces in SXML and (S)XPath is discussed in
 more detail in " (cite "SXML-NS") ".")
 
@@ -582,62 +650,69 @@ compiler option or pragma. A web page " (cite
     "Normalized SXML is a proper subset of SXML optimized for
 efficient processing. An SXML document in a normalized form must
 satisfy a number of additional restrictions. Most of the restrictions
-concern the order and the appearance of the " (code (nonterm
-"attributes-list")) " and " (code (nonterm "aux-list")) " within an
-" (code (nonterm "Element")) " node, production [2]. In the spirit of the relational database
-model, we introduce a number of increasingly rigorous normal forms for
-SXML expressions. An SXML document in normal form N is also in normal
-form M for any M<N. The higher normal forms impose more constraints on
-the structure of SXML expressions but in return permit faster access.")
+concern the order and the appearance of the " (nonterm
+"annot-attributes") " and " (nonterm "annotations") " within an
+" (nonterm "Element") " node, productions [2-4]. In the spirit of the
+relational database model, we introduce a number of increasingly
+rigorous normal forms for SXML expressions. An SXML document in normal
+form N is also in normal form M for any M<N. The higher normal forms
+impose more constraints on the structure of SXML expressions but in
+return permit faster access.")
+
+; several attrib lists?
+   (p
+    "The most permissive 0NF does not mandate the presence or the
+relative order of " (nonterm "annot-attributes") " and " (nonterm
+"annotations") ". The attribute list, if present, may be inter-mixed
+with " (nonterm "child-of-element") ". SGML provides two equal forms
+for boolean attributes: minimized, e.g., " (code "<OPTION checked>") "
+and full, " (code "<OPTION checked=\"checked\">") ". XML mandates the
+full form only, whereas HTML allows both, favoring the former. 0NF
+SXML supports the minimized form along with the full one: " (code
+"(OPTION (@ (checked)))") " and " (code "(OPTION (@ (checked
+\"checked\")))") ".")
+
+; should annotations appear at the beginning of the annot-attributes?
+    (p "In the 1NF, optional " (nonterm "annot-attributes") " if
+present must precede all other components of an " (nonterm "Element")
+" SXML node. This is the order reflected in Production [2].  Boolean
+attributes must appear in their full form, e.g., " (code "(OPTION (@
+\(checked \"checked\")))") ". The 1NF is the \"recommended\" normal
+form.")
 
    (p
-    "The most permissive 0NF does not mandate the presence or the relative
-order of " (code (nonterm "attributes-list")) " and " (code (nonterm
-"aux-list")) ". These lists, if present, may be inter-mixed
-with " (code (nonterm "child-of-element")) ". SGML provides two equal forms for
-boolean attributes: minimized, e.g., " (code "<OPTION checked>") " and
-full, " (code "<OPTION checked=\"checked\">") ". XML mandates the full
-form only, whereas HTML allows both, favoring the former. 0NF SXML
-supports the minimized form along with the full one: " (code "(OPTION (@ (checked)))") " and " (code "(OPTION (@ (checked \"checked\")))") ".")
+    "The 2NF makes " (nonterm "annot-attributes") " a required
+component of an SXML element node. If an element has no attributes nor annotations, " (nonterm "annot-attributes") " shall be specified as " (code
+"(@)") ". In the 2NF, " (nonterm "comment") " and " (nonterm "entity")
+" nodes must be absent. Parsed entities should be expanded, even if
+they are external.")
 
+; annotations mandatory in 3NF? Their position?
+; If annotations mandatory, should each attribute be annotated too?
    (p
-    "In the 1NF, an optional " (code (nonterm "attributes-list")) " must
-precede an optional " (code (nonterm "aux-list"))
-" in an " (code (nonterm "Element")) " SXML node. This is the order
-reflected in Production [2].  In addition, if " (code (nonterm
-"aux-list")) " is present, then
-" (code (nonterm "attributes-list")) " must also be specified, at least as
-an empty attribute list " (code "(@)") ". This restriction ensures
-that " (code (nonterm "aux-list")) ", if present, is always the third
-element of a list representing the SXML node. Boolean attributes must
-appear in their full form, e.g., " (code "(OPTION (@ (checked \"checked\")))") ". The 1NF is the \"recommended\" normal form.")
+    "The third normal form 3NF makes " (nonterm "annotations") "
+mandatory as well. "
 
-   (p
-    "The 2NF makes " (code (nonterm "attributes-list")) " a required component of an SXML element node. If an element has no attributes, " (code (nonterm "attributes-list")) " shall be specified as " (code "(@)") ". An optional " (code (nonterm "aux-list")) ", if present, must immediately follow. In the 2NF,
-" (code (nonterm "comment")) " and " (code (nonterm "entity")) " nodes
-must be absent. Parsed entities should be expanded, even
-if they are external.")
+; This list is always the third member of an SXML
+; element node, after " (nonterm "name") 
+; " and " (nonterm "attr-aux-list") ". If an node has
+; no annotations, the " (nonterm "aux-list") " must
+; be specified as " (code "(@)") ". " 
 
-   (p
-    "The third normal form 3NF makes " (code (nonterm "aux-list")) "
-mandatory as well. This list is always the third member of an SXML
-element node, after " (code (nonterm "name")) 
-" and " (code (nonterm "attributes-list")) ". If an element node has
-no associated auxiliary information, the " (code (nonterm "aux-list")) " must
-be specified as " (code "(@@)") ". In addition, all text strings must be
-joined into maximal text strings: no " (code (nonterm "Nodelist")) " shall
+"In addition, all text strings must be
+joined into maximal text strings: no " (nonterm "Nodelist") " shall
 contain two adjacent text-string nodes.")
 
-; A node " (code (nonterm "namespaces"))  " may appear only in
+; A node " (nonterm "namespaces")  " may appear only in
 ; a " (code "*TOP*") " element.")
-; Mention *NAMESPACES* in @@ of an attribute. It is allowed, in 0NF and
+; Mention *NAMESPACES* in @ of an attribute. It is allowed, in 0NF and
 ; perhaps 1NF, but not in higher NF.
 
    (p
     "The normal forms make it possible to access SXML items in
 efficient ways. If an SXML document is known to be in the 3NF, for
 example, an application never has to check for the existence of
- " (code (nonterm "attributes-list")) " or " (code (nonterm "aux-list"))
+ " (nonterm "annot-attributes") " or " (nonterm "annotations")
 ". Checking for child nodes and retrieving text data are simplified as well.")
 
 
@@ -746,7 +821,7 @@ example, an application never has to check for the existence of
 	(td (@ (align "left"))
 	    (verbatim
 	     "(*TOP*"
-	     "  (@@ (*NAMESPACES* "
+	     "  (@ (*NAMESPACES* "
 	     "       (HTML \"http://www.w3.org/TR/REC-html40\")))"
 	     "  (RESERVATION"
 	     "    (NAME (@ (HTML:CLASS \"largeSansSerif\"))"
@@ -761,7 +836,9 @@ example, an application never has to check for the existence of
 
 
    (Section 2 "Acknowledgment")
-   (p "I am indebted to Kirill Lisovsky of MISA University for numerous discussions and suggestions. He shares the credit for this page. The errors are all mine.")
+   (p "I am indebted to Kirill Lisovsky for numerous discussions and
+suggestions. He shares the credit for this page. The errors are all
+mine.")
 
 
    (References
@@ -818,6 +895,13 @@ XPath. September 17, 2000."
       (URL "http://sourceforge.net/mailarchive/forum.php?thread_id=759249&forum_id=599")
       (URL "http://sourceforge.net/mailarchive/forum.php?thread_id=789156&forum_id=599"))
 
+
+    (bibitem "Annotations" "Annotations"
+      "An alternative syntax for aux-list. "
+      "Discussion thread on the SSAX-SXML mailing list. "
+      "January 5-14, 2004."
+      (URL "http://article.gmane.org/gmane.lisp.scheme.ssax-sxml/37"))
+
     (bibitem "DOM" "DOM"
        "World Wide Web Consortium. Document Object Model (DOM) Level 1
 Specification. W3C Recommendation."
@@ -841,7 +925,88 @@ Specification. W3C Recommendation."
 Version 1.0. W3C Recommendation. November 16, 1999."
        (URL "http://www.w3.org/TR/xpath"))
     )
-   
+
+  (Section 2 "Changes from the previous version")
+
+  (p "Following the suggestion by Matthias Radestock, " (nonterm
+"aux-list") " is renamed into " (nonterm "annotations") ", and " (nonterm
+"aux-node") " into " (nonterm "annotation") ". What used to be called
+" (nonterm "attribute-list") " is now " (nonterm "annot-attributes")
+".")
+  (p
+    "Jim Bender suggested to permit annotations in " (nonterm "PI") "
+nodes, for example, to record the location of the processing
+instruction in the document source.")
+  (p "We have added a detailed discussion of annotations on a single
+attribute, and of " (nonterm "TOP") " annotations.")
+
+  (p
+    "Previously SXML defined an attributes list and an aux-list as:")
+
+    (verbatim
+      "[3]  <attributes-list> ::= ( @ <attribute>* )"
+      "[15] <aux-list> ::= ( @@ <namespaces>? <aux-node>* )"
+      )
+
+  (p "Both lists looked alike, as tagged associative lists. Attribute
+lists were tagged with a distinguished symbol " (code "@") " and
+aux-lists were tagged with a distinguished symbol " (code "@@")
+". Both lists were ``improper'' children of their parent SXML
+element. Both lists were optional.  An aux-list contained `auxiliary'
+associations, e.g., the information about original namespace prefixes
+or the pointer to the parent SXML element. Here is an example of an SXML
+element with both attributes-list and aux-list:")
+
+    (verbatim
+      "(tag (@ (attr \"val\")) (@@ (*parent* val)) kid1 kid2)"
+      )
+
+    (p "In a normalized SXML (2NF), both lists had to be present, and
+appear in the right order among the children of an element. The empty
+attributes-list had to be coded as " (code "(@)") " and the empty
+aux-list had to be coded as " (code "(@@)") ".")
+
+    (p "In the present version, " (nonterm "attributes-list") " is renamed into
+" (nonterm "annot-attributes") " and " (nonterm "aux-list") " into
+" (nonterm "annotations") ".  Both " (nonterm "annot-attributes") " and
+" (nonterm "annotations") " are tagged with the same symbol: " (code "@")
+". Annotations may no longer appear among the children of an
+element. Rather, annotations may only appear inside
+" (nonterm "annot-attributes") " and at the top level. The previous
+example reads now as follows:")
+
+    (verbatim
+      "(tag (@ (attr \"val\") (@ (*parent* val))) kid1 kid2)"
+      )
+
+   (p
+      "The new format for annotations makes it easier to skip them
+when not needed. If an SXML application only looks up attributes by
+their names, the change in syntax is transparent.  The transparency of
+annotation nodes in SXPath is one reason for using the same symbol
+" (code "@") " to tag both " (nonterm
+"annot-attributes") " and " (nonterm "annotations") ". In more detail,
+this point is discussed in " (cite "Annotations") ". It seems that
+most of the existing SXML processing code will not be affected by the
+change. Placing annotations inside " (nonterm "annot-attributes") "
+seems to make it easier to process them during SXSLT traversals. In
+fact, that was the original motivation for the change in syntax.")
+
+    (p "The new format makes SXML more space efficient, for documents
+where most elements have no annotations nor attributes. Indeed, an
+SXML node without attributes and annotations previously had the
+following 3NF form:")
+    (verbatim
+      "(tag (@) (@@) data)"
+      )
+    "Now, the same node is realized as"
+    (verbatim
+      "(tag (@) data) or (tag (@ (@)) data)"
+      )
+    (p "That representation saves space because " (code "(@)") " and
+" (code "(@ (@))") " can all be shared. A detailed discussion is given
+in " (cite "Annotations") ". ")
+
   (footer)
 
 
@@ -1052,55 +1217,60 @@ stylesheets are available at " ,master-url "."))))
      (nonterm		; Non-terminal of a grammar
       *macro*
       . ,(lambda (tag term)
-	   (list "<" term ">")))
+	   `(code "<" ,term ">")))
 
      (term-id		; terminal that is a Scheme id
       *macro*
       . ,(lambda (tag term)
-	   term))
+	   `(code ,term)))
 
      (term-str		; terminal that is a Scheme string
       *macro*
       . ,(lambda (tag term)
-	   (list "\"" term "\"")))
+	   (list 'code "\"" term "\"")))
 
      (term-lit		; a literal Scheme symbol
       *macro*
       . ,(lambda (tag term)
-	   `(em ,term)))
+	   `(code (em ,term))))
 
      (ebnf-opt		; An optional term
-      . ,(lambda (tag term)
-	   (list term "?")))
+       *macro*
+       . ,(lambda (tag term)
+	    (list term '(code "?"))))
 
      (ebnf-*		; Zero or more repetitions
-      . ,(lambda (tag term)
-	   (list term "*")))
+       *macro*
+       . ,(lambda (tag term)
+	    (list term '(code "*"))))
 
      (ebnf-+		; One or more repetitions
-      . ,(lambda (tag term)
-	   (list term "+")))
+       *macro*
+       . ,(lambda (tag term)
+	    (list term '(code "+"))))
 
      (ebnf-choice	; Choice of terms
-      . ,(lambda (tag . terms)
-	   (list-intersperse terms " | ")))
+       *macro*
+       . ,(lambda (tag . terms)
+	    (list-intersperse terms '(code " | "))))
 
      (sexp		; S-expression constructor
       *macro*
       . ,(lambda (tag . terms)
-	   `((strong "(") " " ,(list-intersperse terms " ") " "
-	     (strong ")"))))
+	   `((code (strong "(") " ") ,(list-intersperse terms " ")
+	      (code " " (strong ")")))))
 
      (sexp-cons		; S-expression constructor, like cons
       *macro*
       . ,(lambda (tag pcar pcdr)
-	   `((strong "(") " " ,pcar (strong " . ") ,pcdr  " "
-	      (strong ")"))))
+	   `((code (strong "(") " ") ,pcar (code (strong " . ")) ,pcdr
+	      (code " " (strong ")")))))
 
      (sexp-symb		; Symbol constructor
       *macro*
       . ,(lambda (tag . terms)
-	   `((strong (em "MAKE-SYMBOL") "(") ,terms (strong ")"))))
+	   `((code (strong (em "make-symbol") "(")) ,terms
+	     (code (strong ")")))))
 
      (production
       *macro*
@@ -1109,14 +1279,13 @@ stylesheets are available at " ,master-url "."))))
 	      (td (@ (align right))
 		(a (@ (name ("prod-" ,number))) "[" ,number "]") (n_))
 	      (td (@ (align right))
-		(code ,lhs))
+		,lhs)
 	      (td (@ (align center))
 		(code " ::= "))
 	      (td (@ (align left))
-		(code
-		  ,(if (pair? rhs)
-		     (list-intersperse rhs " ")
-		     rhs))
+		,(if (pair? rhs)
+		   (list-intersperse rhs " ")
+		   rhs)
 		" " ,comment))))
 
      (productions
@@ -1127,3 +1296,5 @@ stylesheets are available at " ,master-url "."))))
 
 (generate-HTML Content)
 
+
+; LocalWords:  Infoset XPath LocalName ExpName NCName QName XSLT Nodelist CDATA
