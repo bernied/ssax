@@ -78,6 +78,16 @@
      => list)
     (else '())))
 
+; optimized (string-rindex name #\:)
+; returns position of a separator between namespace-id and LocalName
+(define-macro (sxml:find-name-separator len)
+  `(let rpt ((pos (-- ,len))) 
+     (cond
+       ((negative? pos) #f) 	
+       ((char=? #\: (string-ref name pos)) pos)
+       (else (rpt (-- pos))))))
+  
+
 ; sxml error message
 (define (sxml:error . messages)
   (cerr nl "SXML ERROR: ")
@@ -87,25 +97,6 @@
 
 ;==============================================================================
 ; Predicates
-
-; Predicate which returns #t if <obj> is SXML element, otherwise returns #f. 
-; A faster counterpart to ((ntype?? *) obj)
-(define (sxml:element? obj)	
-   (and (pair? obj)
-	(symbol? (car obj))
-	(not (memq (car obj) 
-	'(@ @@ *PI* *COMMENT* *ENTITY*)))))
-
-
-; In SXML everything but auxiliary list is a SXML node
-; Auxilliary list contains some "hidden" information and is not considered 
-; as SXML node.
-(define (sxml:node? node)
-  (not 
-    (and 
-      (pair? node)
-      (eq? (car node) '@@))))
-
 
 ; Predicate which returns #t if given element <obj> is empty. 
 ; Empty element has no nested elements, text nodes, PIs, Comments or entities
@@ -204,21 +195,27 @@
   (let* ((name (symbol->string (car obj)))
 	 (len (string-length name)))
     (cond
-      ((let rpt ((pos (-- len))) ; optimized and inlined (string-rindex name #\:) 
-	 (cond
-	   ((negative? pos) #f) 	
-	   ((char=? #\: (string-ref name pos)) pos)
-	   (else (rpt (-- pos)))))
+      ((sxml:find-name-separator len)
        => (lambda (pos) 
 	    (substring name (+ pos 1) len)))
       (else name))))
+
+; Returns namespace-id part of given name, or #f if it's LocalName
+(define (sxml:name->ns-id sxml-name)
+  (let* ((name (symbol->string sxml-name)))
+    (cond
+      ((sxml:find-name-separator (string-length name))
+       => (lambda (pos) 
+	    (substring name  0 pos)))
+      (else #f))))
+    
 
 ; Returns the content of given SXML element or nodeset (just text and element
 ; nodes) representing it as a list of strings and nested elements in document 
 ; order.  This list is empty if <obj> is empty element or empty list.
 (define (sxml:content obj)
   (((if (nodeset? obj) 
-      sxp:filter
+      sxml:filter
       select-kids) 
     (lambda(x)
       (or
@@ -253,15 +250,6 @@
        cddr)
      cdr) obj))
 
-; Returns the list of attributes for given element or nodeset.
-; Analog of ((sxpath '(@ *)) obj)
-; Empty list is returned if there is no list of attributes.
-(define (sxml:attr-list obj)
-  (if (and (not (null? (cdr obj)))
-	    (pair? (cadr obj)) 
-	    (eq? '@ (caadr obj)))
-	 (cdadr obj)
-	 '()))
 
 ; Returns the list of attributes for given element or nodeset.
 ; Analog of ((sxpath '(@ *)) obj)
@@ -606,7 +594,7 @@
 	,@(sxml:content obj)))
       obj)
 
-; Eliminates empty lists of attributes and aux-nodes for given SXML element 
+; Eliminates empty lists of attributes and aux-lists for given SXML element 
 ; <obj> and its descendants ("minimize" it)
 ; Returns: minimized and normalized SXML element
 (define (sxml:squeeze! obj)
@@ -635,8 +623,9 @@
        (sxml:content obj))
     ))
    )
+
 	     
-; Eliminates empty lists of attributes and aux-nodes for given SXML element 
+; Eliminates empty lists of attributes and aux-lists for given SXML element 
 ; <obj> and its descendants ("minimize" it)
 ; Returns: minimized and normalized SXML element
 (define (sxml:squeeze obj)
@@ -663,6 +652,25 @@
 	    (else x)))
        (sxml:content obj))))
 
+; Eliminates empty lists of attributes and ALL aux-lists for given SXML element 
+; <obj> and its descendants
+; Returns: minimized and normalized SXML element
+(define (sxml:clean obj)
+  `(,(sxml:name obj)
+   ,@(cond 
+	((sxml:attr-list-node obj)
+	 => (lambda (atl) 
+	      (if (null? (cdr atl)) 
+		 '()
+	         (list atl))))	
+	(else '()))
+    ,@(map
+	(lambda(x)
+	  (cond 
+	    (((ntype?? '*) x)
+	     (sxml:clean x))
+	    (else x)))
+       (sxml:content obj))))
 ;==============================================================================
 ; SXPath-related 
 
@@ -688,30 +696,6 @@
 	(car lst))
       (else (rpt (cdr lst)))) 
     )))
-
-;------------------------------------------------------------------------------
-; Wrappers 
-
-; sxpath always returns a list, which is #t in Scheme 
-; if-sxpath returns #f instead of empty list
-(define (if-sxpath path)
-  (lambda (obj)
-   (let ((x ((sxpath path) obj)))
-     (if (null? x) #f x))))
-
-; Returns first node found, if any.
-; Otherwise returns #f.
-(define (if-car-sxpath path)
-  (lambda (obj)
-   (let ((x ((sxpath path) obj)))
-     (if (null? x) #f (car x)))))
-
-; Returns first node found, if any.
-; Otherwise returns empty list.
-(define (car-sxpath path)
-  (lambda (obj)
-   (let ((x ((sxpath path) obj)))
-     (if (null? x) '() (car x)))))
 
 ;------------------------------------------------------------------------------
 ; Fast node-parent 
@@ -740,7 +724,7 @@
     ((elt obj)
      (p '*TOP*)
      (at-aux (if (eq? (sxml:name obj) '*TOP*)
-		'()
+		(list (cons '@@ (sxml:aux-list-u obj)))
 		(list
 		  (cons '@ (sxml:attr-list obj))
 		  (cons '@@ (cons `(*PARENT* ,(lambda() (car top-ptr))) 
@@ -763,29 +747,6 @@
 		     (sxml:content elt)))))
       (set-cdr! h b)
       h)))
-
-;------------------------------------------------------------------------------
-; lookup by a value of ID type attribute
-
-; Built an index as a list of (ID_value . element) pairs for given
-; node. lpaths are location paths for attributes of type ID.
-(define (sxml:id-alist node . lpaths)
-  (apply
-    append
-    (map 
-      (lambda(lp)
-	(let ((lpr (reverse lp)))
-	  (map 
-	    (lambda (nd)
-	      (cons (sxml:attr nd (car lpr))
-		    nd))
-	    ; Selects elements with ID attributes
-	    ;  using (lpath ,(node-self (sxpath '(@ attrname))))
-	    ((sxpath (reverse (cons 
-				(node-self (sxpath `(@ ,(car lpr))))
-				(cddr lpr)))) node))   
-	  ))
-      lpaths)))
 
 
 ; Lookup an element using its ID 

@@ -1,63 +1,16 @@
 ;;			XML processing in Scheme
 ;		     SXPath -- SXML Query Language
 ;
-; This file is modified and examples-stripped version of Oleg Kiselyov's 
-; SXPath.scm 3.5 2001/01/12 23:20:35 oleg Exp oleg
-;
 ; $Id$
+;
+; This code is in Public Domain
+; It's based on SXPath by Oleg Kiselyov, and multiple improvements 
+; implemented by Dmitry Lizorkin.
+;
+; The list of differences from original SXPath.scm my be found in changelog.txt
 ; 
-; Differences from the original sxpath:
+;  Kirill Lisovsky    lisovsky@acm.org
 ;
-; 1. Criterion '*' doesn't accept COMMENT, ENTITY and NAMESPACES nodes
-;  any more
-;
-; 2. Criterion *data* introduced in ntype?? function.
-;
-; 3. Function ntype-names?? introduced. It takes a list of node names, and
-; returns a predicate Node -> Boolean
-; A node is accepted if its name is in the list of names given.
-;
-; 4. ntype-namespace-id?? introduced.  It takes a namespace-id, and
-; returns a predicate Node -> Boolean, which yields #t for nodes with this
-; very namespace-id. 
-;
-; 5. sxpath has an additional rewriting rule for 'or@':
-; (sxpath1 '(or@ ...))  -> (select-kids (ntype-names??
-;                                          (cdr '(or@ ...))))
-;
-; 6. Function "filter" is renamed as "sxp:filter" for the sake of
-; compatibility with SRFI-1
-;
-; 7. Function pretty-print is replaced by pp
-;
-; 8. Function "sxp:invert" introduced.
-;
-; 9. sxpath has an additional rewriting rule for 'not@' (EXPERIMENTAL?):
-; (sxpath1 '(not@ ...)) -> (select-kids (sxp:invert 
-;                                         (ntype-names??
-;                                          (cdr '(not@ ...)))))
-;
-; 10. sxpath has an additional rewriting rule for 'ns-id:*' (EXPERIMENTAL?):
-; (sxpath1 '(ns-id:* x)) -> (select-kids 
-;                                      (ntype-namespace-id?? x))
-;
-; 11. Function renamed:
-;          node-typeof?       --> ntype??
-;
-; 12. SXPathlib 3.5.1.x functions renamed:           
-;          node-nameof?       --> ntype-names??
-;          node-prefix-of?    --> ntype-names??
-;
-; 13. Aux-lists are supported. Aux lists are "special" nodes with '@@ name       
-;
-; 14. *NAMESPACES* are nested in aux-lists.       
-;         
-; 15. SXPathlib 3.5.2.3:
-;         ntype??              - optimized                  
-;         ntype-namespace-id?? - ns-id parameter is a string now
-;
-;         Kirill Lisovsky 
-;         lisovsky@acm.org
 ;                                 *  *  *
 ;
 ; SXPath is a query language for SXML, an instance of XML Information
@@ -129,11 +82,8 @@
 ; example, tree1.
 ;
 
-(define (nodeset? x)
-  (or (and (pair? x) (not (symbol? (car x)))) (null? x)))
 
-
-;-------------------------
+;=============================================================================
 ; Basic converters and applicators
 ; A converter is a function
 ;	type Converter = Node|Nodeset -> Nodeset
@@ -142,11 +92,28 @@
 ; nodeset, the converter-predicate is deemed satisfied. Throughout
 ; this file a nil nodeset is equivalent to #f in denoting a failure.
 
+; Returns #t if given object is a nodeset
+(define (nodeset? x)
+  (or (and (pair? x) (not (symbol? (car x)))) (null? x)))
 
-; The following function implements a 'Node test' as defined in
+; If x is a nodeset - returns it as is, otherwise wrap it in a list.
+(define (as-nodeset x)
+  (if (nodeset? x) x (list x)))
+
+;-----------------------------------------------------------------------------
+; Node test
+; The following functions implement 'Node test's as defined in
 ; Sec. 2.3 of XPath document. A node test is one of the components of a
 ; location step. It is also a converter-predicate in SXPath.
 
+; Predicate which returns #t if <obj> is SXML element, otherwise returns #f. 
+(define (sxml:element? obj)	
+   (and (pair? obj)
+	(symbol? (car obj))
+	(not (memq (car obj) 
+			   ; '(@ @@ *PI* *COMMENT* *ENTITY* *NAMESPACES*)
+			   ; the line above is a workaround for old SXML
+	'(@ @@ *PI* *COMMENT* *ENTITY*)))))
 
 ; The function ntype-names?? takes a list of acceptable node names as a
 ; criterion and returns a function, which, when applied to a node, 
@@ -157,15 +124,6 @@
   (lambda(node)
     (and (pair? node)
 	 (memq (car node) crit))))
-
-; This function takes a predicate and returns it inverted 
-; That is if the given predicate yelds #f or '() the inverted one  
-; yields the given node (#t) and vice versa.
-(define (sxp:invert pred)
-  (lambda(node)
-    (case (pred node)
-      ((#f '()) node)
-      (else #f))))
 
 ; The function ntype?? takes a type criterion and returns
 ; a function, which, when applied to a node, will tell if the node satisfies
@@ -186,11 +144,7 @@
 ;	*any*		- #t for any type of Node
 (define (ntype?? crit)
   (case crit
-    ((*) (lambda (node)
-	   (and (pair? node)
-		(symbol? (car node)) ; is used for "permissive" SXML data
-		(not (memq (car node) 
-			   '(@ @@ *PI* *COMMENT* *ENTITY*))))))
+    ((*) sxml:element?)
     ((*any*) (lambda (node) #t))
     ((*text*) (lambda (node) (string? node)))
     ((*data*) (lambda (node) (not (pair? node))))
@@ -214,6 +168,16 @@
 		(= pos (string-length ns-id))
 		(string-prefix? ns-id nm))))
 	     (else (not ns-id)))))))
+;^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+; This function takes a predicate and returns it inverted 
+; That is if the given predicate yelds #f or '() the inverted one  
+; yields the given node (#t) and vice versa.
+(define (sxml:invert pred)
+  (lambda(node)
+    (case (pred node)
+      ((#f '()) node)
+      (else #f))))
 
 ; Curried equivalence converter-predicates
 (define (node-eq? other)
@@ -235,7 +199,6 @@
 ; the tail of the list.
 ; ((node-pos -1) Nodeset) selects the last node of a non-empty nodeset;
 ; ((node-pos -2) Nodeset) selects the last but one node, if exists.
-
 (define (node-pos n)
   (lambda (nodeset)
     (cond
@@ -251,9 +214,10 @@
 ; A filter applicator, which introduces a filtering context. The argument
 ; converter is considered a predicate, with either #f or nil result meaning
 ; failure.
-(define (sxp:filter pred?)
+(define (sxml:filter pred?)
   (lambda (lst)	; a nodeset or a node (will be converted to a singleton nset)
-    (let loop ((lst (if (nodeset? lst) lst (list lst))) (res '()))
+    (let loop ((lst (as-nodeset lst)) 
+	       (res '()))
       (if (null? lst)
 	  (reverse res)
 	  (let ((pred-result (pred? (car lst))))
@@ -274,10 +238,9 @@
 ; The nodeset returned by ((take-until (not pred)) nset) is a subset -- 
 ; to be more precise, a prefix -- of the nodeset returned by
 ; ((filter pred) nset)
-
 (define (take-until pred?)
   (lambda (lst)	; a nodeset or a node (will be converted to a singleton nset)
-    (let loop ((lst (if (nodeset? lst) lst (list lst))))
+    (let loop ((lst (as-nodeset lst)))
       (if (null? lst) lst
 	  (let ((pred-result (pred? (car lst))))
 	    (if (and pred-result (not (null? pred-result)))
@@ -295,10 +258,9 @@
 ; take-after along with take-until partition an input nodeset into three
 ; parts: the first element that satisfies a predicate, all preceding
 ; elements and all following elements.
-
 (define (take-after pred?)
   (lambda (lst)	; a nodeset or a node (will be converted to a singleton nset)
-    (let loop ((lst (if (nodeset? lst) lst (list lst))))
+    (let loop ((lst (as-nodeset lst)))
       (if (null? lst) lst
 	  (let ((pred-result (pred? (car lst))))
 	    (if (and pred-result (not (null? pred-result)))
@@ -311,7 +273,6 @@
 ;
 ; From another point of view, map-union is a function Converter->Converter,
 ; which places an argument-converter in a joining context.
-
 (define (map-union proc lst)
   (if (null? lst) lst
       (let ((proc-res (proc (car lst))))
@@ -332,7 +293,6 @@
 ; (node-trace title) is an identity converter. In addition it prints out
 ; a node or nodeset it is applied to, prefixed with the 'title'.
 ; This converter is very useful for debugging.
-
 (define (node-trace title)
   (lambda (node-or-nodeset)
     (cout nl "-->" title " :")
@@ -340,7 +300,7 @@
     node-or-nodeset))
 
 
-;-------------------------
+;------------------------------------------------------------------------------
 ; Converter combinators
 ;
 ; Combinators are higher-order functions that transmogrify a converter
@@ -366,14 +326,13 @@
 ;
 ; More succinctly, the signature of this function is
 ; select-kids:: Converter -> Converter
-
 (define (select-kids test-pred?)
   (lambda (node)		; node or node-set
     (cond 
      ((null? node) node)
      ((not (pair? node)) '())   ; No children
      ((symbol? (car node))
-      ((sxp:filter test-pred?) (cdr node)))	; it's a single node
+      ((sxml:filter test-pred?) (cdr node)))	; it's a single node
      (else (map-union (select-kids test-pred?) node)))))
 
 
@@ -382,7 +341,7 @@
 ; Similar to select-kids but apply to the Node itself rather
 ; than to its children. The resulting Nodeset will contain either one
 ; component, or will be empty (if the Node failed the Pred).
-(define node-self sxp:filter)
+(define node-self sxml:filter)
 
 
 ; node-join:: [LocPath] -> Node|Nodeset -> Nodeset, or
@@ -451,7 +410,6 @@
 ; (select-kids (ntype?? '*)) will return an empty nodeset. At
 ; this point further iterations will no longer affect the result and
 ; can be stopped.
-
 (define (node-closure test-pred?)	    
   (lambda (node)		; Nodeset or node
     (let loop ((parent node) (result '()))
@@ -461,118 +419,108 @@
 			((select-kids test-pred?) parent)))
 	  ))))
 
+;=============================================================================
+; Unified with sxpath-ext and sxml-tools
+
+; According to XPath specification 2.3, this test is true for any
+; XPath node.
+; For SXML auxiliary lists and lists of attributes has to be excluded.
+(define (sxml:node? node)
+  (not (and 
+	 (pair? node)
+	 (memq (car node) '(@ @@)))))
+
+; Returns the list of attributes for a given SXML node
+; Empty list is returned if the given node os not an element,
+; or if it has no list of attributes
+(define (sxml:attr-list obj)
+  (if (and  (sxml:element? obj) 
+	    (not (null? (cdr obj)))
+	    (pair? (cadr obj)) 
+	    (eq? '@ (caadr obj)))
+	 (cdadr obj)
+	 '()))
+
+; Attribute axis
+(define (sxml:attribute test-pred?)
+  (let ((fltr (sxml:filter test-pred?)))
+    (lambda (node)
+      (fltr
+	(apply append
+	       (map
+             sxml:attr-list
+		(as-nodeset node)))))))
+
+; Child axis
+;  This function is similar to 'select-kids', but it returns an empty
+;  child-list for PI, Comment and Entity nodes
+(define (sxml:child test-pred?)
+  (lambda (node)		; node or node-set
+    (cond 
+      ((null? node) node)
+      ((not (pair? node)) '())   ; No children
+      ((memq (car node) '(*PI* *COMMENT* *ENTITY*))   ; PI, Comment or Entity
+       '())   ; No children
+      ((symbol? (car node))    ; it's a single node       
+       ((sxml:filter test-pred?) (cdr node)))
+      (else (map-union (sxml:child test-pred?) node)))))
+
+; Parent axis
+; Given a predicate, it returns a function 
+;  RootNode -> Converter
+; which which yields a 
+;  node -> parent 
+; converter then applied to a rootnode.
+; Thus, such a converter may be constructed using
+;  ((sxml:parent test-pred) rootnode)
+; and returns a parent of a node it is applied to.
+; If applied to a nodeset, it returns the 
+; list of parents of nodes in the nodeset. The rootnode does not have
+; to be the root node of the whole SXML tree -- it may be a root node
+; of a branch of interest.
+; The parent:: axis can be used with any SXML node.
+(define (sxml:parent test-pred?)
+  (lambda (root-node)   ; node or nodeset
+    (lambda (node)   ; node or nodeset
+      (if (nodeset? node)
+	(map-union ((sxml:parent test-pred?) root-node) node)
+	(let rpt ((pairs
+		    (apply append
+		     (map 
+			      (lambda (root-n)
+				(map
+				  (lambda (arg) (cons arg root-n))
+				  (append 
+				    (sxml:attr-list root-n)
+				    ((sxml:child sxml:node?) root-n))))
+                              (as-nodeset root-node)))
+		     ))
+	  (if (null? pairs)
+	    '()
+	    (let ((pair (car pairs)))
+	      (if (eq? (car pair) node)
+		((sxml:filter test-pred?) (list (cdr pair)))
+		(rpt (append
+			(map
+			  (lambda (arg) (cons arg (car pair)))
+			  (append 
+			    (sxml:attr-list (car pair))
+			    ((sxml:child sxml:node?) (car pair))))
+			(cdr pairs)
+			))))))))))
+
 ; node-parent:: RootNode -> Converter
 ; (node-parent rootnode) yields a converter that returns a parent of a
 ; node it is applied to. If applied to a nodeset, it returns the list
-; of parents of nodes in the nodeset. The rootnode does not have
-; to be the root node of the whole SXML tree -- it may be a root node
-; of a branch of interest.
+; of parents of nodes in the nodeset.
 ; Given the notation of Philip Wadler's paper on semantics of XSLT,
 ;  parent(x) = { y | y=subnode*(root), x=subnode(y) }
 ; Therefore, node-parent is not the fundamental converter: it can be
 ; expressed through the existing ones.  Yet node-parent is a rather
 ; convenient converter. It corresponds to a parent:: axis of SXPath.
-; Note that the parent:: axis can be used with an attribute node as well!
-
-(define (node-parent rootnode)
-  (lambda (node)		; Nodeset or node
-    (if (nodeset? node) (map-union (node-parent rootnode) node)
-	(let ((pred
-	       (node-or
-		(node-reduce
-		 (node-self (ntype?? '*))
-		 (select-kids (node-eq? node)))
-		(node-join
-		 (select-kids (ntype?? '@))
-		 (select-kids (node-eq? node))))))
-	  ((node-or
-	    (node-self pred)
-	    (node-closure pred))
-	   rootnode)))))
-
-;-------------------------
-; Evaluate an abbreviated SXPath
-;	sxpath:: AbbrPath -> Converter, or
-;	sxpath:: AbbrPath -> Node|Nodeset -> Nodeset
-; AbbrPath is a list. It is translated to the full SXPath according
-; to the following rewriting rules
-; (sxpath '()) -> (node-join)
-; (sxpath '(path-component ...)) ->
-;		(node-join (sxpath1 path-component) (sxpath '(...)))
-; (sxpath1 '//) -> (node-or 
-;		     (node-self (ntype?? '*any*))
-;		      (node-closure (ntype?? '*any*)))
-; (sxpath1 '(equal? x)) -> (select-kids (node-equal? x))
-; (sxpath1 '(eq? x))    -> (select-kids (node-eq? x))
-; (sxpath1 '(or@ ...))  -> (select-kids (ntype-names??
-;                                          (cdr '(or@ ...))))
-; (sxpath1 '(not@ ...)) -> (select-kids (sxp:invert 
-;                                         (ntype-names??
-;                                          (cdr '(not@ ...)))))
-; (sxpath1 '(ns-id:* x)) -> (select-kids 
-;                                      (ntype-namespace-id?? x))
-; (sxpath1 ?symbol)     -> (select-kids (ntype?? ?symbol))
-; (sxpath1 procedure)   -> procedure
-; (sxpath1 '(?symbol ...)) -> (sxpath1 '((?symbol) ...))
-; (sxpath1 '(path reducer ...)) ->
-;		(node-reduce (sxpath path) (sxpathr reducer) ...)
-; (sxpathr number)      -> (node-pos number)
-; (sxpathr path-filter) -> (filter (sxpath path-filter))
-
-(define (sxpath path)
-  (lambda (nodeset)
-    (let loop ((nodeset nodeset) (path path))
-    (cond
-     ((null? path) nodeset)
-     ; or@ handler
-     ((and (list? (car path)) 
-	   (not (null? (car path)))
-	   (eq? 'or@ (caar path)))
-      (loop ((select-kids (ntype-names?? (cdar path))) nodeset)
-	    (cdr path)))
-     ; not@ handler 
-     ((and (list? (car path)) 
-	   (not (null? (car path)))
-	   (eq? 'not@ (caar path)))
-      (loop ((select-kids (sxp:invert (ntype-names?? (cdar path)))) nodeset)
-	    (cdr path)))
-     ((nodeset? nodeset)
-      (map-union (sxpath path) nodeset))
-     ((procedure? (car path))
-      (loop ((car path) nodeset) (cdr path)))
-     ((eq? '// (car path))
-      (loop
-       ((if (nodeset? nodeset) append cons) nodeset
-	((node-closure (ntype?? '*any*)) nodeset))
-       (cdr path)))
-     ((symbol? (car path))
-      (loop ((select-kids (ntype?? (car path))) nodeset)
-	    (cdr path)))
-     ((and (pair? (car path)) (eq? 'equal? (caar path)))
-      (loop ((select-kids (apply node-equal? (cdar path))) nodeset)
-	    (cdr path)))
-     ; ns-id:* handler 
-     ((and (pair? (car path)) (eq? 'ns-id:* (caar path)))
-      (loop ((select-kids (ntype-namespace-id?? (cadar path))) nodeset)
-	    (cdr path)))
-     ((and (pair? (car path)) (eq? 'eq? (caar path)))
-      (loop ((select-kids (apply node-eq? (cdar path))) nodeset)
-	    (cdr path)))
-     ((pair? (car path))
-      (let reducer ((nodeset 
-		     (if (symbol? (caar path))
-			 ((select-kids (ntype?? (caar path))) nodeset)
-			 (loop nodeset (caar path))))
-		    (reducing-path (cdar path)))
-	(cond
-	 ((null? reducing-path) (loop nodeset (cdr path)))
-	 ((number? (car reducing-path))
-	  (reducer ((node-pos (car reducing-path)) nodeset)
-		   (cdr reducing-path)))
-	 (else
-	  (reducer ((sxp:filter (sxpath (car reducing-path))) nodeset)
-		   (cdr reducing-path))))))
-     (else
-      (error "Invalid path step: " (car path)))
-))))
+;
+; Please note: this function is provided for backward compatibility 
+; with SXPath/SXPathlib ver. 3.5.x.x and earlier.
+; Now it's a particular case of 'sxml:parent' application: 
+(define node-parent (sxml:parent (ntype?? '*any*)))
 
