@@ -17,12 +17,12 @@
 ;  1. When converting a nodeset - a document order is not preserved
 ;  2. number->string function returns the result in a form which is slightly
 ; different from XPath Rec. specification
-(define (sxml:string object)
+(define (sxp:string object)
   (cond
     ((string? object) object)
     ((nodeset? object) (if (null? object)
 			 ""
-			 (sxml:string-value (car object))))
+			 (sxp:string-value (car object))))
     ((number? object) (number->string object))
     ((boolean? object) (if object "true" "false"))
     (else "")))  ; Unknown type -> empty string. 
@@ -30,7 +30,7 @@
 
 ; The counterpart to XPath 'boolean' function (section 4.3 XPath Rec.)
 ; Converts its argument to a boolean
-(define (sxml:boolean object)
+(define (sxp:boolean object)
   (cond
     ((boolean? object) object)
     ((number? object) (not (= object 0)))
@@ -44,7 +44,7 @@
 ;  1. The argument is not optional (yet?)
 ;  2. string->number conversion is not IEEE 754 round-to-nearest
 ;  3. NaN is represented as 0
-(define (sxml:number obj)
+(define (sxp:number obj)
   (cond
     ((number? obj) obj)
     ((string? obj)
@@ -53,12 +53,12 @@
 	 nmb
 	 0))) ; NaN
     ((boolean? obj) (if obj 1 0))
-    ((nodeset? obj) (sxml:number (sxml:string obj)))
+    ((nodeset? obj) (sxp:number (sxp:string obj)))
     (else 0))) ; unknown datatype
 
 ; Returns a string value for a given node in accordance to
 ; XPath Rec. 5.1 - 5.7 
-(define (sxml:string-value node)
+(define (sxp:string-value node)
   (if
     (not (pair? node))  ; a text node?
      (if (string? node)
@@ -68,7 +68,7 @@
    string-append
    (cons ""
          (map
-          sxml:string-value
+          sxp:string-value
           ((cond
 	     ((null? (cdr node)) cdr)
              ((not (pair? (cadr node))) cdr)
@@ -76,17 +76,17 @@
              (else cddr))
            node))))))
 
-; Select SXML element by its unique IDs
+; Select SXML element by their unique IDs
 ; XPath Rec. 4.1
 ;  object - a nodeset or a datatype which can be converted to a string by means
 ; of a 'string' function
 ;  id-index = ( (id-value . element) (id-value . element) ... ) 
-; This index is used for selection of an element by its unique ID. 
+; This index is used for selecting an element by its unique ID. 
 ; The result is a nodeset
-(define (sxml:id id-index)
+(define (sxp:id id-index)
   (lambda(object)
     (if (nodeset? object)
-      (let loop ((str-lst (map sxml:string-value object))
+      (let loop ((str-lst (map sxp:string-value object))
 		 (res '()))
 	(if (null? str-lst)
 	  (reverse res)
@@ -94,7 +94,7 @@
 	    (if (not node)  ; no such element
 	      (loop (cdr str-lst) res)
 	      (loop (cdr str-lst) (cons node res))))))
-      (let rpt ((lst (string->list (sxml:string object)))
+      (let rpt ((lst (string->list (sxp:string object)))
 		(tmp '())
 		(res '()))
 	(cond
@@ -117,125 +117,125 @@
              
 ;=========================================================================
 ; Comparators for XPath objects 
+; All the functions have an 'op' argument which is a symbolic representation
+; for an operation: = != < > <= >=
 
-; A helper for XPath equality operations: = , !=
-;  'bool-op', 'number-op' and 'string-op' are comparison operations for 
-; a pair of booleans,  numbers and strings respectively
-(define (sxml:equality-cmp bool-op number-op string-op)
-  (lambda (obj1 obj2)
-    (cond
-      ((and (not (nodeset? obj1)) (not (nodeset? obj2)))  
-       ; neither object is a nodeset
+; This function "inverts" an operation (example: < to >)
+(define (sxp:invert-op op)
+  (cond
+    ((assq op '((< >) (> <) (<= >=) (>= <=)))
+     => cdr)
+    (else (cerr "sxp:invert-op:  unknown operation - " op nl)
+     op)))
+
+; Compare two booleans
+(define (sxp:cmp-booleans op bool1 bool2)
+  (cond 
+    ((eq? op '=) (eq? bool1 bool2))
+    ((eq? op '!=) (not (eq? bool1 bool2)))
+    ((eq? op '<) (and (not bool1) bool2))
+    ((eq? op '>) (and bool1 (not bool2)))
+    ((eq? op '<=) (or (not bool1) bool2))
+    ((eq? op '>=) (or bool1 (not bool2)))
+    (else (cerr "sxp:cmp-booleans:  unknown operation - " op nl)
+     #f)))
+
+; Compare two numbers
+(define (sxp:cmp-numbers op num1 num2)
+  (cond
+    ((eq? op '=) (= num1 num2))
+    ((eq? op '!=) (not (= num1 num2)))
+    ((eq? op '<) (< num1 num2))
+    ((eq? op '>) (> num1 num2))
+    ((eq? op '<=) (<= num1 num2))
+    ((eq? op '>=) (>= num1 num2))
+    (else (cerr "sxp:cmp-numbers:  unknown operation - " op nl)
+     #f)))
+
+; Compare two strings
+(define (sxp:cmp-strings op str1 str2)
+  (cond
+    ((eq? op '=) (string=? str1 str2))
+    ((eq? op '!=) (not (string=? str1 str2)))
+    ((eq? op '<) (string<? str1 str2))
+    ((eq? op '>) (string>? str1 str2))
+    ((eq? op '<=) (string<=? str1 str2))
+    ((eq? op '>=) (string>=? str1 str2))
+    (else (cerr "sxp:cmp-strings:  unknown operation - " op nl)
+     #f)))
+
+; Compare a nodeset with an object
+; Object can have the following type:  nodeset, boolean, number, string
+(define (sxp:cmp-nodeset-object op nodeset object)
+  (cond
+    ((nodeset? object)
+     (let rpt ((str-set1 (map sxp:string-value nodeset))
+                (str-set2 (map sxp:string-value object)))
        (cond
-         ((boolean? obj1) (bool-op obj1 (sxml:boolean obj2)))
-         ((boolean? obj2) (bool-op (sxml:boolean obj1) obj2))
-         ((number? obj1) (number-op obj1 (sxml:number obj2)))
-         ((number? obj2) (number-op (sxml:number obj1) obj2))
-         (else  ; both objects are strings
-          (string-op obj1 obj2))))
-      ((and (nodeset? obj1) (nodeset? obj2))  ; both objects are nodesets
-       (let first ((str-set1 (map sxml:string-value obj1))
-                   (str-set2 (map sxml:string-value obj2)))
-         (cond
-           ((null? str-set1) #f)
-           ((let second ((elem (car str-set1))
-                         (set2 str-set2))
-              (cond
-                ((null? set2) #f)
-                ((string-op elem (car set2)) #t)
-                (else (second elem (cdr set2))))) #t)
-           (else
-            (first (cdr str-set1) str-set2)))))
-      (else  ; one of the objects is a nodeset, another is not
-       (let-values*
-        (((nset elem)
-          ; Equality operations are commutative
-          (if (nodeset? obj1) (values obj1 obj2) (values obj2 obj1))))
-        (cond
-          ((boolean? elem) (bool-op elem (sxml:boolean nset)))
-          ((number? elem)
-           (let loop ((nset 
-                       (map
-                        (lambda (node) (sxml:number (sxml:string-value node)))
-                        nset)))
-             (cond
-               ((null? nset) #f)
-               ((number-op elem (car nset)) #t)
-               (else (loop (cdr nset))))))
-          ((string? elem)
-           (let loop ((nset (map sxml:string-value nset)))
-             (cond
-               ((null? nset) #f)
-               ((string-op elem (car nset)) #t)
-               (else (loop (cdr nset))))))
-          (else  ; unknown datatype
-           (cerr "Unknown datatype: " elem nl)
-           #f)))))))
-                   
-         
-(define sxml:equal? (sxml:equality-cmp eq? = string=?))
+         ((null? str-set1) #f)
+         ((let loop ((set2 str-set2))
+            (cond
+	      ((null? set2) #f)
+	      ((sxp:cmp-strings op (car str-set1) (car set2)) #t)
+	      (else (loop (cdr set2))))) #t)
+         (else
+          (rpt (cdr str-set1) str-set2)))))
+    ((number? object)
+     (let rpt ((str-set (map sxp:string-value nodeset)))
+       (cond
+	 ((null? str-set) #f)
+	 ((sxp:cmp-numbers op (sxp:number (car str-set)) object) #t)
+	 (else (rpt (cdr str-set))))))
+    ((string? object)
+     (let rpt ((str-set (map sxp:string-value nodeset)))
+       (cond
+	 ((null? str-set) #f)
+	 ((sxp:cmp-strings op (car str-set) object) #t)
+	 (else (rpt (cdr str-set))))))
+    ((boolean? object)
+     (let rpt ((str-set (map sxp:string-value nodeset)))
+       (cond
+	 ((null? str-set) #f)
+	 ((sxp:cmp-booleans op (sxp:boolean (car str-set)) object) #t)
+	 (else (rpt (cdr str-set))))))
+    (else #f)))
+       
+; Compare two object
+; Object can have the following type:  nodeset, boolean, number, string
+(define (sxp:cmp-objects op obj1 obj2)
+  (cond
+    ((nodeset? obj1) (sxp:cmp-nodeset-object op obj1 obj2))
+    ((nodeset? obj2) (sxp:cmp-nodeset-object (sxp:invert-op op) obj2 obj1))
+    ((memq op '(= !=))
+     (cond
+       ((boolean? obj1) (sxp:cmp-booleans op obj1 (sxp:boolean obj2)))
+       ((boolean? obj2) (sxp:cmp-booleans op (sxp:boolean obj1) obj2))
+       ((number? obj1) (sxp:cmp-numbers op obj1 (sxp:number obj2)))
+       ((number? obj2) (sxp:cmp-numbers op (sxp:number obj1) obj2))
+       (else (sxp:cmp-strings op (sxp:string obj1) (sxp:string obj2)))))
+    (else (sxp:cmp-numbers op (sxp:number obj1) (sxp:number obj2)))))
+     
+;=========================================================================
+; Node tests
 
-(define sxml:not-equal?
-  (sxml:equality-cmp
-   (lambda (bool1 bool2) (not (eq? bool1 bool2)))
-   (lambda (num1 num2) (not (= num1 num2)))
-   (lambda (str1 str2) (not (string=? str1 str2)))))
-         
+; According to XPath specification 2.3, this test is true for every node.
+; For SXML: auxiliary lists and lists of attributes has to be excluded.
+; See also sxml:node? function in sxml-tools
+(define (sxp:node? node)
+  (not (and 
+	 (pair? node)
+	 (memq (car node) '(@ @@)))))
 
-; Relational operation ( < , > , <= , >= ) for two XPath objects
-;  op is comparison procedure: < , > , <= or >=
-(define (sxml:relational-cmp op)
-  (lambda (obj1 obj2)
-    (cond
-      ((not (or (nodeset? obj1) (nodeset? obj2)))  ; neither obj is a nodeset
-       (op (sxml:number obj1) (sxml:number obj2)))
-      ((boolean? obj1)  ; 'obj1' is a boolean, 'obj2' is a nodeset
-       (op (sxml:number obj1) (sxml:number (sxml:boolean obj2))))
-      ((boolean? obj2)  ; 'obj1' is a nodeset, 'obj2' is a boolean
-       (op (sxml:number (sxml:boolean obj1)) (sxml:number obj2)))
-      ((or (null? obj1) (null? obj2)) ; one of the objects is an empty nodeset
-       #f)
-      (else  ; at least one object is a nodeset
-       (op
-        (cond
-          ((nodeset? obj1)  ; 'obj1' is a (non-empty) nodeset
-           (let ((nset1 (map
-                         (lambda (node) (sxml:number (sxml:string-value node)))
-                         obj1)))
-             (let first ((num1 (car nset1))
-                         (nset1 (cdr nset1)))
-               (cond
-                 ((null? nset1) num1)
-                 ((op num1 (car nset1)) (first num1 (cdr nset1)))
-                 (else (first (car nset1) (cdr nset1)))))))
-          ((string? obj1) (sxml:number obj1))
-          (else  ; 'obj1' is a number
-           obj1))
-        (cond
-          ((nodeset? obj2)  ; 'obj2' is a (non-empty) nodeset
-           (let ((nset2 (map
-                         (lambda (node) (sxml:number (sxml:string-value node)))
-                         obj2)))
-             (let second ((num2 (car nset2))
-                          (nset2 (cdr nset2)))
-               (cond
-                 ((null? nset2) num2)
-                 ((op num2 (car nset2)) (second (car nset2) (cdr nset2)))
-                 (else (second num2 (cdr nset2)))))))
-          ((string? obj2) (sxml:number obj2))
-          (else  ; 'obj2' is a number
-           obj2)))))))
-           
 ;=========================================================================
 ; XPath axises
 ; An order in resulting nodeset is preserved
 
 ; Ancestor axis
-(define (sxml:ancestor test-pred?)
+(define (sxp:ancestor test-pred?)
   (lambda (root-node)   ; node or nodeset
     (lambda (node)      ; node or nodeset
       (if (nodeset? node)
-	(map-union ((sxml:ancestor test-pred?) root-node) node)
+	(map-union ((sxp:ancestor test-pred?) root-node) node)
 	(let rpt ((paths (if (nodeset? root-node)
 			   (map list root-node)
 			   (list (list root-node)))))
@@ -243,60 +243,86 @@
 	    '()
 	    (let ((path (car paths)))
 	      (if (eq? (car path) node)
-		((sxml:filter test-pred?) (cdr path))
+		((sxp:filter test-pred?) (cdr path))
 		(rpt (append
 		       (map
 			 (lambda (arg) (cons arg path))
 			 (append 
-			   ((sxml:attribute (ntype?? '*)) (car path))
-			   ((sxml:child sxml:node?) (car path))))
+			   ((sxp:attribute (ntype?? '*)) (car path))
+			   ((sxp:child sxp:node?) (car path))))
 		       (cdr paths)))))))))))
 
 ; Ancestor-or-self axis
-(define (sxml:ancestor-or-self test-pred?)
+(define (sxp:ancestor-or-self test-pred?)
   (lambda (root-node)   ; node or nodeset
     (lambda (node)   ; node or nodeset
       (if (nodeset? node)
-	(map-union ((sxml:ancestor-or-self test-pred?) root-node) node)
+	(map-union ((sxp:ancestor-or-self test-pred?) root-node) node)
 	(let rpt ((paths (if (nodeset? root-node)
 			   (map list root-node)
 			   (list (list root-node)))))
 	  (if (null? paths)
-	    ((sxml:filter test-pred?) (list node))
+	    ((sxp:filter test-pred?) (list node))
 	    (let ((path (car paths)))
 	      (if (eq? (car path) node)
-		((sxml:filter test-pred?) path)
+		((sxp:filter test-pred?) path)
 		(rpt (append
 		       (map
 			 (lambda (arg) (cons arg path))
 			 (append 
-			   ((sxml:attribute (ntype?? '*)) (car path))
-			   ((sxml:child sxml:node?) (car path))))
+			   ((sxp:attribute (ntype?? '*)) (car path))
+			   ((sxp:child sxp:node?) (car path))))
 		       (cdr paths)))))))))))
                                                                       
+; Attribute axis
+; 'sxml:attr-list' is used. Define it as sxml:attr-list-u for non-normalized SXML
+(define (sxp:attribute test-pred?)
+  (let ((fltr (sxp:filter test-pred?)))
+    (lambda (node)
+      (fltr
+	(apply append
+	  (filter-and-map
+             sxml:element?
+             sxml:attr-list
+		(if (nodeset? node) node (list node))))))))
+        
+; Child axis
+;  This function is similar to 'select-kids', but it returns an empty
+;  child-list for PI, Comment and Entity nodes
+(define (sxp:child test-pred?)
+  (lambda (node)		; node or node-set
+    (cond 
+      ((null? node) node)
+      ((not (pair? node)) '())   ; No children
+      ((memq (car node) '(*PI* *COMMENT* *ENTITY*))   ; PI, Comment or Entity
+       '())   ; No children
+      ((symbol? (car node))    ; it's a single node       
+       ((sxp:filter test-pred?) (cdr node)))
+      (else (map-union (sxp:child test-pred?) node)))))
+
 ; Descendant axis
 ; It's similar to original 'node-closure' a resulting nodeset is 
 ; in depth-first order rather than breadth-first
 ; Fix: din't descend in non-element nodes!
-(define (sxml:descendant test-pred?)
+(define (sxp:descendant test-pred?)
   (lambda (node)   ; node or nodeset
     (if (nodeset? node)
-      (map-union (sxml:descendant test-pred?) node)
+      (map-union (sxp:descendant test-pred?) node)
       (let rpt ((res '())
-		(more ((sxml:child sxml:node?) node)))
+		(more ((sxp:child sxp:node?) node)))
 	(if (null? more)
 	  (reverse res)
 	  (rpt (if (test-pred? (car more))
 		 (cons (car more) res)
 		 res)
-	       (append ((sxml:child sxml:node?) (car more))
+	       (append ((sxp:child sxp:node?) (car more))
 		       (cdr more))))))))
 
 ; Descendant-or-self axis
-(define (sxml:descendant-or-self test-pred?)
+(define (sxp:descendant-or-self test-pred?)
   (lambda (node)   ; node or nodeset
     (if (nodeset? node)
-      (map-union (sxml:descendant-or-self test-pred?) node)
+      (map-union (sxp:descendant-or-self test-pred?) node)
       (let rpt ((res '())
 		(more (list node)))
 	(if (null? more)
@@ -304,16 +330,16 @@
 	  (rpt (if (test-pred? (car more))
 		 (cons (car more) res)
 		 res)
-	       (append ((sxml:child sxml:node?) (car more))
+	       (append ((sxp:child sxp:node?) (car more))
 		       ; sxml:node?
 		       (cdr more))))))))
 
 ; Following axis
-(define (sxml:following test-pred?)
+(define (sxp:following test-pred?)
   (lambda (root-node)   ; node or nodeset
     (lambda (node)      ; node or nodeset
       (if (nodeset? node)
-	(map-union ((sxml:following test-pred?) root-node) node)
+	(map-union ((sxp:following test-pred?) root-node) node)
 	(let loop ((seq (if (nodeset? root-node)
 			  (list root-node)
 			  (list (list root-node)))))
@@ -328,27 +354,27 @@
 		 (rpt (cdr seq)
 		      (append 
 			res
-			((sxml:descendant-or-self test-pred?) (car seq)))))))
+			((sxp:descendant-or-self test-pred?) (car seq)))))))
 	    ((and (sxml:element? (caar seq))
 		  (memq node (sxml:attr-list (caar seq))))
 	     (let rpt ((sq (cdr (apply append seq)))
-		       (res ((sxml:descendant test-pred?) (caar seq))))
+		       (res ((sxp:descendant test-pred?) (caar seq))))
 	       (if (null? sq)
 		 res
 		 (rpt (cdr sq)
 		      (append res
-			      ((sxml:descendant-or-self test-pred?) (car sq)))))))
+			      ((sxp:descendant-or-self test-pred?) (car sq)))))))
 	    (else
 	      (loop (cons 
-		      ((sxml:child sxml:node?) (caar seq))
+		      ((sxp:child sxp:node?) (caar seq))
 		      (cons (cdar seq) (cdr seq)))))))))))
 
 ; Following-sibling axis
-(define (sxml:following-sibling test-pred?)
+(define (sxp:following-sibling test-pred?)
   (lambda (root-node)   ; node or nodeset
     (lambda (node)   ; node or nodeset
       (if (nodeset? node)
-	(map-union ((sxml:following-sibling test-pred?) root-node) node)
+	(map-union ((sxp:following-sibling test-pred?) root-node) node)
 	(let loop ((seqs (if (nodeset? root-node)
 			   (list root-node)
 			   (list (list root-node)))))
@@ -358,24 +384,63 @@
 	      (cond
 		((null? seq)
 		 (loop (append
-			 (map (sxml:child sxml:node?)
+			 (map (sxp:child sxp:node?)
 			      (car seqs))
 			 (cdr seqs))))
-		((eq? (car seq) node) ((sxml:filter test-pred?) (cdr seq)))
+		((eq? (car seq) node) ((sxp:filter test-pred?) (cdr seq)))
 		(else (rpt (cdr seq)))))))))))
 
 ; Namespace axis
-(define (sxml:namespace test-pred?)
+(define (sxp:namespace test-pred?)
   (lambda (node)   ; node or nodeset
-    ((sxml:filter test-pred?) 
+    ((sxp:filter test-pred?) 
      (sxml:ns-list node))))
 
-; Preceding axis
-(define (sxml:preceding test-pred?)
+; Parent axis
+; Faster counterpart to original 'node-parent' function 
+; 'node-parent' calls node-closure from the root of the document, and
+; the test-predicate for a node-closure looks like
+; (node-or (node-reduce ...) (node-join ...)) 
+; sxp:attribute?
+; aux-list?
+; comments, PI, etc ?
+; ???
+(define (sxp:parent test-pred?)
   (lambda (root-node)   ; node or nodeset
     (lambda (node)   ; node or nodeset
       (if (nodeset? node)
-	(map-union ((sxml:preceding test-pred?) root-node) node)
+	(map-union ((sxp:parent test-pred?) root-node) node)
+	(let rpt ((pairs 
+		     (apply append
+		       (map
+			 (lambda (n)
+			   (map
+			     (lambda (arg) (cons arg n))
+			     (append 
+			       ((sxp:attribute (ntype?? '*)) n)
+			       ((sxp:child sxp:node?) n))))                     
+			 (if (nodeset? root-node)
+			   root-node
+			   (list root-node))))))
+	  (if (null? pairs)
+	    '()
+	    (let ((pair (car pairs)))
+	      (if (eq? (car pair) node)
+		((sxp:filter test-pred?) (list (cdr pair)))
+		(rpt (append
+			(map
+			  (lambda (arg) (cons arg (car pair)))
+			  (append 
+			    ((sxp:attribute (ntype?? '*)) (car pair))
+			    ((sxp:child sxp:node?) (car pair))))
+			(cdr pairs)))))))))))
+
+; Preceding axis
+(define (sxp:preceding test-pred?)
+  (lambda (root-node)   ; node or nodeset
+    (lambda (node)   ; node or nodeset
+      (if (nodeset? node)
+	(map-union ((sxp:preceding test-pred?) root-node) node)
 	(let loop ((seq (if (nodeset? root-node)
 			  (list (reverse root-node))
 			  (list (list root-node)))))
@@ -383,7 +448,7 @@
 	    ((null? seq) '())
 	    ((null? (car seq)) (loop (cdr seq)))
 	    ((or (eq? (caar seq) node)
-		 (not (null? ((sxml:attribute 
+		 (not (null? ((sxp:attribute 
 				(lambda (n)
 				  (eq? n node))) 
 			      (caar seq)))))
@@ -393,17 +458,17 @@
 		 res
 		 (rpt (cdr seq)
 		      (append res
-			      (reverse ((sxml:descendant-or-self test-pred?) 
+			      (reverse ((sxp:descendant-or-self test-pred?) 
 					(car seq))))))))
-	    (else (loop (cons (reverse ((sxml:child sxml:node?) (caar seq)))
+	    (else (loop (cons (reverse ((sxp:child sxp:node?) (caar seq)))
 			      (cons (cdar seq) (cdr seq)))))))))))
 
 ; Preceding-sibling axis
-(define (sxml:preceding-sibling test-pred?)
+(define (sxp:preceding-sibling test-pred?)
   (lambda (root-node)   ; node or nodeset
     (lambda (node)   ; node or nodeset
       (if(nodeset? node)
-	(map-union ((sxml:preceding-sibling test-pred?) root-node) node)
+	(map-union ((sxp:preceding-sibling test-pred?) root-node) node)
 	(let loop ((seqs (if (nodeset? root-node)
 			   (list root-node)
 			   (list (list root-node)))))
@@ -415,8 +480,8 @@
 		 (loop (append
 			 (map
 			   (lambda (n)
-			     (reverse ((sxml:child sxml:node?) n)))
+			     (reverse ((sxp:child sxp:node?) n)))
 			   (car seqs))
 			 (cdr seqs))))
-		((eq? (car seq) node) ((sxml:filter test-pred?) (cdr seq)))
+		((eq? (car seq) node) ((sxp:filter test-pred?) (cdr seq)))
 		(else (rpt (cdr seq)))))))))))

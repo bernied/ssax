@@ -59,7 +59,6 @@
      '((@)))
     (else '())))
 
-
 ; Returns aux-list node for a given obj 
 ;   or #f if it is absent
 (define (sxml:aux-list-node obj)
@@ -79,16 +78,6 @@
      => list)
     (else '())))
 
-; optimized (string-rindex name #\:)
-; returns position of a separator between namespace-id and LocalName
-(define-macro (sxml:find-name-separator len)
-  `(let rpt ((pos (-- ,len))) 
-     (cond
-       ((negative? pos) #f) 	
-       ((char=? #\: (string-ref name pos)) pos)
-       (else (rpt (-- pos))))))
-  
-
 ; sxml error message
 (define (sxml:error . messages)
   (cerr nl "SXML ERROR: ")
@@ -98,6 +87,25 @@
 
 ;==============================================================================
 ; Predicates
+
+; Predicate which returns #t if <obj> is SXML element, otherwise returns #f. 
+; A faster counterpart to ((ntype?? *) obj)
+(define (sxml:element? obj)	
+   (and (pair? obj)
+	(symbol? (car obj))
+	(not (memq (car obj) 
+	'(@ @@ *PI* *COMMENT* *ENTITY*)))))
+
+
+; In SXML everything but auxiliary list is a SXML node
+; Auxilliary list contains some "hidden" information and is not considered 
+; as SXML node.
+(define (sxml:node? node)
+  (not 
+    (and 
+      (pair? node)
+      (eq? (car node) '@@))))
+
 
 ; Predicate which returns #t if given element <obj> is empty. 
 ; Empty element has no nested elements, text nodes, PIs, Comments or entities
@@ -196,47 +204,27 @@
   (let* ((name (symbol->string (car obj)))
 	 (len (string-length name)))
     (cond
-      ((sxml:find-name-separator len)
+      ((let rpt ((pos (-- len))) ; optimized and inlined (string-rindex name #\:) 
+	 (cond
+	   ((negative? pos) #f) 	
+	   ((char=? #\: (string-ref name pos)) pos)
+	   (else (rpt (-- pos)))))
        => (lambda (pos) 
 	    (substring name (+ pos 1) len)))
       (else name))))
-
-; Returns namespace-id part of given name, or #f if it's LocalName
-(define (sxml:name->ns-id sxml-name)
-  (let* ((name (symbol->string sxml-name)))
-    (cond
-      ((sxml:find-name-separator (string-length name))
-       => (lambda (pos) 
-	    (substring name  0 pos)))
-      (else #f))))
-    
 
 ; Returns the content of given SXML element or nodeset (just text and element
 ; nodes) representing it as a list of strings and nested elements in document 
 ; order.  This list is empty if <obj> is empty element or empty list.
 (define (sxml:content obj)
   (((if (nodeset? obj) 
-      sxml:filter
+      sxp:filter
       select-kids) 
     (lambda(x)
       (or
 	(string? x)   ;  ((ntype?? '*text*) x)
        ((ntype?? '*) x)))) 
    obj))
-
-; Returns a string which combines all the character data 
-; from text node childrens of the given SXML element
-; or "" if there is no text node children
-(define (sxml:text obj)
-  (let ((tnodes
-	 ((select-kids
-	   string?) 
-	   obj)))
-    (cond 
-      ((null? tnodes) "")
-      ((null? (cdr tnodes))
-       (car tnodes))
-      (else (apply string-append tnodes)))))
 
 ;------------------------------------------------------------------------------
 ; Normalization-dependent accessors
@@ -265,6 +253,15 @@
        cddr)
      cdr) obj))
 
+; Returns the list of attributes for given element or nodeset.
+; Analog of ((sxpath '(@ *)) obj)
+; Empty list is returned if there is no list of attributes.
+(define (sxml:attr-list obj)
+  (if (and (not (null? (cdr obj)))
+	    (pair? (cadr obj)) 
+	    (eq? '@ (caadr obj)))
+	 (cdadr obj)
+	 '()))
 
 ; Returns the list of attributes for given element or nodeset.
 ; Analog of ((sxpath '(@ *)) obj)
@@ -320,12 +317,6 @@
      => cadr)
     (else #f)))
 
-; Extracts a value of attribute with given name from attr-list
-(define (sxml:attr-from-list attr-list name)
-	    (cond 
-	      ((assq name attr-list) 
-	       => cadr)
-	      (else #f)))
 
 ; Accessor for a numerical attribute <attr-name> of given SXML element <obj> 
 ; which It returns: 
@@ -615,7 +606,7 @@
 	,@(sxml:content obj)))
       obj)
 
-; Eliminates empty lists of attributes and aux-lists for given SXML element 
+; Eliminates empty lists of attributes and aux-nodes for given SXML element 
 ; <obj> and its descendants ("minimize" it)
 ; Returns: minimized and normalized SXML element
 (define (sxml:squeeze! obj)
@@ -644,9 +635,8 @@
        (sxml:content obj))
     ))
    )
-
 	     
-; Eliminates empty lists of attributes and aux-lists for given SXML element 
+; Eliminates empty lists of attributes and aux-nodes for given SXML element 
 ; <obj> and its descendants ("minimize" it)
 ; Returns: minimized and normalized SXML element
 (define (sxml:squeeze obj)
@@ -673,25 +663,6 @@
 	    (else x)))
        (sxml:content obj))))
 
-; Eliminates empty lists of attributes and ALL aux-lists for given SXML element 
-; <obj> and its descendants
-; Returns: minimized and normalized SXML element
-(define (sxml:clean obj)
-  `(,(sxml:name obj)
-   ,@(cond 
-	((sxml:attr-list-node obj)
-	 => (lambda (atl) 
-	      (if (null? (cdr atl)) 
-		 '()
-	         (list atl))))	
-	(else '()))
-    ,@(map
-	(lambda(x)
-	  (cond 
-	    (((ntype?? '*) x)
-	     (sxml:clean x))
-	    (else x)))
-       (sxml:content obj))))
 ;==============================================================================
 ; SXPath-related 
 
@@ -717,6 +688,30 @@
 	(car lst))
       (else (rpt (cdr lst)))) 
     )))
+
+;------------------------------------------------------------------------------
+; Wrappers 
+
+; sxpath always returns a list, which is #t in Scheme 
+; if-sxpath returns #f instead of empty list
+(define (if-sxpath path)
+  (lambda (obj)
+   (let ((x ((sxpath path) obj)))
+     (if (null? x) #f x))))
+
+; Returns first node found, if any.
+; Otherwise returns #f.
+(define (if-car-sxpath path)
+  (lambda (obj)
+   (let ((x ((sxpath path) obj)))
+     (if (null? x) #f (car x)))))
+
+; Returns first node found, if any.
+; Otherwise returns empty list.
+(define (car-sxpath path)
+  (lambda (obj)
+   (let ((x ((sxpath path) obj)))
+     (if (null? x) '() (car x)))))
 
 ;------------------------------------------------------------------------------
 ; Fast node-parent 
@@ -745,7 +740,7 @@
     ((elt obj)
      (p '*TOP*)
      (at-aux (if (eq? (sxml:name obj) '*TOP*)
-		(list (cons '@@ (sxml:aux-list-u obj)))
+		'()
 		(list
 		  (cons '@ (sxml:attr-list obj))
 		  (cons '@@ (cons `(*PARENT* ,(lambda() (car top-ptr))) 
@@ -769,6 +764,30 @@
       (set-cdr! h b)
       h)))
 
+;------------------------------------------------------------------------------
+; lookup by a value of ID type attribute
+
+; Built an index as a list of (ID_value . element) pairs for given
+; node. lpaths are location paths for attributes of type ID.
+(define (sxml:id-alist node . lpaths)
+  (apply
+    append
+    (map 
+      (lambda(lp)
+	(let ((lpr (reverse lp)))
+	  (map 
+	    (lambda (nd)
+	      (cons (sxml:attr nd (car lpr))
+		    nd))
+	    ; Selects elements with ID attributes
+	    ;  using (lpath ,(node-self (sxpath '(@ attrname))))
+	    ((sxpath (reverse (cons 
+				(node-self (sxpath `(@ ,(car lpr))))
+				(cddr lpr)))) node))   
+	  ))
+      lpaths)))
+
+
 ; Lookup an element using its ID 
 (define (sxml:lookup id index)
     (cond
@@ -779,6 +798,37 @@
 ;==============================================================================
 ; Markup generation
 
+; Filter the 'fragments'
+; The fragments are a list of strings, characters,
+; numbers, thunks, #f -- and other fragments.
+; The function traverses the tree depth-first, and returns a list
+; of strings, characters and executed thunks, and ignores #f and '().
+;
+; If all the meaningful fragments are strings, then
+;  (apply string-append ... )
+; to a result of this function will return its string-value 
+;
+; It may be considered as a variant of Oleg Kiselyov's SRV:send-reply:
+; While SRV:send-reply displays fragments, this function returns the list 
+; of meaningful fragments and filter out the garbage.
+(define (sxml:clean-feed . fragments)
+  (reverse
+  (let loop ((fragments fragments) (result '()))
+    (cond
+      ((null? fragments) result)
+      ((not (car fragments)) (loop (cdr fragments) result))
+      ((null? (car fragments)) (loop (cdr fragments) result))
+      ((pair? (car fragments))
+        (loop (cdr fragments) 
+	      (loop (car fragments) result)))
+ ;      ((procedure? (car fragments))
+ ;         (loop (cdr fragments) 
+ ;              (cons ((car fragments))
+ ;	       result)))
+      (else
+        (loop (cdr fragments) 
+	      (cons (car fragments) result)))))))
+
 ;------------------------------------------------------------------------------
 ; XML
 
@@ -786,14 +836,6 @@
 (define (sxml:attr->xml attr)
    (list " " (sxml:ncname attr)
 	 "='" (cadr attr) "'"))
-
-; Return a string or a list of strings where all the occurences of 
-; characters < > & " ' in a given string are replaced by corresponding 
-; character entity references. See also:  sxml:string->html
-(define sxml:string->xml
-  (make-char-quotator
-   '((#\< . "&lt;") (#\> . "&gt;") (#\& . "&amp;") 
-		    (#\" . "&quot;") (#\' . "&apos;"))))
 
 ; A version of dispatch-node specialized and optimized for SXML->XML
 ; transformation.
@@ -804,15 +846,17 @@
 	    (sxml:sxml->xml a-tree)) 
 	  tree))
     ((pair? tree)
-     (let* ((name (sxml:name tree))   ; NS (URI-prefixed) not supported
-	    (nm (symbol->string name))
-	    (content (sxml:content-raw tree)))
-	 `("<" ,nm ,@(map sxml:attr->xml (sxml:attr-list tree))
-	   ,@(if (null? content) '("/>")
-	       `(">" ,@(sxml:sxml->xml content) "</" ,nm ">")))))
+     (let ((nm (sxml:name tree))  ; NS (URI-prefixed) not supported
+	   (content (sxml:content-raw tree)))
+       (if (null? content)
+	 `("<" ,nm ,(map sxml:attr->xml 
+			 (sxml:attr-list tree)) "/>")
+	 `("<" ,nm ,(map sxml:attr->xml 
+			 (sxml:attr-list tree)) ">"
+	   ,@(sxml:sxml->xml content)
+	   "</" ,nm ">" ))))
     ((string? tree) (sxml:string->xml tree)) ; *text*
-    (else (sxml:error "sxml->html - unexpected type of node: " tree))))
-
+    (else (sxml:error "sxml->xml - unexpected type of node: " tree))))
 
 ;------------------------------------------------------------------------------
 ; HTML
@@ -822,7 +866,27 @@
 	 (if (equal? "" (cadr attr))
              (list " " (sxml:ncname attr))
              (list " " (sxml:ncname attr) "='" (cadr attr) "'")))
-
+	   
+; A version of dispatch-node specialized and optimized for SXML->HTML
+; transformation.
+(define (sxml:sxml->html tree)
+  (cond
+    ((nodeset? tree)
+     (map (lambda (a-tree) 
+	    (sxml:sxml->html a-tree)) 
+	  tree))
+    ((pair? tree)
+     (let ((nm (sxml:ncname tree))
+	   (content (sxml:content-raw tree)))
+       (if (null? content)
+	 `("<" ,nm ,(map sxml:attr->html 
+			 (sxml:attr-list tree)) ">")
+	 `("<" ,nm ,(map sxml:attr->html 
+			 (sxml:attr-list tree)) ">"
+	   ,@(sxml:sxml->html content)
+	   "</" ,nm ">" ))))
+    ((string? tree) (sxml:string->html tree)) ; *text*
+    (else (sxml:error "sxml->html - unexpected type of node: " tree))))
 
 
 ; Given a string, check to make sure it does not contain characters
@@ -835,29 +899,10 @@
   (make-char-quotator
    '((#\< . "&lt;") (#\> . "&gt;") (#\& . "&amp;") (#\" . "&quot;"))))
 
-
-; This predicate yields #t for "unterminated" HTML 4.0 tags
-(define (sxml:non-terminated-html-tag? tag) 
-  (memq tag 
-     '(area base basefont br col frame hr img input isindex link meta param)))
-
-
-; A version of dispatch-node specialized and optimized for SXML->HTML
-; transformation.
-(define (sxml:sxml->html tree)
-  (cond
-    ((nodeset? tree)
-     (map (lambda (a-tree) 
-	    (sxml:sxml->html a-tree)) 
-	  tree))
-    ((pair? tree)
-     (let* ((name (sxml:name tree))
-	    (nm (symbol->string name))
-	    (content (sxml:content-raw tree)))
-	 `("<" ,nm ,@(map sxml:attr->html (sxml:attr-list tree))
-	   ,@(if (null? content)
-	       (if (sxml:non-terminated-html-tag? name) '(">") '("/>"))
-	       `(">" ,@(sxml:sxml->html content) "</" ,nm ">")))))
-    ((string? tree) (sxml:string->html tree)) ; *text*
-    (else (sxml:error "sxml->html - unexpected type of node: " tree))))
-
+; Return a string or a list of strings where all the occurences of 
+; characters < > & " ' in a given string are replaced by corresponding 
+; character entity references. 
+(define sxml:string->xml
+  (make-char-quotator
+   '((#\< . "&lt;") (#\> . "&gt;") (#\& . "&amp;") 
+		    (#\" . "&quot;") (#\' . "&apos;"))))
