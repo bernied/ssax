@@ -281,6 +281,53 @@
 ; Uniting context-sets, preserving distinct document order
 ; Is required for XPath UnionExpr
 
+; Returns all contexts of the document, including the ones for attribute nodes
+; and for attribute value nodes. All contexts are returned in document order,
+; attribute value nodes immediately follow attribute nodes
+(define (ddo:all-contexts-in-doc doc)
+  (let iter-nodes ((contents (map
+                              (lambda (kid) (list kid doc))
+                              ((sxml:child sxml:node?) doc)))
+                   (res (list doc)))
+    (cond
+      ((null? contents)  ; every content processed
+       (reverse res))
+      ((not ((ntype?? '*) (caar contents)))  ; text node or PI or etc.
+       (iter-nodes (cdr contents)
+                   (cons
+                    (draft:make-context (caar contents) (cdar contents))
+                    res)))
+      (else  ; element node
+       (let iter-attrs ((attrs (sxml:attr-list (caar contents)))
+                        (res (cons
+                              (draft:make-context
+                               (caar contents) (cdar contents))
+                              res)))
+         (cond
+           ((null? attrs)  ; all attributes of a given element processed
+            (iter-nodes
+             (append (map
+                      (lambda (kid) (cons kid (car contents)))
+                      ((sxml:child sxml:node?) (caar contents)))
+                     (cdr contents))
+             res))
+           ((not (sxml:node? (car attrs)))  ; aux node of SXML 3.0
+            (iter-attrs (cdr attrs) res))
+           ((null? (cdar attrs))  ; singular attribute
+            (iter-attrs (cdr attrs)
+                        (cons
+                         (draft:make-context (car attrs) (car contents))
+                         res)))
+           (else  ; an attribute has a value
+            (iter-attrs
+             (cdr attrs)
+             (cons  ; attribute value
+              (draft:make-context (cadar attrs)
+                                  (cons (car attrs) (car contents)))
+              (cons
+               (draft:make-context (car attrs) (car contents))
+               res))))))))))
+
 ; Every context in both context-sets must contain all the ancestors of the
 ; context node (this corresponds to the num-ancestors=#f)
 ; All nodes must have one and the same root node (i.e. this function cannot
@@ -288,56 +335,38 @@
 ; Returns the context-set that is a distinct-document-order union of the
 ; argument context-sets
 (define (ddo:unite-2-contextsets cntset1 cntset2)
-  (cond
-    ((null? cntset1) cntset2)
-    ((null? cntset2) cntset1)
-    ; none of the context-sets is empty
-    ((eq? (sxml:context->node (car cntset1))
-          (sxml:context->node (car cntset2)))
-     (cons
-      (car cntset1)
-      (ddo:unite-2-contextsets (cdr cntset1) (cdr cntset2))))
-    (else
-     (let ((rev1 (reverse (sxml:context->content (car cntset1))))
-           (rev2 (reverse (sxml:context->content (car cntset2)))))
-       (if
-        (not (eq? (car rev1) (car rev2)))  ; different roots
-        (cons  ; can't order properly - probably better raise an error
-         (car cntset1)
-         (cons
-          (car cntset2)
-          (ddo:unite-2-contextsets (cdr cntset1) (cdr cntset2))))
-        (let iter-ancs ((parent (car rev1))
-                        (rev1 (cdr rev1))
-                        (rev2 (cdr rev2)))
-          (cond
-            ((null? rev1)  ; => node2 is the child of node1
-             (cons
-              (car cntset1)
-              (ddo:unite-2-contextsets (cdr cntset1) cntset2)))
-            ((null? rev2)  ; => node1 is the child of node2
-             (cons
-              (car cntset2)
-              (ddo:unite-2-contextsets cntset1 (cdr cntset2))))
-            ((eq? (car rev1) (car rev2))  ; the same branch
-             (iter-ancs (car rev1) (cdr rev1) (cdr rev2)))
-            ; nodes are located in different branches of 'parent'
-            ((memq (car rev1) (cdr parent))
-             ; 'parent' is an element => cdr gives its children
-             => (lambda (foll-siblings-or-self)
-                  (if
-                   (memq (car rev2) foll-siblings-or-self)
-                   ; node2 is after node1
-                   (cons
-                    (car cntset1)
-                    (ddo:unite-2-contextsets (cdr cntset1) cntset2))
-                   (cons
-                    (car cntset2)
-                    (ddo:unite-2-contextsets cntset1 (cdr cntset2))))))
-            (else  ; node1 is an attribute => it is before node2
-             (cons
-              (car cntset1)
-              (ddo:unite-2-contextsets (cdr cntset1) cntset2))))))))))
+  (if
+   (null? cntset1)  ; nothing to do
+   cntset2
+   (let loop ((order (ddo:all-contexts-in-doc
+                      (draft:list-last
+                       (sxml:context->content (car cntset1)))))
+              (cntset1 cntset1)
+              (cntset2 cntset2)
+              (res '()))
+     (cond
+       ((null? cntset1)
+        (append (reverse res) cntset2))
+       ((null? cntset2)
+        (append (reverse res) cntset1))
+       ; order should never be null
+       ((eq? (sxml:context->node (car order))
+             (sxml:context->node (car cntset1)))
+        (loop (cdr order)
+              (cdr cntset1)
+              (if (eq? (sxml:context->node (car cntset1))
+                       (sxml:context->node (car cntset2)))
+                  (cdr cntset2)
+                  cntset2)
+              (cons (car cntset1) res)))
+       ((eq? (sxml:context->node (car order))
+             (sxml:context->node (car cntset2)))
+        (loop (cdr order)
+              cntset1
+              (cdr cntset2)              
+              (cons (car cntset2) res)))
+       (else
+        (loop (cdr order) cntset1 cntset2 res))))))
 
 ; Based on the function for uniting 2 context-sets, unites multiple
 ; context-sets
@@ -633,11 +662,7 @@
 ; ATTENTION: in deep-predicates, each predicate must come after a predicate it
 ; is dependent on.
 (define (ddo:evaluate-deep-predicates deep-predicates doc var-binding)
-  (let* ((context-set
-          (let* ((nodes ((ddo:descendant-or-self sxml:node? #f) doc))
-                 (attrs ((draft:attribute sxml:node? #f) nodes))
-                 (attr-values ((draft:child (ntype?? '*text*) #f) attrs)))
-            (append nodes attrs attr-values)))
+  (let* ((context-set (ddo:all-contexts-in-doc doc))
          (max-size (if
                     ; position-required? for at least one deep predicate
                     (not (null? (filter cadr deep-predicates)))
@@ -1369,9 +1394,9 @@
 (define (ddo:ast-union-expr op num-anc single-level? pred-nesting)
   (let ((expr-res-lst
          (map
-          (lambda (expr)
+          (lambda (expr na)
             (let ((expr-res
-                   (ddo:ast-expr expr #f single-level? pred-nesting)))
+                   (ddo:ast-expr expr na single-level? pred-nesting)))
               (if
                (not (or (eq? (list-ref expr-res 4) ddo:type-nodeset)
                         (eq? (list-ref expr-res 4) ddo:type-any)))
@@ -1379,7 +1404,14 @@
                 "expression to be unioned evaluates to a non-nodeset - "
                 expr)
                expr-res)))
-          (cdr op))))
+          (cdr op)
+          (reverse  ; number of ancestors for each of the expressions unioned
+           (cons
+            num-anc  ; the last expr doesn't require num-ancestors=#f
+            (map
+             (lambda (dummy) #f)
+             (cddr op)  ; (cdr op) is non-null
+             ))))))
     (if
      (member #f expr-res-lst)  ; error detected
      #f
