@@ -1344,8 +1344,10 @@
           (vars2offsets (list-ref expr-res 6)))
       (let-values*
        (((pred-impl deep-predicates vars2offsets)
-       (if        
-        (> pred-nesting 3)  ; this is a deep predicate
+       (if
+        (or    ; this is a deep predicate
+         (> pred-nesting 3)
+         (and (not requires-position?) (> pred-nesting 1)))
         (let ((pred-id (car vars2offsets)
                        ; was: (ddo:generate-pred-id)
                        ))
