@@ -1086,12 +1086,12 @@
       (list draft:preceding-sibling (draft:na-max num-anc 1) #f))
      ((self)
       (list draft:self num-anc #f))
-     ((arc)
-      (list xlink:axis-arc #f #f))
-     ((traverse)
-      (list xlink:axis-traverse #f #t))
-     ((traverse-arc)
-      (list xlink:axis-traverse-arc #f #t))
+     ;((arc)
+     ; (list xlink:axis-arc #f #f))
+     ;((traverse)
+     ; (list xlink:axis-traverse #f #t))
+     ;((traverse-arc)
+     ; (list xlink:axis-traverse-arc #f #t))
      (else
       (draft:signal-semantic-error "unknown AxisName - " op)))))
 

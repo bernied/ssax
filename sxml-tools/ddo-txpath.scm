@@ -1415,12 +1415,12 @@
     ((steps-res (ddo:ast-step-list
                  (cddr op) num-anc
                  #f  ; consider single-level?=#f after FilterExpr
-                 ))
+                 pred-nesting))
      (filter-lst (ddo:ast-filter-expr
                   (cadr op)
                   (cadr steps-res)  ; num-ancestors
                   single-level?
-                  )))
+                  pred-nesting)))
     (if
      (not (or (eq? (list-ref filter-lst 4) ddo:type-nodeset)
               (eq? (list-ref filter-lst 4) ddo:type-any)))
@@ -1691,7 +1691,7 @@
 ; Helper for constructing several highest-level API functions
 (define (ddo:api-helper grammar-parser ast-parser)
   (lambda (xpath-string . ns+na)
-    (let-values
+    (let-values*
         (((ns-binding num-anc) (draft:arglist->ns+na ns+na)))
       (and-let*
        ((ast (grammar-parser xpath-string ns-binding))

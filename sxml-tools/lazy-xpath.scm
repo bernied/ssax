@@ -16,8 +16,22 @@
 ; node. To fulfill this requirement, branches of the document may be forced
 ; until at least a result node for a portion is obtained.
 
+; Implement 'or' as a function, so that we could 'apply' it
+(define (lazy:or . args)
+  (if (null? args) #f (or (car args) (apply lazy:or (cdr args)))))
+
 ;=========================================================================
 ; Misc helpers for working with a lazy nodeset
+
+; Predicate for detecting a promise
+; There is no such a predicate in R5RS, so different Scheme implementations
+; use different names for this functionality
+(define lazy:promise?
+  (cond-expand
+   (plt promise?)
+   (bigloo procedure?   ; ATTENTION: returns #t in more general situations
+           )
+   (else promise?)))
 
 ;-------------------------------------------------
 ; Lazy analogues for common list operations
@@ -29,7 +43,7 @@
   (cond
     ((null? nodeset) #t)
     ((not (null? (filter   ; contains at least one non-promise
-                  (lambda (node) (not (promise? node)))
+                  (lambda (node) (not (lazy:promise? node)))
                   nodeset)))
      #f)
     (else  ; all nodeset members are promises
@@ -45,7 +59,7 @@
   (cond
     ((null? nodeset)  ; iteration is over
      nodeset)
-    ((promise? (car nodeset))
+    ((lazy:promise? (car nodeset))
      (list
       (delay
         (lazy:map func
@@ -60,7 +74,7 @@
   (cond
     ((null? nodeset)  ; iteration is over
      nodeset)
-    ((promise? (car nodeset))
+    ((lazy:promise? (car nodeset))
      (list
       (delay
         (lazy:filter func
@@ -79,7 +93,7 @@
     ; Checking for a safe variant
     ;((null? nodeset)  ; failed
     ; #f)
-    ((promise? (car nodeset))
+    ((lazy:promise? (car nodeset))
      (let ((nset-car (force (car nodeset))))
        (lazy:car
         ((if (nodeset? nset-car) append cons)
@@ -90,7 +104,7 @@
 ; Like conventional cdr
 (define (lazy:cdr nodeset)
   (if
-   (promise? (car nodeset))
+   (lazy:promise? (car nodeset))
    (let ((nset-car (force (car nodeset))))
      (lazy:cdr
       ((if (nodeset? nset-car) append cons)
@@ -103,7 +117,7 @@
 (define (lazy:length nodeset)
   (cond
     ((null? nodeset) 0)
-    ((promise? (car nodeset))
+    ((lazy:promise? (car nodeset))
      (let ((nset-car (force (car nodeset))))
        (lazy:length
         ((if (nodeset? nset-car) append cons)
@@ -120,7 +134,7 @@
     (cond
       ((null? nset)  ; finished scanning
        (reverse res))
-      ((promise? (car nset))
+      ((lazy:promise? (car nset))
        (iter-nset (append (as-nodeset (force (car nset))) (cdr nset))
                   res))
       (else  ; the first member is a node
@@ -135,7 +149,7 @@
         (lambda (nodeset)
           (cond
             ((null? nodeset) nodeset)
-            ((promise? (car nodeset))
+            ((lazy:promise? (car nodeset))
              (let ((nset-car (force (car nodeset))))               
                (force-nodeset
                 ((if (nodeset? nset-car) append cons)
@@ -145,7 +159,7 @@
                    (force-nodeset (cdr nodeset))))))))
     (if
      (or (not (pair? node))
-         (null? ((sxml:descendant promise?) node)))
+         (null? ((sxml:descendant lazy:promise?) node)))
      node     ; will not make a copy of the node
      (cons (car node) (force-nodeset (cdr node))))))
 
@@ -161,7 +175,7 @@
             (cond
               ((null? src)  ; nothing more to do
                (reverse res))
-              ((promise? (car src))
+              ((lazy:promise? (car src))
                (if
                 (null? res)  ; need to force this
                 (loop (append (as-nodeset (force (car src)))
@@ -171,17 +185,15 @@
                  (cons (delay (find-root src prev-result))
                        res))))
               (else  ; (car src) is the ordinary node
-               (loop (cdr src)
-                     (let ((rt
-                            (if
-                             (sxml:context? (car src))
+               (let ((rt (if (sxml:context? (car src))
                              (draft:list-last
                               (sxml:context->ancestors-u (car src)))
                              (car src))))
+                 (loop (cdr src)
                        (if
                         (memq rt prev-result)  ; already returned
-                        res (cons rt res)))
-                     (cons rt prev-result))))))))
+                        res (cons rt res))
+                       (cons rt prev-result)))))))))
     (find-root contextset '())))
 
 ; Analogue for draft:contextset->nodeset for the lazy case
@@ -191,7 +203,7 @@
         (lambda (nset)
           (cond
             ((null? nset) nset)
-            ((promise? (car nset))
+            ((lazy:promise? (car nset))
              (list
               (delay (iter-nset (append (as-nodeset (force (car nset)))
                                         (cdr nset))))))
@@ -209,7 +221,7 @@
   (cond
     ((null? nodeset)  ; nothing more to do
      '())
-    ((promise? (car nodeset))
+    ((lazy:promise? (car nodeset))
      (delay (lazy:recover-contextset
              (append (as-nodeset (force (car nodeset)))
                      (cdr nodeset))
@@ -232,16 +244,19 @@
            cdr  ; ignore starting '*CONTEXT* for a faster search
            (map-union
             (lambda (node)
-              ; Have to be evaluated in the active manner, since all of the
+              ; Has to be evaluated in the active manner, since all of the
               ; candidates generally have to be scanned
               (lazy:result->list (descend node)))
-            (lazy:result->list ancestors-set)))))
+            ;(lazy:result->list ancestors-set)
+            (map-union
+             sxml:context->ancestors
+             (lazy:result->list context-set))))))
     (let iter-nset ((nodeset nodeset)
-                    (res res))
+                    (res '()))   ; DL: was: res
       (cond
         ((null? nodeset)  ; scanning is over
          (reverse res))
-        ((promise? (car nodeset))
+        ((lazy:promise? (car nodeset))
          (if (null? res)  ; result is still null => have to force
              (iter-nset (append (as-nodeset (force (car nodeset)))
                                 (cdr nodeset))
@@ -284,7 +299,7 @@
             (cond
               ((null? src)  ; iteration is over
                (reverse res))
-              ((promise? (car src))               
+              ((lazy:promise? (car src))               
                 (reverse  ; otherwise - return the result with a promise
                  (cons
                   (delay
@@ -308,7 +323,7 @@
   (cond
     ((null? nodeset)  ; not found
      '())
-    ((promise? (car nodeset))
+    ((lazy:promise? (car nodeset))
      (lazy:find-foll-siblings
       node
       (append (as-nodeset (force (car nodeset)))
@@ -327,7 +342,7 @@
     (cond
       ((null? nodeset)  ; not found
        '())
-      ((promise? (car nodeset))
+      ((lazy:promise? (car nodeset))
        (loop
         (append (as-nodeset (force (car nodeset)))
                 (cdr nodeset))
@@ -410,7 +425,7 @@
             (cond
               ((null? nodeset)  ; failed
                #f)
-              ((promise? (car nodeset))
+              ((lazy:promise? (car nodeset))
                (find-attr-node
                 (append (as-nodeset (force (car nodeset)))
                         (cdr nodeset))))
@@ -478,7 +493,7 @@
         (cond
           ((null? more)  ; no more candidates         
            (reverse res))
-          ((promise? (car more))  ; need to force it
+          ((lazy:promise? (car more))  ; need to force it
            (reverse
             (cons
              (delay (rpt '()
@@ -501,7 +516,7 @@
         (cond
           ((null? more)  ; no more candidates         
            (reverse res))
-          ((promise? (car more))  ; need to force it
+          ((lazy:promise? (car more))  ; need to force it
            (reverse
             (cons
              (delay (rpt '()
@@ -541,7 +556,7 @@
                         (car ancs-to-view)))
                       '()
                       res)))
-              ((promise? (car foll-siblings))
+              ((lazy:promise? (car foll-siblings))
                (reverse
                 (cons
                  (delay
@@ -558,7 +573,7 @@
                        (car foll-siblings)
                        ancs-to-view num-anc))
                      res))))
-           ((promise? (car descendants))  ; need to force descendant axis
+           ((lazy:promise? (car descendants))  ; need to force descendant axis
             (reverse
              (cons
               (delay
@@ -645,7 +660,7 @@
                         (car ancs-to-view)))
                       descendants  ; is null
                       res)))
-              ((promise? (car prec-siblings))
+              ((lazy:promise? (car prec-siblings))
                (reverse
                 (cons
                  (delay
@@ -664,7 +679,7 @@
                         (car prec-siblings)
                         ancs-to-view num-anc)))
                      res))))
-           ((promise? (car descendants))  ; need to force descendant axis
+           ((lazy:promise? (car descendants))  ; need to force descendant axis
             (reverse
              (cons
               (delay
@@ -733,14 +748,14 @@
                (cond
                  ((null? src)  ; iteration is over
                   (reverse res))
-                 ((promise? (car src))
+                 ((lazy:promise? (car src))
                   (if
                    (null? res)  ; result is still empty, need to force src
                    (let ((src-car (as-nodeset (force (car src)))))
                      (cond
                        ((null? src-car)  ; a rare practical situation
                         (loop (cdr src) candidates res))
-                       ((promise? (car src-car))  ; this shouldn't happen
+                       ((lazy:promise? (car src-car))  ; this shouldn't happen
                         (loop (append src-car (cdr src))
                               candidates
                               res))
@@ -756,7 +771,7 @@
                   (loop (cdr src)
                         (axis (car src))  ; candidates are null
                         res))))
-              ((promise? (car candidates))               
+              ((lazy:promise? (car candidates))               
                ; First candidate is a promise
                (if
                 (null? res)  ; result is still empty, need to force candidate
@@ -764,7 +779,7 @@
                   (cond
                     ((null? cand-car)  ; generally, (cdr candidates)=null
                      (loop src (cdr candidates) res))
-                    ((promise? (car cand-car))  ; this shouldn't happen
+                    ((lazy:promise? (car cand-car))  ; this shouldn't happen
                      (loop src
                            (append cand-car (cdr candidates))
                            res))
@@ -846,7 +861,7 @@
 ; Undocumented functionality - can be applied for a node that is a promise
 (define (lazy:string-value node)
   (cond
-    ((promise? node)
+    ((lazy:promise? node)
      (let ((value (force node)))
        (if (nodeset? value)
            (apply string-append
@@ -892,7 +907,7 @@
                    (str-set2 (lazy:map lazy:string-value obj2)))
          (cond
            ((null? str-set1) #f)
-           ((promise? (car str-set1))   ; time to get the next portion
+           ((lazy:promise? (car str-set1))   ; time to get the next portion
             (first (append (as-nodeset (force (car str-set1)))
                            (cdr str-set1))
                    str-set2))
@@ -900,7 +915,7 @@
                          (set2 str-set2))
               (cond
                 ((null? set2) #f)
-                ((promise? (car set2))   ; time to get the next portion
+                ((lazy:promise? (car set2))   ; time to get the next portion
                  (second elem
                          (append (as-nodeset (force (car set2)))
                                  (cdr set2))))
@@ -922,7 +937,7 @@
                         nset)))
              (cond
                ((null? nset) #f)
-               ((promise? (car nset))  ; time to get the next portion
+               ((lazy:promise? (car nset))  ; time to get the next portion
                 (loop (append (as-nodeset (force (car nset)))
                               (cdr nset))))
                ((number-op elem (car nset)) #t)
@@ -931,7 +946,7 @@
            (let loop ((nset (lazy:map lazy:string-value nset)))
              (cond
                ((null? nset) #f)
-               ((promise? (car nset))  ; time to get the next portion
+               ((lazy:promise? (car nset))  ; time to get the next portion
                 (loop (append (as-nodeset (force (car nset)))
                               (cdr nset))))
                ((string-op elem (car nset)) #t)
@@ -972,7 +987,7 @@
                          (nset1 (cdr nset1)))
                (cond
                  ((null? nset1) num1)
-                 ((promise? (car nset1))  ; time to obtain the next portion
+                 ((lazy:promise? (car nset1))  ; time to obtain the next portion
                   (first num1
                          (apply (as-nodeset (force (car nset1)))
                                 (cdr nset1))))
@@ -990,7 +1005,7 @@
                           (nset2 (cdr nset2)))
                (cond
                  ((null? nset2) num2)
-                 ((promise? (car nset2))  ; time to obtain the next portion
+                 ((lazy:promise? (car nset2))  ; time to obtain the next portion
                   (second num2
                           (apply (as-nodeset (force (car nset2)))
                                  (cdr nset2))))
@@ -1638,7 +1653,7 @@
                  (cond
                    ((null? src)  ; iteration is over
                     (reverse res))
-                   ((promise? (car src))
+                   ((lazy:promise? (car src))
                     (if
                      (null? res)  ; result is still empty, need to force src
                      (iter-src (append (as-nodeset (force (car src)))
@@ -1661,7 +1676,7 @@
                          ((car preds) nset position+size var-binding)
                          (cdr preds))))
                      res))))
-                ((promise? (car candidates))
+                ((lazy:promise? (car candidates))
                  ; First candidate is a promise
                  (if
                   (null? res)  ; result is still empty, need to force candidate
@@ -1722,7 +1737,7 @@
                (cond
                  ((null? nset)
                   (reverse res))
-                 ((promise? (car nset))
+                 ((lazy:promise? (car nset))
                   ; This promise was already forced when evaluating lazy:length
                   (loop (append (as-nodeset (force (car nset)))
                                 (cdr nset))
@@ -1748,7 +1763,7 @@
              (cond
                ((null? nset)
                 (reverse res))
-               ((promise? (car nset))
+               ((lazy:promise? (car nset))
                 (reverse
                  (cons
                   (delay (loop
@@ -1855,7 +1870,7 @@
             ((lazy:boolean ((car fs) nodeset position+size var-binding)) #t)
             (else (rpt (cdr fs))))))
       (apply draft:na-max (map cadr expr-res-lst))  ; num-ancestors
-      (apply ddo:or (map caddr expr-res-lst))  ; requires-last?
+      (apply lazy:or (map caddr expr-res-lst))  ; requires-last?
       )))))
 
 ; {11} <AndExpr> ::= (and <Expr> <Expr>+ )
@@ -1879,7 +1894,7 @@
              #f)
             (else (rpt (cdr fs))))))
       (apply draft:na-max (map cadr expr-res-lst))  ; num-ancestors
-      (apply ddo:or (map caddr expr-res-lst))  ; requires-last?
+      (apply lazy:or (map caddr expr-res-lst))  ; requires-last?
       )))))
 
 ; {12} <EqualityExpr> ::= (=  <Expr> <Expr> )
@@ -1953,7 +1968,7 @@
               (expr nodeset position+size var-binding))))
           expr-impls)))
       (apply draft:na-max (map cadr expr-res-lst))  ; num-ancestors
-      (apply ddo:or (map caddr expr-res-lst))  ; requires-last?
+      (apply lazy:or (map caddr expr-res-lst))  ; requires-last?
       )))))
 
 ; {15} <MultiplicativeExpr> ::= (*  <Expr> <Expr> )
@@ -2011,7 +2026,7 @@
                       '())
                    (else nset)))
                  res)))
-              ((promise? (car candidates))
+              ((lazy:promise? (car candidates))
                (if
                 (null? res)  ; res is still null, need to force candidate
                 (iter-operands
@@ -2020,17 +2035,18 @@
                          (cdr candidates))
                  res)
                 (reverse
-                 (delay (iter-operands
-                         fs
-                         (append (as-nodeset (force (car candidates)))
-                                 (cdr candidates))
-                         '()))
-                 res)))
+                 (cons
+                  (delay (iter-operands
+                          fs
+                          (append (as-nodeset (force (car candidates)))
+                                  (cdr candidates))
+                          '()))
+                  res))))
               (else  ; first candidate is a node
                (iter-operands
                 fs (cdr candidates) (cons (car candidates) res))))))
         (apply draft:na-max (map cadr expr-res-lst))
-        (apply ddo:or (map caddr expr-res-lst))  ; requires-last?
+        (apply lazy:or (map caddr expr-res-lst))  ; requires-last?
         )))))
 
 ; {17} <PathExpr> ::= (path-expr  <FilterExpr> <Step>+ )
@@ -2233,7 +2249,7 @@
 ; Helper for constructing several highest-level API functions
 (define (lazy:api-helper grammar-parser ast-parser)
   (lambda (xpath-string . ns+na)
-    (let-values
+    (let-values*
         (((ns-binding num-anc) (draft:arglist->ns+na ns+na)))
       (and-let*
        ((ast (grammar-parser xpath-string ns-binding))

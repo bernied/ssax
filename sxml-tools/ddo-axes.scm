@@ -1146,7 +1146,7 @@
                               (+ order-num 1))))
                       ; There are descendants to be scanned
                       ((eq? (car desc-to-scan) next-node)
-                       (let-values
+                       (let-values*
                            (((new-pos-res new-src new-order-num)
                              (src-walk (car src)
                                        (cdr src)
@@ -1188,7 +1188,7 @@
            (filter  ; removing empty result nodesets
             (lambda (x) (not (null? x)))
             pos-result)
-           (let-values
+           (let-values*
                (((new-pos-res new-src new-order-num)
                  (src-walk (car src) (cdr src) order-num)))
              (rpt new-src
@@ -1229,7 +1229,7 @@
                (let ((curr-cntnt (car content-to-scan)))
                  (if
                   (eq? (car curr-cntnt) next-node)
-                  (let-values
+                  (let-values*
                       (((new-pos-res new-src new-order-num)
                         (src-walk (car src)
                                   (cdr src)
@@ -1279,7 +1279,7 @@
            (filter  ; removing empty result nodesets
             (lambda (x) (not (null? x)))
             pos-result)
-           (let-values
+           (let-values*
                (((new-pos-res new-src new-order-num)
                  (src-walk (car src) (cdr src) order-num)))             
              (rpt new-src
@@ -1316,7 +1316,7 @@
                (let ((curr-cntnt (car content-to-scan)))
                  (if
                   (eq? (car curr-cntnt) next-node)
-                  (let-values
+                  (let-values*
                       (((new-pos-res new-src new-order-num)
                         (src-walk (car src) (cdr src) order-num)))
                     (loop new-src
@@ -1356,7 +1356,7 @@
            (filter  ; removing empty result nodesets
             (lambda (x) (not (null? x)))
             pos-result)
-           (let-values
+           (let-values*
                (((new-pos-res new-src new-order-num)
                  (src-walk (car src) (cdr src) order-num)))             
              (rpt new-src
@@ -1730,7 +1730,7 @@
                      ((memq next (sxml:attr-list (caar ancs-to-view)))
                       ; next node is an attribute of currently scanned node
                       (let ((pos-result
-                             (proc-curr-node (car src) (cdr src) vacant-num)))
+                             (process-single (car src) (cdr src) vacant-num)))
                         (cons
                          (append (reverse pos-nset) (car pos-result))
                          pos-result)))                     
