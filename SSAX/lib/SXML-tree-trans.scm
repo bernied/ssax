@@ -1,12 +1,19 @@
 ;		XML/HTML processing in Scheme
 ;		SXML expression tree transformers
 ;
+; IMPORT
+; A prelude appropriate for your Scheme system
+;	(myenv-bigloo.scm, myenv-mit.scm, etc.)
+;
+; EXPORT
+; (provide SRV:send-reply
+;	   post-order pre-post-order replace-range)
+;
+; See vSXML-tree-trans.scm for the validation code, which also
+; serves as usage examples.
+;
 ; $Id$
 
-; The following macro runs built-in test cases -- or does not run,
-; depending on which of the two lines below you commented out
-;(define-macro (run-test . body) `(begin (display "\n-->Test\n") ,@body))
-(define-macro (run-test . body) '(begin #f))
 
 ; Output the 'fragments'
 ; The fragments are a list of strings, characters,
@@ -290,82 +297,3 @@
   (let-values* (((new-forest keep?) (loop forest #t '())))
      new-forest))
 
-; A few tests
-(run-test
- (let* ((tree
-	 '(root
-	      (n1 (n11) "s12" (n13))
-	    "s2"
-	    (n2 (n21) "s22")
-	    (n3 
-	     (n31 (n311))
-	     "s32"
-	     (n33 (n331) "s332" (n333))
-	     "s34")))
-	(test
-	 (lambda (pred-begin pred-end expected)
-	   (let ((computed
-		  (car (replace-range pred-begin pred-end (list tree)))))
-	     (assert (equal? computed expected)))))
-	)
-   (pp tree)
-      ; Remove one node, "s2"
-   (test
-    (lambda (node)
-      (and (equal? node "s2") '()))
-    (lambda (node) (list node))
-    '(root (n1 (n11) "s12" (n13))
-       (n2 (n21) "s22")
-       (n3 (n31 (n311)) "s32" (n33 (n331) "s332" (n333)) "s34")))
-
-      ; Replace one node, "s2" with "s2-new"
-   (test 
-    (lambda (node)
-      (and (equal? node "s2") '("s2-new")))
-    (lambda (node) (list node))
-    '(root (n1 (n11) "s12" (n13))
-       "s2-new"
-       (n2 (n21) "s22")
-       (n3 (n31 (n311)) "s32" (n33 (n331) "s332" (n333)) "s34")))
-
-      ; Replace one node, "s2" with "s2-new" and its brother (n-new "s")
-   (test 
-    (lambda (node)
-      (and (equal? node "s2") '("s2-new" (n-new "s"))))
-    (lambda (node) (list node))
-    '(root (n1 (n11) "s12" (n13))
-       "s2-new" (n-new "s")
-       (n2 (n21) "s22")
-       (n3 (n31 (n311)) "s32" (n33 (n331) "s332" (n333)) "s34")))
-
-      ; Remove everything from "s2" onward
-   (test 
-    (lambda (node)
-      (and (equal? node "s2") '()))
-    (lambda (node) #f)
-    '(root (n1 (n11) "s12" (n13))))
-   
-      ; Remove everything from "n1" onward
-   (test 
-    (lambda (node)
-      (and (pair? node) (eq? 'n1 (car node)) '()))
-    (lambda (node) #f)
-    '(root))
-
-      ; Replace from n1 through n33
-   (test 
-    (lambda (node)
-      (and (pair? node)
-	   (eq? 'n1 (car node))
-	   (list node '(n1* "s12*"))))
-    (lambda (node)
-      (and (pair? node)
-	   (eq? 'n33 (car node))
-	   (list node)))
-    '(root
-	 (n1 (n11) "s12" (n13))
-       (n1* "s12*")
-       (n3 
-	(n33 (n331) "s332" (n333))
-	"s34")))
-   ))
