@@ -30,6 +30,14 @@
     (set! error orig-error)
     caught))
 
-(define-macro (failed? . stmts)
-  `(thunk-failed? (lambda () ,@stmts)))
+(cond-expand
+  ((or bigloo gambit)
+    (define-macro (failed? . stmts)
+      `(thunk-failed? (lambda () ,@stmts))))
+  (else
+    (define-syntax failed?
+      (syntax-rules ()
+	((failed? . stmts)
+	  (thunk-failed? (lambda () . stmts)))))))
+
 
