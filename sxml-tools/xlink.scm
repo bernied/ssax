@@ -1,5 +1,12 @@
 ;; XLink implementation and the API for XLink processing in Scheme
 ;
+; This software is in Public Domain.
+; IT IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+;
+; Please send bug reports and comments to:
+;   lisovsky@acm.org      Kirill Lisovsky
+;   lizorkin@hotbox.ru    Dmitry Lizorkin
+;
 ; doc ::= '(*TOP*
 ;           (@@
 ;            (sxlink
@@ -41,12 +48,12 @@
           (string=? (car attval) type)))))
 
 ; Node tests for different XLink elements
-(define xlink:extended? (xlink:ntype?? "extended"))
-(define xlink:simple? (xlink:ntype?? "simple"))
-(define xlink:locator? (xlink:ntype?? "locator"))
-(define xlink:resource? (xlink:ntype?? "resource"))
-(define xlink:arc? (xlink:ntype?? "arc"))
-(define xlink:title? (xlink:ntype?? "title"))
+(define xlink:elem-extended? (xlink:ntype?? "extended"))
+(define xlink:elem-simple? (xlink:ntype?? "simple"))
+(define xlink:elem-locator? (xlink:ntype?? "locator"))
+(define xlink:elem-resource? (xlink:ntype?? "resource"))
+(define xlink:elem-arc? (xlink:ntype?? "arc"))
+(define xlink:elem-title? (xlink:ntype?? "title"))
 
 
 ;==========================================================================
@@ -77,7 +84,7 @@
             ((linkbase simple inbound outbound third-party local-to-local
               from to declaration)
              ; Recursive application to children
-             (let-values
+             (let-values*
                  (((new-children new-uri-alist)
                    (process-nodeset (cdr node) uri-alist)))
                (values (cons (car node) new-children)
@@ -107,13 +114,13 @@
             (if
              (null? nset)
              (values (reverse res) uri-alist)
-             (let-values
+             (let-values*
                  (((new-node new-uri-alist)
                    (process-arc (car nset) uri-alist)))
                (loop (cdr nset)
                      (cons new-node res)
                      new-uri-alist)))))))
-    (let-values
+    (let-values*
         (((new-sxlink-arcs dummy)
           (process-nodeset sxlink-arcs '())))
       new-sxlink-arcs)))
@@ -194,7 +201,7 @@
   (cerr nl))
 
 ; Id+XLink parser parameterized
-(define xlink:parser (SSAX:multi-parser 'id 'xlink))
+(define xlink:parser (ssax:multi-parser 'id 'xlink))
 
 ; Returns the SXML representation for the resource specified by REQ-URI.
 ; Resource types supported: XML and HTML. XML is parsed into SXML with SSAX,
@@ -216,7 +223,7 @@
        (xlink:set-uri req-uri doc)))
     ((html)
      (let* ((port (open-input-resource req-uri))
-            (doc (htmlprag:html->sxml port #f)))
+            (doc (htmlprag:html->sxml port)))
        (close-input-port port)
        (SHTML->SHTML+xlink
         (xlink:set-uri req-uri doc))))    
@@ -573,7 +580,7 @@
              ; Text node or aux node
              (values node outgoing-alist #f))
             ((eq? (car node) '@)
-             (let-values 
+             (let-values*
                  (((content new-out-alist changed?)
                    ((process-nodeset process-attribute-node)
                     (cdr node) outgoing-alist)))
@@ -663,14 +670,14 @@
                (values (reverse res)
                        out-alist
                        changed?)
-               (let-values
+               (let-values*
                    (((new-node new-out-alist ch?)
                      (processing-func (car nset) out-alist)))
                  (loop (cdr nset)
                        new-out-alist
                        (or changed? ch?)
                        (cons new-node res)))))))))
-    (let-values
+    (let-values*
         (((content new-out-alist changed?)
           ((process-nodeset process-element-node)
            (cdr document)
@@ -794,7 +801,31 @@
      (lambda (uri . uris)
        (xlink:docs-exchange-arcs (apply doc-getter (cons uri uris)))))))
 
-; The most popular cases of parametrization
+; Each of these 2 functions has the following signature:
+;  (lambda (string . more-strings) ...)
+; Accepts one or more strings as arguments. Each string denotes the URI of
+; the requested document to be loaded. The requested document(s) are loaded
+; and are represented in SXML. All XLink links declared in these document(s)
+; are represented as a set of SXLink arcs. If XLink links refer to XLink
+; linkbases, these linkbases are additionally loaded, for additional SXLink
+; arcs declared there.
+;
+; The starting resource for each SXLink arc is determined.
+;  1. For each loaded SXML document, the function 'xlink:document' adds all
+; SXLink arcs whose starting resource is located within this document, to the
+; auxiliary list of its document node *TOP*.
+;  2. The function 'xlink:documents-embed' embeds each SXLink arc into its
+; starting resource-node, via auxiliary list of that node. For text nodes
+; serving for starting resources, their SXLink arcs are stored in the auxiliary
+; list of the document node *TOP* (since SXML text nodes do not support their
+; own auxiliary lists).
+;
+; Supported URI formats:
+;  - local file
+;  - http:// schema
+;
+; Supported document formats: XML and HTML. In the case of HTML, <a> hyperlinks
+; are considered as XLink simple links.
 (define xlink:documents
   (xlink:load-linked-docs-with-params 'linkbases))
 (define xlink:documents-embed

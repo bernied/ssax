@@ -1,7 +1,13 @@
-
-;;
-; This programme parses XML documents containing XLink elements
-; It returns an SXML presentation for a document plus additional information
+;; Parser for XML documents that contain XLink elements
+;
+; This software is in Public Domain.
+; IT IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+;
+; Please send bug reports and comments to:
+;   lisovsky@acm.org      Kirill Lisovsky
+;   lizorkin@hotbox.ru    Dmitry Lizorkin
+;
+; Returns an SXML presentation for a document plus additional information
 ; extracted from XLink markup (described below)
 ;
 ; 'SSAX:XML->SXML+xlink' function is the core of the programme. This funcion
@@ -833,18 +839,18 @@
   (let((stack-element (car (xlink:seed-stack seed))))
     (let ((position (car stack-element))
           (xlink-values (cadr stack-element)))
-      (let ((mode (xlink:seed-mode parent-seed))
-            (sxlink-arcs (xlink:seed-sxlink-arcs parent-seed))
-            (sxpointer
-             (xlink:sxpointer4sibling (xlink:seed-sxpointer parent-seed)))
-            (stack (xlink:seed-stack parent-seed))
-            (locators+resources 
-             (xlink:add-resource xlink-values element sxpointer
-                                 (xlink:seed-locators+resources parent-seed)))
-            (arcs (xlink:seed-arcs parent-seed))
-            (declared-labels
-             (xlink:add-declared-label
-              xlink-values (xlink:seed-declared-labels parent-seed))))
+      (let* ((mode (xlink:seed-mode parent-seed))
+             (sxlink-arcs (xlink:seed-sxlink-arcs parent-seed))
+             (sxpointer
+              (xlink:sxpointer4sibling (xlink:seed-sxpointer parent-seed)))
+             (stack (xlink:seed-stack parent-seed))
+             (locators+resources 
+              (xlink:add-resource xlink-values element sxpointer
+                                  (xlink:seed-locators+resources parent-seed)))
+             (arcs (xlink:seed-arcs parent-seed))
+             (declared-labels
+              (xlink:add-declared-label
+               xlink-values (xlink:seed-declared-labels parent-seed))))
         (xlink:make-full-seed mode sxlink-arcs sxpointer stack
                               locators+resources arcs declared-labels)))))
 
