@@ -595,7 +595,7 @@
           (let-values*
            (((prefix local)
              (cond
-               ((string-rindex attribute-name #\:)
+               ((string-index-right attribute-name #\:)
                 => (lambda (pos)
                      (values
                       (string->symbol (substring attribute-name 0 pos))

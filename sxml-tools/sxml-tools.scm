@@ -79,7 +79,7 @@
      => list)
     (else '())))
 
-; optimized (string-rindex name #\:)
+; optimized (string-index-right name #\:)
 ; returns position of a separator between namespace-id and LocalName
 (define-syntax sxml:find-name-separator
   (syntax-rules ()

@@ -31,8 +31,7 @@
 
 (define-structure sxpathlib sxpathlib-interface
   (open scheme
-	(subset srfi-13 (string-prefix?))
-	(subset oleg-utils (string-rindex))
+	(subset srfi-13 (string-prefix? string-index-right))
 	assertions
 	coutputs
 	ppretty-prints)
@@ -100,6 +99,7 @@
 (define-structure sxml-tools sxml-tools-interface
   (open scheme
 	(subset srfi-1 (filter))
+	(subset srfi-13 (string-index-right))
 	srfi-23 ; ERROR
 	coutputs
 	(subset oleg-utils (make-char-quotator))
@@ -190,10 +190,11 @@
 
 (define-structure txpath txpath-interface
   (open scheme
-	(subset srfi-13 (string-prefix? string-split string-prefix-ci?))
+	(subset srfi-13
+		(string-prefix? string-prefix-ci? string-index-right))
 	srfi-23 ; ERROR
 	coutputs
-	(subset oleg-utils (string-rindex string-split substring?))
+	(subset oleg-utils (string-split substring?))
 	sxml-tools
 	sxpath-ext
 	sxpathlib

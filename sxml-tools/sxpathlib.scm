@@ -162,7 +162,7 @@
 			 '(@ @@ *PI* *COMMENT* *ENTITY*)))
 	 (let ((nm (symbol->string (car node))))
 	   (cond 
-	     ((string-rindex nm #\:)	   
+	     ((string-index-right nm #\:)	   
 	      => (lambda (pos) 
 	      (and 
 		(= pos (string-length ns-id))

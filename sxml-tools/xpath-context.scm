@@ -649,7 +649,7 @@
             (else
              (let ((name (symbol->string (caar nodeset))))
                (cond
-                 ((string-rindex name #\:)
+                 ((string-index-right name #\:)
                   => (lambda (pos)
                        (substring name (+ pos 1) (string-length name))))
                  (else  ; a NCName
@@ -669,7 +669,7 @@
               (else
                (let ((name (symbol->string (caar obj))))
                  (cond
-                   ((string-rindex name #\:)
+                   ((string-index-right name #\:)
                     => (lambda (pos)
                          (substring
                           name (+ pos 1) (string-length name))))
@@ -687,7 +687,7 @@
             (else
              (let ((name (symbol->string (caar nodeset))))
                (cond
-                 ((string-rindex name #\:)
+                 ((string-index-right name #\:)
                   => (lambda (pos)
                        (substring name 0 pos)))
                  (else  ; a NCName
@@ -707,7 +707,7 @@
               (else
                (let ((name (symbol->string (caar obj))))
                  (cond
-                   ((string-rindex name #\:)
+                   ((string-index-right name #\:)
                     => (lambda (pos)
                          (substring name 0 pos)))
                    (else ""))))))))))

@@ -1082,7 +1082,7 @@
             (else
              (let ((name (symbol->string (car (lazy:car nodeset)))))
                (cond
-                 ((string-rindex name #\:)
+                 ((string-index-right name #\:)
                   => (lambda (pos)
                        (substring name (+ pos 1) (string-length name))))
                  (else  ; a NCName
@@ -1102,7 +1102,7 @@
               (else
                (let ((name (symbol->string (car (lazy:car obj)))))
                  (cond
-                   ((string-rindex name #\:)
+                   ((string-index-right name #\:)
                     => (lambda (pos)
                          (substring
                           name (+ pos 1) (string-length name))))
@@ -1120,7 +1120,7 @@
             (else
              (let ((name (symbol->string (car (lazy:car nodeset)))))
                (cond
-                 ((string-rindex name #\:)
+                 ((string-index-right name #\:)
                   => (lambda (pos)
                        (substring name 0 pos)))
                  (else  ; a NCName
@@ -1140,7 +1140,7 @@
               (else
                (let ((name (symbol->string (car (lazy:car obj)))))
                  (cond
-                   ((string-rindex name #\:)
+                   ((string-index-right name #\:)
                     => (lambda (pos)
                          (substring name 0 pos)))
                    (else ""))))))))))
