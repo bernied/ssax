@@ -1265,16 +1265,16 @@
               (bool (or index-required (caddr lst))))
            (cond
              ((sxp:parse-check "<=" path)
-              (loop (cons func funcs) (cons '<= opers)                    
+              (loop (cons func funcs) (cons (sxp:relational-cmp <=) opers)
                     (sxp:parse-assert "<=" path) bool))
              ((sxp:parse-check ">=" path)
-              (loop (cons func funcs) (cons '>= opers)
+              (loop (cons func funcs) (cons (sxp:relational-cmp >=) opers)
                     (sxp:parse-assert ">=" path) bool))             
              ((sxp:parse-check "<" path)
-              (loop (cons func funcs) (cons '< opers)                    
+              (loop (cons func funcs) (cons (sxp:relational-cmp <) opers)
                     (sxp:parse-assert "<" path) bool))
              ((sxp:parse-check ">" path)
-              (loop (cons func funcs) (cons '> opers)                    
+              (loop (cons func funcs) (cons (sxp:relational-cmp >) opers)
                     (sxp:parse-assert ">" path) bool))
              (else  ; no more AdditiveExprs
               (if (null? funcs) ; only one AdditiveExpr  ; sxp:no-more-helper ?
@@ -1288,8 +1288,7 @@
                                 (ops (reverse opers)))
                         (if (null? fs) 
                            res
-                           (rpt (sxp:cmp-objects
-                                 (car ops) 
+                           (rpt ((car ops) 
                                  res 
                                  ((car fs) nodeset root-node context
                                            var-binding id-index))
@@ -1315,10 +1314,10 @@
 		    (id-ind? (or index-required (caddr lst))))
 		(cond
 		  ((sxp:parse-check "=" path)
-		   (loop (cons func funcs) (cons '= opers)                    
+		   (loop (cons func funcs) (cons sxp:equal? opers)
 			 (sxp:parse-assert "=" path) id-ind?))
 		  ((sxp:parse-check "!=" path)
-		   (loop (cons func funcs) (cons '!= opers)                    
+		   (loop (cons func funcs) (cons sxp:not-equal? opers)
 			 (sxp:parse-assert "!=" path) id-ind?))
 		  (else  ; no more RelationalExprs
 		    (if (null? funcs) ; only one RelationalExpr
@@ -1330,13 +1329,12 @@
 						       var-binding id-index))
 				      (fs (cdr flst))
 				      (ops (reverse opers)))
-			      (if (null? fs) 
+			      (if (null? fs)
 				res
-				(rpt (sxp:cmp-objects
-				       (car ops) 
-				       res 
-				       ((car fs) nodeset root-node context
-						 var-binding id-index))
+				(rpt ((car ops) 
+                                      res 
+                                      ((car fs) nodeset root-node context
+                                       var-binding id-index))
 				     (cdr fs)
 				     (cdr ops)))))
 			  path

@@ -76,12 +76,12 @@
              (else cddr))
            node))))))
 
-; Select SXML element by their unique IDs
+; Select SXML element by its unique IDs
 ; XPath Rec. 4.1
 ;  object - a nodeset or a datatype which can be converted to a string by means
 ; of a 'string' function
 ;  id-index = ( (id-value . element) (id-value . element) ... ) 
-; This index is used for selecting an element by its unique ID. 
+; This index is used for selection of an element by its unique ID. 
 ; The result is a nodeset
 (define (sxp:id id-index)
   (lambda(object)
@@ -117,103 +117,115 @@
              
 ;=========================================================================
 ; Comparators for XPath objects 
-; All the functions have an 'op' argument which is a symbolic representation
-; for an operation: = != < > <= >=
 
-; This function "inverts" an operation (example: < to >)
-(define (sxp:invert-op op)
-  (cond
-    ((assq op '((< >) (> <) (<= >=) (>= <=)))
-     => cdr)
-    (else (cerr "sxp:invert-op:  unknown operation - " op nl)
-     op)))
-
-; Compare two booleans
-(define (sxp:cmp-booleans op bool1 bool2)
-  (cond 
-    ((eq? op '=) (eq? bool1 bool2))
-    ((eq? op '!=) (not (eq? bool1 bool2)))
-    ((eq? op '<) (and (not bool1) bool2))
-    ((eq? op '>) (and bool1 (not bool2)))
-    ((eq? op '<=) (or (not bool1) bool2))
-    ((eq? op '>=) (or bool1 (not bool2)))
-    (else (cerr "sxp:cmp-booleans:  unknown operation - " op nl)
-     #f)))
-
-; Compare two numbers
-(define (sxp:cmp-numbers op num1 num2)
-  (cond
-    ((eq? op '=) (= num1 num2))
-    ((eq? op '!=) (not (= num1 num2)))
-    ((eq? op '<) (< num1 num2))
-    ((eq? op '>) (> num1 num2))
-    ((eq? op '<=) (<= num1 num2))
-    ((eq? op '>=) (>= num1 num2))
-    (else (cerr "sxp:cmp-numbers:  unknown operation - " op nl)
-     #f)))
-
-; Compare two strings
-(define (sxp:cmp-strings op str1 str2)
-  (cond
-    ((eq? op '=) (string=? str1 str2))
-    ((eq? op '!=) (not (string=? str1 str2)))
-    ((eq? op '<) (string<? str1 str2))
-    ((eq? op '>) (string>? str1 str2))
-    ((eq? op '<=) (string<=? str1 str2))
-    ((eq? op '>=) (string>=? str1 str2))
-    (else (cerr "sxp:cmp-strings:  unknown operation - " op nl)
-     #f)))
-
-; Compare a nodeset with an object
-; Object can have the following type:  nodeset, boolean, number, string
-(define (sxp:cmp-nodeset-object op nodeset object)
-  (cond
-    ((nodeset? object)
-     (let rpt ((str-set1 (map sxp:string-value nodeset))
-                (str-set2 (map sxp:string-value object)))
+; A helper for XPath equality operations: = , !=
+;  'bool-op', 'number-op' and 'string-op' are comparison operations for 
+; a pair of booleans,  numbers and strings respectively
+(define (sxp:equality-cmp bool-op number-op string-op)
+  (lambda (obj1 obj2)
+    (cond
+      ((and (not (nodeset? obj1)) (not (nodeset? obj2)))  
+       ; neither object is a nodeset
        (cond
-         ((null? str-set1) #f)
-         ((let loop ((set2 str-set2))
-            (cond
-	      ((null? set2) #f)
-	      ((sxp:cmp-strings op (car str-set1) (car set2)) #t)
-	      (else (loop (cdr set2))))) #t)
-         (else
-          (rpt (cdr str-set1) str-set2)))))
-    ((number? object)
-     (let rpt ((str-set (map sxp:string-value nodeset)))
-       (cond
-	 ((null? str-set) #f)
-	 ((sxp:cmp-numbers op (sxp:number (car str-set)) object) #t)
-	 (else (rpt (cdr str-set))))))
-    ((string? object)
-     (let rpt ((str-set (map sxp:string-value nodeset)))
-       (cond
-	 ((null? str-set) #f)
-	 ((sxp:cmp-strings op (car str-set) object) #t)
-	 (else (rpt (cdr str-set))))))
-    ((boolean? object)
-     (let rpt ((str-set (map sxp:string-value nodeset)))
-       (cond
-	 ((null? str-set) #f)
-	 ((sxp:cmp-booleans op (sxp:boolean (car str-set)) object) #t)
-	 (else (rpt (cdr str-set))))))
-    (else #f)))
-       
-; Compare two object
-; Object can have the following type:  nodeset, boolean, number, string
-(define (sxp:cmp-objects op obj1 obj2)
-  (cond
-    ((nodeset? obj1) (sxp:cmp-nodeset-object op obj1 obj2))
-    ((nodeset? obj2) (sxp:cmp-nodeset-object (sxp:invert-op op) obj2 obj1))
-    ((memq op '(= !=))
-     (cond
-       ((boolean? obj1) (sxp:cmp-booleans op obj1 (sxp:boolean obj2)))
-       ((boolean? obj2) (sxp:cmp-booleans op (sxp:boolean obj1) obj2))
-       ((number? obj1) (sxp:cmp-numbers op obj1 (sxp:number obj2)))
-       ((number? obj2) (sxp:cmp-numbers op (sxp:number obj1) obj2))
-       (else (sxp:cmp-strings op (sxp:string obj1) (sxp:string obj2)))))
-    (else (sxp:cmp-numbers op (sxp:number obj1) (sxp:number obj2)))))
+         ((boolean? obj1) (bool-op obj1 (sxp:boolean obj2)))
+         ((boolean? obj2) (bool-op (sxp:boolean obj1) obj2))
+         ((number? obj1) (number-op obj1 (sxp:number obj2)))
+         ((number? obj2) (number-op (sxp:number obj1) obj2))
+         (else  ; both objects are strings
+          (string-op obj1 obj2))))
+      ((and (nodeset? obj1) (nodeset? obj2))  ; both objects are nodesets
+       (let first ((str-set1 (map sxp:string-value obj1))
+                   (str-set2 (map sxp:string-value obj2)))
+         (cond
+           ((null? str-set1) #f)
+           ((let second ((elem (car str-set1))
+                         (set2 str-set2))
+              (cond
+                ((null? set2) #f)
+                ((string-op elem (car set2)) #t)
+                (else (second elem (cdr set2))))) #t)
+           (else
+            (first (cdr str-set1) str-set2)))))
+      (else  ; one of the objects is a nodeset, another is not
+       (let-values*
+        (((nset elem)
+          ; Equality operations are commutative
+          (if (nodeset? obj1) (values obj1 obj2) (values obj2 obj1))))
+        (cond
+          ((boolean? elem) (bool-op elem (sxp:boolean nset)))
+          ((number? elem)
+           (let loop ((nset 
+                       (map
+                        (lambda (node) (sxp:number (sxp:string-value node)))
+                        nset)))
+             (cond
+               ((null? nset) #f)
+               ((number-op elem (car nset)) #t)
+               (else (loop (cdr nset))))))
+          ((string? elem)
+           (let loop ((nset (map sxp:string-value nset)))
+             (cond
+               ((null? nset) #f)
+               ((string-op elem (car nset)) #t)
+               (else (loop (cdr nset))))))
+          (else  ; unknown datatype
+           (cerr "Unknown datatype: " elem nl)
+           #f)))))))
+                   
+         
+(define sxp:equal? (sxp:equality-cmp eq? = string=?))
+
+(define sxp:not-equal?
+  (sxp:equality-cmp
+   (lambda (bool1 bool2) (not (eq? bool1 bool2)))
+   (lambda (num1 num2) (not (= num1 num2)))
+   (lambda (str1 str2) (not (string=? str1 str2)))))
+         
+
+; Relational operation ( < , > , <= , >= ) for two XPath objects
+;  op is comparison procedure: < , > , <= or >=
+(define (sxp:relational-cmp op)
+  (lambda (obj1 obj2)
+    (cond
+      ((not (or (nodeset? obj1) (nodeset? obj2)))  ; neither obj is a nodeset
+       (op (sxp:number obj1) (sxp:number obj2)))
+      ((boolean? obj1)  ; 'obj1' is a boolean, 'obj2' is a nodeset
+       (op (sxp:number obj1) (sxp:number (sxp:boolean obj2))))
+      ((boolean? obj2)  ; 'obj1' is a nodeset, 'obj2' is a boolean
+       (op (sxp:number (sxp:boolean obj1)) (sxp:number obj2)))
+      ((or (null? obj1) (null? obj2)) ; one of the objects is an empty nodeset
+       #f)
+      (else  ; at least one object is a nodeset
+       (op
+        (cond
+          ((nodeset? obj1)  ; 'obj1' is a (non-empty) nodeset
+           (let ((nset1 (map
+                         (lambda (node) (sxp:number (sxp:string-value node)))
+                         obj1)))
+             (let first ((num1 (car nset1))
+                         (nset1 (cdr nset1)))
+               (cond
+                 ((null? nset1) num1)
+                 ((op num1 (car nset1)) (first num1 (cdr nset1)))
+                 (else (first (car nset1) (cdr nset1)))))))
+          ((string? obj1) (sxp:number obj1))
+          (else  ; 'obj1' is a number
+           obj1))
+        (cond
+          ((nodeset? obj2)  ; 'obj2' is a (non-empty) nodeset
+           (let ((nset2 (map
+                         (lambda (node) (sxp:number (sxp:string-value node)))
+                         obj2)))
+             (let second ((num2 (car nset2))
+                          (nset2 (cdr nset2)))
+               (cond
+                 ((null? nset2) num2)
+                 ((op num2 (car nset2)) (second (car nset2) (cdr nset2)))
+                 (else (second num2 (cdr nset2)))))))
+          ((string? obj2) (sxp:number obj2))
+          (else  ; 'obj2' is a number
+           obj2)))))))
+           
      
 ;=========================================================================
 ; Node tests
