@@ -114,7 +114,7 @@
 ; as passed to make-header.
 (define (make-footer head-parms)
   `((br)
-    (p (hr))
+    (div (hr))
     (h3 "Last updated "
 	,(let* ((date-revised
 		 (car (lookup-def 'Date-Revision-yyyymmdd head-parms #f)))
@@ -134,7 +134,8 @@
 	      (and home
 		   `(p "This site's top page is "
 		       (a (@ (href ,home)) (strong ,home)))))))
-    (p (address "oleg-at-pobox.com or oleg-at-acm.org or oleg-at-computer.org"
+    (div 
+      (address "oleg-at-pobox.com or oleg-at-acm.org or oleg-at-computer.org"
        (br)
        "Your comments, problem reports, questions are very welcome!"))
     (p (font (@ (size "-2")) "Converted from SXML by SXML->HTML"))
@@ -218,11 +219,12 @@
    `((html:begin 
       . ,(lambda (tag . elems)
 	   (list
-	    "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0 Transitional//EN\""
-	    "\"http://www.w3.org/TR/REC-html40/loose.dtd\">" nl
-	    "<html>" nl
-	    elems
-	    "</html>" nl)))
+	     "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\""
+	     nl 
+	     "\"http://www.w3.org/TR/html4/loose.dtd\">" nl
+	     "<html>" nl
+	     elems
+	     "</html>" nl)))
 
      (Header
       *preorder*
