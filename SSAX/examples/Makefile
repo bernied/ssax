@@ -38,15 +38,15 @@ run-sxml-bigloo: run-sxml-bigloo.scm run-sxml.scm \
 
 run-html-parse-sample-bigloo-i: html-parser.scm \
 		$(LIBDIR)/SSAX-code.scm
-	$(BIGLOO) $(BFLAGS) -i html-parser.scm
+	$(BIGLOO) $(BFLAGS) -i -eval '(module permissive-HTML-parser (include "myenv-bigloo.scm") (include "util.scm") (include "look-for-str.scm") (include "input-parse.scm") (include "SSAX-code.scm"))' html-parser.scm
 
 run-pull-punct-bigloo-i: pull-punct-sxml.scm \
 		$(LIBDIR)/SSAX-code.scm
-	$(BIGLOO) $(BFLAGS) -i pull-punct-sxml.scm
+	$(BIGLOO) $(BFLAGS) -i -eval '(module pull-punct-sxml (include "myenv-bigloo.scm") (include "util.scm") (include "look-for-str.scm") (include "input-parse.scm") (include "SSAX-code.scm") (include "SXML-tree-trans.scm")(include "SXML-to-HTML.scm"))' pull-punct-sxml.scm
 
 run-apply-templates-bigloo-i: apply-templates.scm \
 		$(LIBDIR)/SSAX-code.scm
-	$(BIGLOO) $(BFLAGS) -i apply-templates.scm
+	$(BIGLOO) $(BFLAGS) -i -eval '(module apply-templates-simple (include "myenv-bigloo.scm") (include "util.scm") (include "look-for-str.scm") (include "input-parse.scm") (include "SSAX-code.scm") (include "SXML-tree-trans.scm") (include "SXML-to-HTML.scm") (include "SXPath-old.scm"))' apply-templates.scm
 
 run-sxml-db-conv-i: sxml-db-conv.scm \
 		$(LIBDIR)/SSAX-code.scm

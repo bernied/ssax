@@ -1,22 +1,22 @@
 ; A simple example of XSLT-like 'apply-templates' form.
 ; For more advanced and real-life examples, see Kirill Lisovsky's STX.
 ;
+; IMPORT
+; The following is a Bigloo-specific module declaration.
+; Other Scheme systems have something similar.
+; (module apply-templates-simple
+; 	(include "myenv-bigloo.scm")
+; 	(include "util.scm")
+; 	(include "look-for-str.scm")
+; 	(include "input-parse.scm")
+; 	(include "SSAX-code.scm")
+; 	(include "SXML-tree-trans.scm")
+; 	(include "SXML-to-HTML.scm")
+; 	(include "SXPath-old.scm")
+; 	)
+;
 ; $Id$
 
-; The following is a Bigloo-specific module declaration.
-; Please replace with an appropriate inclusion form if using Scheme48
-; or other Scheme system.
-; The rest of the code is portable.
-(module apply-templates-simple
-	(include "myenv-bigloo.scm")
-	(include "util.scm")
-	(include "look-for-str.scm")
-	(include "input-parse.scm")
-	(include "SSAX-code.scm")
-	(include "SXML-tree-trans.scm")
-	(include "SXML-to-HTML.scm")
-	(include "SXPath-old.scm")
-	)
 
 ; Running examples: SXML data structures
 

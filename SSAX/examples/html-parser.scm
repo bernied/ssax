@@ -1,9 +1,19 @@
-(module permissive-HTML-parser
-	(include "myenv-bigloo.scm")
-	(include "util.scm")
-	(include "look-for-str.scm")
-	(include "input-parse.scm")
-	(include "SSAX-code.scm"))
+; An example of using the SSAX library: a permissive HTML parser
+;
+; IMPORT
+; The following is a Bigloo-specific module declaration.
+; Other Scheme systems have something similar.
+; (module permissive-HTML-parser
+; 	(include "myenv-bigloo.scm")
+; 	(include "util.scm")
+; 	(include "look-for-str.scm")
+; 	(include "input-parse.scm")
+; 	(include "SSAX-code.scm"))
+;
+; $Id$
+
+; To satisfy SSAX imports
+
 (define parser-error error)
 (define SSAX:warn cerr)
 

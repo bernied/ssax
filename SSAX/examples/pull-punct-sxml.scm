@@ -32,6 +32,19 @@
 ; the transformation is a mix of breadth-first and depth-first
 ; traversals.
 ;
+; IMPORT
+; The following is a Bigloo-specific module declaration.
+; Other Scheme systems have something similar.
+; (module pull-punct-sxml
+; 	(include "myenv-bigloo.scm")
+; 	(include "util.scm")
+; 	(include "look-for-str.scm")
+; 	(include "input-parse.scm")
+; 	(include "SSAX-code.scm")
+; 	(include "SXML-tree-trans.scm")
+; 	(include "SXML-to-HTML.scm")
+; 	)
+;
 ; $Id$
 
 
@@ -39,15 +52,6 @@
 ; Please replace with an appropriate inclusion form if using Scheme48
 ; or other Scheme system.
 ; The rest of the code is portable.
-(module pull-punct-sxml
-	(include "myenv-bigloo.scm")
-	(include "util.scm")
-	(include "look-for-str.scm")
-	(include "input-parse.scm")
-	(include "SSAX-code.scm")
-	(include "SXML-tree-trans.scm")
-	(include "SXML-to-HTML.scm")
-	)
 
 (define (parser-error port message . specialising-msgs)
   (apply cerr (cons message specialising-msgs))
