@@ -92,7 +92,7 @@
 (define bigloo-error error)
 (define error
   (lambda (msg . args)
-    (bigloo-error "myerror" msg args))))
+    (bigloo-error "myerror" msg args)))
 
 ; Bigloo has an advanced module system
 (define include (lambda (_) #f))
