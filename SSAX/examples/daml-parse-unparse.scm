@@ -13,29 +13,85 @@
 ;
 ; A Bigloo Scheme system is assumed. We extensively rely on the
 ; match-case form provided by Bigloo.
-;
 ; $Id$
 
+; IMPORTS
+; (module xml-to-sxml-to-xml
+; 	(include "myenv-bigloo.scm")
+;  	(include "srfi-13-local.scm") ; or import from SRFI-13 if available
+; 	(include "char-encoding.scm")
+; 	(include "util.scm")
+; 	(include "look-for-str.scm")
+; 	(include "input-parse.scm")
+; 	(include "SSAX-code.scm")
+; 	(include "SXML-tree-trans.scm")
+; 	)
 
-(module xml-to-sxml-to-xml
-	(include "myenv-bigloo.scm")
- 	(include "srfi-13-local.scm") ; or import from SRFI-13 if available
-	(include "char-encoding.scm")
-	(include "util.scm")
-	(include "look-for-str.scm")
-	(include "input-parse.scm")
-	(include "SSAX-code.scm")
-	(include "SXML-tree-trans.scm")
-	)
 
-; The following two definitions satisfy the import requirement of SSAX
-(define (parser-error port message . specialising-msgs)
-  (apply cerr (cons message specialising-msgs))
-  (cerr nl)
-  (exit 4))
-(define (ssax:warn port message . specialising-msgs)
-  (apply cerr (cons message specialising-msgs))
-  (cerr nl))
+; A simple linear pattern matcher
+; It is efficient (generates code at macro-expansion time) and simple:
+; it should work on any R5RS Scheme system.
+
+
+; (match-case-simple exp <clause> ...[<else-clause>])
+; <clause> ::= (<pattern> <guard> exp ...)
+; <else-clause> ::= (else exp ...)
+; <guard> ::= boolean exp | ()
+; <pattern> :: =
+;         var  -- matches always and binds the var
+;                 pattern must be linear! No check is done
+;         _    -- matches always
+;        'exp  -- matches exp (using equal?)
+;        (<pattern1> <pattern2> ...) -- matches the list of patterns
+;        (<pattern1> . <pattern2>)  -- ditto
+;        ()    -- matches the empty list
+
+(define-syntax match-case-simple
+  (syntax-rules ()
+    ((match-case-simple exp clause ...)
+      (let ((val-to-match exp))
+	(match-case-simple* val-to-match clause ...)))))
+
+(define (<match-failure> val)
+  (assert #f "failed match" val))
+
+(define-syntax match-case-simple*
+  (syntax-rules (else)
+    ((match-case-simple* val (else exp ...))
+      (let () exp ...))
+    ((match-case-simple* val)
+      (<match-failure> val))
+    ((match-case-simple* val (pattern () exp ...) . clauses)
+      (let ((fail (lambda () (match-case-simple* val . clauses))))
+	  ; note that match-pattern may do binding. Here,
+	  ; other clauses are outside of these binding
+	(match-pattern val pattern (let () exp ...) (fail))))
+    ((match-case-simple* val (pattern guard exp ...) . clauses)
+      (let ((fail (lambda () (match-case-simple* val . clauses))))
+	(match-pattern val pattern
+	  (if guard (let () exp ...) (fail))
+	  (fail))))))
+
+
+; (match-pattern val pattern kt kf)
+(define-syntax match-pattern
+  (syntax-rules (_ quote)
+    ((match-pattern val _ kt kf) kt)
+    ((match-pattern val () kt kf)
+      (if (null? val) kt kf))
+    ((match-pattern val (quote lit) kt kf)
+      (if (equal? val (quote lit)) kt kf))
+    ((match-pattern val (x . y) kt kf)
+      (if (pair? val)
+	(let ((valx (car val))
+	      (valy (cdr val)))
+	  (match-pattern valx x
+	    (match-pattern valy y kt kf)
+	    kf))
+	kf))
+    ((match-pattern val var kt kf)
+      (let ((var val)) kt))))
+
 
 ; The file is downloaded from
 ; http://www.daml.org/services/daml-s/0.7/CongoProfile.daml
@@ -45,24 +101,27 @@
 
 ; Internal entities declared in the CongoProfile.daml file
 (define DAML-entities
-  '((rdf . "http://www.w3.org/1999/02/22-rdf-syntax-ns")
-    (rdfs . "http://www.w3.org/2000/01/rdf-schema")
-    (daml . "http://www.daml.org/2001/03/daml+oil")
-    (process . "http://www.daml.org/services/daml-s/0.7/Process.daml")
-    (service . "http://www.daml.org/services/daml-s/0.7/Service.daml")
-    (profile . "http://www.daml.org/services/daml-s/0.7/Profile.daml")
-    (profileTaxonomy . 
+  (map
+    (lambda (ass)
+      (cons (string->symbol (car ass)) (cdr ass)))
+  '(("rdf" . "http://www.w3.org/1999/02/22-rdf-syntax-ns")
+    ("rdfs" . "http://www.w3.org/2000/01/rdf-schema")
+    ("daml" . "http://www.daml.org/2001/03/daml+oil")
+    ("process" . "http://www.daml.org/services/daml-s/0.7/Process.daml")
+    ("service" . "http://www.daml.org/services/daml-s/0.7/Service.daml")
+    ("profile" . "http://www.daml.org/services/daml-s/0.7/Profile.daml")
+    ("profileTaxonomy" . 
 	"http://www.daml.org/services/daml-s/0.7/ProfileTaxonomy.daml")
-    (country . "http://www.daml.ri.cmu.edu/ont/Country.daml")
-    (concepts . "http://www.daml.ri.cmu.edu/ont/DAML-S/concepts.daml")
-    (congoService . 
+    ("country" . "http://www.daml.ri.cmu.edu/ont/Country.daml")
+    ("concepts" . "http://www.daml.ri.cmu.edu/ont/DAML-S/concepts.daml")
+    ("congoService" . 
 		  "http://www.daml.org/services/daml-s/0.7/CongoService.daml")
-    (congoProcess . 
+    ("congoProcess" . 
 		  "http://www.daml.org/services/daml-s/0.7/CongoProcess.daml")
-    (time . "http://www.ai.sri.com/daml/ontologies/time/Time.daml")
-    (xsd . "http://www.w3.org/2000/10/XMLSchema.xsd")
-    (DEFAULT . "http://www.daml.org/services/daml-s/0.7/CongoProfile.daml")
-    ))
+    ("time" . "http://www.ai.sri.com/daml/ontologies/time/Time.daml")
+    ("xsd" . "http://www.w3.org/2000/10/XMLSchema.xsd")
+    ("DEFAULT" . "http://www.daml.org/services/daml-s/0.7/CongoProfile.daml")
+    )))
 
 ;------------------------------------------------------------------------
 ;			Parsing of DAML
@@ -220,7 +279,7 @@
       (if last-colon ; GE is indeed an extended name
 	  (values
 	   (substring ge-str 0 last-colon)
-	   (substring ge-str (++ last-colon) (string-length ge-str)))
+	   (substring ge-str (inc last-colon) (string-length ge-str)))
 	  (values #f ge-str))))
 
   (define (make-symbol . pieces)
@@ -251,8 +310,8 @@
       (let ((ns (assq '*NAMESPACES* annotations)))
 	(if (not ns) namespaces
 	    (let loop ((nss (cdr ns)) (namespaces namespaces))
-	      (match-case nss
-		(((?ns-id ?uri . ?prefix-opt) . ?ns-rest)
+	      (match-case-simple nss
+		(((ns-id uri . prefix-opt) . ns-rest) ()
 		 (if (assq ns-id namespaces) ; seen already. Check prefixes!
 		     (loop ns-rest namespaces)
 		     (loop ns-rest
@@ -266,17 +325,17 @@
 
     (let loop ((node sxml) (todo '())
 	       (namespaces '()) (translation '()))
-      (match-case node
-        (()
+      (match-case-simple node
+        (() ()
 	 (if (null? todo)
 	     (values namespaces translation)  ; we're done
 	     (loop (car todo) (cdr todo) namespaces translation)))
-	((*PI* . ?-) (loop '() todo namespaces translation))
-	((*NAMESPACES* . ?-) (loop '() todo namespaces translation))
-	(((and (? symbol?) ?ge) . ?children)  ; regular node
+	(('*PI* . _) () (loop '() todo namespaces translation))
+	(('*NAMESPACES* . _) () (loop '() todo namespaces translation))
+	((ge . children)  (symbol? ge) ; regular node
 	 (let ((namespaces
-		(match-case children
-		 (((@ . ?attrs) . ?-)
+		(match-case-simple children
+		 ((('@ . attrs) . _) ()
 		  (cond
 		    ((assq '@ attrs) =>
 		      (lambda (annot-assoc)
@@ -316,7 +375,7 @@
 		   (cons
 		    (list ge (make-symbol prefix ":" local-name))
 		    translation)))))))))
-	((?hd . ?tl)	; list of nodes, break them up
+	((hd . tl) ()	; list of nodes, break them up
 	 (loop hd (append tl todo) namespaces translation))
 	(else		; atomic, primitive node. Ignore
 	 (loop '() todo namespaces translation))
@@ -357,14 +416,14 @@
 		(values (reverse (cdr elems-rev)) (car elems-rev))))
 	     )
 	    (pre-post-order
-	     (match-case root-elem
+	     (match-case-simple root-elem
 			; the root element had its own attributes, add xmlns:
-	      ((?rootname (@ . ?attrs) . ?children)
+	      ((rootname ('@ . attrs) . children) ()
 	       (list pis
 		 `(,rootname 
 		   (@ ,@ns-attrs . ,attrs) . ,children)))
 			; the root element had no attr list: make one
-	      ((?rootname . ?children)
+	      ((rootname . children) ()
 	       (list pis
 		     `(,rootname
 		       (@ . ,ns-attrs) . ,children)))
@@ -377,12 +436,12 @@
   )))
 
 (define (entag tag elems)
-  (match-case elems
-    (((@ . ?attrs) . ?children)
+  (match-case-simple elems
+    ((('@ . attrs) . children) ()
       (list #\< tag attrs 
 	(if (null? children) "/>"
 	  (list #\> children "</" tag #\>))))
-    (() (list #\< tag "/>"))
+    (() () (list #\< tag "/>"))
     (else
       (list #\< tag #\> elems "</" tag #\>))))
 
