@@ -324,8 +324,7 @@ items never share their children even if the latter have the identical
 content.")
     (p
       "A " (code "parent") " property of an Infoset information item
-might seem troublesome. The Infoset Recommendation " (cite "XML
-Infoset") " specifies that element, attribute and other kinds of
+might seem troublesome. The Infoset Recommendation " (cite "XML Infoset") " specifies that element, attribute and other kinds of
 information items have a property " (code "parent") ", whose value is
 an information item that contains the given item in its " (code
 "children") " property. The property parent thus is an upward link
