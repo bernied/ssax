@@ -7,7 +7,7 @@
    (title "XML and Scheme")
    (description "Representing, authoring, querying and transforming
 markup data in Scheme; XML notation for a programming language")
-   (Date-Revision-yyyymmdd "20030210")
+   (Date-Revision-yyyymmdd "20040204")
    (Date-Creation-yyyymmdd "20010706")
    (keywords "XML, XML parsing, XML Infoset, XPath, XSLT, SAX, SXML, SXSLT, SXPath, Scheme, HTML composition, HTML authoring")
    (AuthorAddress "oleg-at-okmij.org")
@@ -32,8 +32,6 @@ markup data in Scheme; XML notation for a programming language")
 	      (width "88") (height "31") (border "0")
 	      (alt "SourceForge Logo"))))
 
-; Add dates to papers (e.g., SXSLT tutorials)
-; Ref to Jim Bender's papers and site?
 ; Ref to Makoto Satoo
 
    (p "This project offers tools to inter-convert between an
@@ -134,7 +132,7 @@ transformations, re-writing of SXML elements in regular and special
 ways, context-sensitive applications of re-writing rules, and
 reflection. Although the file is technically a Scheme source code, it is
 actually a tutorial. Of 357 lines in the file, 241 are comments and 24
-are just blank lines.")
+are just blank lines. August 2003.")
     (p 
       "SXSLT: Manipulation Language for XML"
       (URL "http://pobox.com/~oleg/ftp/papers/SXSLT-talk.pdf") (br)
@@ -150,9 +148,10 @@ transformations, of being higher-order, declarative and extensible.")
    (p
      "SXPath library: an implementation of XPath. The SXML query library."
      (br)
-     "SXPointer: an implementation of a subset of XPointer"
+     "SXPointer: an SXPath-based implementation of XPointer"
      (who "Kirill Lisovsky")
-     (URL "http://pair.com/lisovsky/sxml/sxpath/"))
+     (URL "http://pair.com/lisovsky/query/"))
+
 
    (p
      "SXLink: An implementation of W3C XLink"
@@ -163,7 +162,16 @@ transformations, of being higher-order, declarative and extensible.")
      "STX: a compiler for a subset of XSLT and an embedding of XSLT
 into Scheme"
      (who "Kirill Lisovsky")
-     (URL "http://pair.com/lisovsky/STX/"))
+     (URL "http://pair.com/lisovsky/transform/stx/"))
+    
+    (p "DataGuides: A descriptive database schema for XML/SXML data"
+     (who "Kirill Lisovsky")
+      (URL "http://pair.com/lisovsky/xml/dg/"))
+
+    (p
+      "WebIt! - An XML Framework for Scheme"
+      (who "Jim Bender")
+      (URL "http://celtic.benderweb.net/webit/"))
 
    (p
      "HtmlPrag: a permissive HTML parser that emits SXML"
@@ -187,35 +195,61 @@ STX:"
      (URL "http://www.metnet.navy.mil/Metcast/Code/get-advisories.scm"))
    (p "This page and all SXML-related pages are authored in SXML.")
     (p
-      "For more detailed explanation of these projects, see the talk at the International Lisp Conference.")
+      "For more detailed explanation of these projects, see the talk
+at the International Lisp Conference.")
 
 
 
    (Section 3 "Availability")
-   (p "The current version of SSAX is 4.9. The whole SSAX code is in public domain.")
-   
+   (p "The current released version of SSAX is 4.9. Release 4.A is
+forthcoming. The whole SSAX code is in public domain.")
+
    "SSAX has been tested on the following Scheme systems:"
    (br)
-   "PLT Scheme (versions 103 and 200), Bigloo 2.4b, GambitC 3.0,
-Chicken, Guile, SCM 5d6, MIT Scheme 7.5.2, SCSH, Gauche 0.4.12."
+   "PLT Scheme (versions 103 and 200), Bigloo, GambitC 3.0,
+Chicken, Guile, SCM, MIT Scheme 7.5.2, SCSH, Gauche, SISC."
 
 
    (Section 3 "Distributions")
    (p "SSAX download site at SourceForge:"
       (URL "http://sf.net/project/showfiles.php?group_id=30687"))
 
-   (p
-    "The SSAX distributions for particular Scheme systems (PLT Scheme, Bigloo, Chicken, Guile, etc.) are created by Kirill Lisovsky, whose efforts are greatly appreciated. These distributions are also available from his web site " 
-      (URL "http://pair.com/lisovsky/sxml/ssax/")
-      (br)
-      "Kirill's web site has detailed instructions for compiling SSAX on different platforms. In particular, you can compile SSAX into " (em "Java bytecode") ", with a Bigloo compiler.")
-   (p
-    (a (@ (href
-	   "http://cvs.sourceforge.net/cgi-bin/viewcvs.cgi/gauche/SXML/"))
-       "A Gauche distribution of SSAX") " is maintained by Shiro Kawai.")
-   (p
-     "Neil W. Van Dyke maintains a port of SSAX to PLT Scheme."
-     (URL "http://www.neilvandyke.org/ssax-plt/"))
+   (p "Kirill Lisovsky's index of various SSAX distributions. Kirill
+has put together many of those distributions, in particular, the ones
+for PLT Scheme."
+     (URL "http://pair.com/lisovsky/xml/ssax/"))
+
+    (p "SSAX/SXML has been integrated into various Scheme systems
+and, in some cases, become part of the distribution for those systems:")
+    (ul
+      (li "Bigloo SSAX-SXML library, version 4.9"
+	(who "Kirill Lisovsky and Dmitry Lizorkin, maintained by
+Dmitry Lizorkin")
+	(URL "http://pair.com/lisovsky/download/sxml/bigloo/"))
+
+      (li "Gauche/SXML, SSAX version 4.9+"
+	(who "Shiro Kawai")
+	(URL "http://cvs.sourceforge.net/viewcvs.py/gauche/Gauche/ext/sxml/"))
+
+      (li "SCSH and Scheme48, version 4.9"
+	(who "Michael Sperber")
+	(URL "http://www.scsh.net/resources/markup.html"))
+
+      (li "Chicken ssax.egg, version 4.9.1"
+	(who "Felix Winkelmann")
+	(URL "http://www.call-with-current-continuation.org/eggs/ssax.html"))
+
+      (li "SISC, an extensible Java based interpreter, SSAX version 4.9"
+	(who "Noel Walsh")
+	(URL "http://sisc.sourceforge.net/wiki/wakka.php?wakka=SSAX"))
+      )
+
+    (p "Preview distributions of SSAX version 4.A:")
+    (ul
+      (li "PLT Scheme"
+	(who "Kirill Lisovsky")
+	(URL "http://pair.com/lisovsky/download/sxml/plt/preview/"))
+    )
 
 
   (Section 3 "CVS" " Tree")
@@ -268,9 +302,9 @@ documentation, validation tests, as well as several sample applications.")
  (SRV:send-reply
   (pre-post-order Content
    (generic-web-rules Content 
-     `((who *preorder*
+     `((who *macro*
 	 . ,(lambda (tag . elems)
-	      (pre-post-order `((br) . ,elems) universal-conversion-rules)))
+	      `((n_) "[by " ,elems "]")))
 
 		; A reference to an anchor in the present file
 		; (local-ref target . title)
