@@ -38,13 +38,12 @@
 (let
   ((x 0))
 
-  (assert (= 2 (when (zero? x) (++! x) (++ x))))
-  (assert (not (when (zero? x) (++! x))))
-  (assert (= x 1))
+  (assert (= 2 (begin (when (zero? x) (++! x)) (++ x))))
+  (assert (begin (when (zero? x) (++! x)) (= x 1)))
   (whennot (zero? x) (--! x))
   (assert (zero? x))
-  (assert (zero? (whennot (positive? x) (--! x) (++ x))))
-  (assert (whennot (negative? x) (++ x)))
+  (assert (zero? (begin (whennot (positive? x) (--! x)) (++ x))))
+  (assert (= -1 (begin (whennot (negative? x) (++! x)) x)))
 )
 
 (cerr nl "Verifying assert..." nl)

@@ -155,14 +155,14 @@
 
 			; if condition is true, execute stmts in turn
 			; and return the result of the last statement
-			; otherwise, return #f
+			; otherwise, return unspecified.
 (define-macro (when condition . stmts)
   `(and ,condition (begin ,@stmts)))
   
 
 			; if condition is false execute stmts in turn
 			; and return the result of the last statement
-			; otherwise, return #t
+			; otherwise, return unspecified.
 			; This primitive is often called 'unless'
 (define-macro (whennot condition . stmts)
   `(or ,condition (begin ,@stmts)))
