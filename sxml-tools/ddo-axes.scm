@@ -1078,7 +1078,7 @@
                 (cons
                  (cons (if (null? ancestors)
                            (car nset)
-                           (sxml:make-context (car nset) ancestors))
+                           (draft:make-context (car nset) ancestors))
                        vacant-num)
                  (create-pos-nset (cdr nset) ancestors (+ vacant-num 1))))))
          (src-walk
@@ -1114,7 +1114,7 @@
                                 (cons
                                  (if (null? curr-ancestors)
                                      (car curr-children)                              
-                                     (sxml:make-context
+                                     (draft:make-context
                                       (car curr-children) curr-ancestors))
                                  order-num))
                                '()))
@@ -1137,7 +1137,7 @@
                                 (cons
                                  (if (null? curr-ancestors)
                                      (car curr-children)
-                                     (sxml:make-context
+                                     (draft:make-context
                                       (car curr-children) curr-ancestors))
                                  order-num)
                                 this-res)

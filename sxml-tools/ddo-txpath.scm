@@ -156,7 +156,7 @@
          (if
           (null? preds)
           nset
-          (let ((size (length nodeset)))  ; context size
+          (let ((size (length nset)))  ; context size
             (let iter-nodes ((nset nset)
                              (res '())
                              (pos 1))                        
@@ -780,10 +780,10 @@
 
 ; {10} <OrExpr> ::= (or <Expr> <Expr>+ )
 ; NOTE: num-anc is dummy here, since it is always 0 for OrExpr
-(define (ast:ast-or-expr op num-anc single-level?)
+(define (ddo:ast-or-expr op num-anc single-level?)
   (let ((expr-res-lst
          (map
-          (lambda (expr) (draft:ast-expr expr 0 single-level?))
+          (lambda (expr) (ddo:ast-expr expr 0 single-level?))
           (cdr op))))
     (if
      (member #f expr-res-lst)  ; error detected
