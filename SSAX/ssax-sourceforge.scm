@@ -7,7 +7,7 @@
    (title "XML and Scheme")
    (description "Representing, authoring, querying and transforming
 markup data in Scheme; XML notation for a programming language")
-   (Date-Revision-yyyymmdd "20040204")
+   (Date-Revision-yyyymmdd "20040916")
    (Date-Creation-yyyymmdd "20010706")
    (keywords "XML, XML parsing, XML Infoset, XPath, XSLT, SAX, SXML, SXSLT, SXPath, Scheme, HTML composition, HTML authoring")
    (AuthorAddress "oleg-at-okmij.org")
@@ -73,7 +73,7 @@ the form of S-expressions.")
   (p
     "" (strong "SXSLT") " is a manipulation language for XML and
 " (strong "SXPath") " is an XPath-conforming XML query language. Both
-languages internally rely on SXML as a representation of XML Infoset.")
+languages internally rely on SXML as a representation of the XML Infoset.")
 
     (ul
       (li (local-ref "Documentation"))
@@ -94,6 +94,15 @@ languages internally rely on SXML as a representation of XML Infoset.")
    (Section 3 "Documentation" " and tutorials")
    (p "Main SSAX/SXML page:"
       (URL "http://pobox.com/~oleg/ftp/Scheme/xml.html"))
+
+    (p "XML Matters: Investigating SXML and SSAX: "
+       "Manipulating XML in the Scheme programming language" (br)
+      "by David Mertz, Ph.D. " 
+      "IBM developerWorks article"
+      (URL "http://www-106.ibm.com/developerworks/library/x-matters31.html")
+      (URL 
+	"http://www-6.ibm.com/jp/developerworks/xml/040402/j_x-matters31.html")
+      "[Japanese]")
 
    (p
     "Detailed introduction, motivation and real-life case-studies of
@@ -146,12 +155,17 @@ transformations, of being higher-order, declarative and extensible.")
    (Section 3 "SXML-related" " projects")
 
    (p
+     "Sedna - a Native XML DBMS"
+     (URL "http://www.modis.ispras.ru/Development/sedna.htm") (br)
+     "Since version 0.2, Sedna provides the representation of query
+results in SXML")
+
+   (p
      "SXPath library: an implementation of XPath. The SXML query library."
      (br)
      "SXPointer: an SXPath-based implementation of XPointer"
      (who "Kirill Lisovsky")
      (URL "http://pair.com/lisovsky/query/"))
-
 
    (p
      "SXLink: An implementation of W3C XLink"
@@ -179,7 +193,13 @@ into Scheme"
      (URL "http://www.neilvandyke.org/htmlprag/"))
 
    (p
-     "sxmlcnv: XML <-> SXML SmartDoc friendly conversion application"
+     "WebScraperHelper: simple generation of SXPath queries to extract 
+data from (parsed) Web pages"
+     (who "Neil W. Van Dyke")
+     (URL "http://www.neilvandyke.org/webscraperhelper/"))
+
+   (p
+     "sxmlcnv: XML <-> SXML SmartDoc-friendly conversion application"
      (who "Kiyoka Nishiyama")
      (URL "http://www.netfort.gr.jp/~kiyoka/sxmlcnv/"))
 
@@ -201,13 +221,13 @@ at the International Lisp Conference.")
 
 
    (Section 3 "Availability")
-   (p "The current released version of SSAX is 4.9. Release 4.A is
-forthcoming. The whole SSAX code is in public domain.")
+   (p "The current released version of SSAX is 5.1.
+The whole SSAX code is in public domain.")
 
    "SSAX has been tested on the following Scheme systems:"
    (br)
-   "PLT Scheme (versions 103 and 200), Bigloo, GambitC 3.0,
-Chicken, Guile, SCM, MIT Scheme 7.5.2, SCSH, Gauche, SISC."
+   "PLT Scheme, Bigloo, GambitC 3.0,
+Chicken, Guile, SCM, MIT Scheme 7.5.2, Scheme48, SCSH, Gauche, SISC."
 
 
    (Section 3 "Distributions")
@@ -222,14 +242,17 @@ for PLT Scheme."
     (p "SSAX/SXML has been integrated into various Scheme systems
 and, in some cases, become part of the distribution for those systems:")
     (ul
-      (li "Bigloo SSAX-SXML library, version 4.9"
-	(who "Kirill Lisovsky and Dmitry Lizorkin, maintained by
-Dmitry Lizorkin")
-	(URL "http://pair.com/lisovsky/download/sxml/bigloo/"))
+      (li "guile-lib, version 5.1"
+	(who "Andy Wingo"))
 
       (li "Gauche/SXML, SSAX version 4.9+"
 	(who "Shiro Kawai")
 	(URL "http://cvs.sourceforge.net/viewcvs.py/gauche/Gauche/ext/sxml/"))
+
+      (li "Bigloo SSAX-SXML library, version 4.9"
+	(who "Kirill Lisovsky and Dmitry Lizorkin, maintained by
+Dmitry Lizorkin")
+	(URL "http://pair.com/lisovsky/download/sxml/bigloo/"))
 
       (li "SCSH and Scheme48, version 4.9"
 	(who "Michael Sperber")
@@ -240,16 +263,9 @@ Dmitry Lizorkin")
 	(URL "http://www.call-with-current-continuation.org/eggs/ssax.html"))
 
       (li "SISC, an extensible Java based interpreter, SSAX version 4.9"
-	(who "Noel Walsh")
+	(who "Noel Welsh")
 	(URL "http://sisc.sourceforge.net/wiki/wakka.php?wakka=SSAX"))
       )
-
-    (p "Preview distributions of SSAX version 4.A:")
-    (ul
-      (li "PLT Scheme"
-	(who "Kirill Lisovsky")
-	(URL "http://pair.com/lisovsky/download/sxml/plt/preview/"))
-    )
 
 
   (Section 3 "CVS" " Tree")
