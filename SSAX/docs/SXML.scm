@@ -1124,7 +1124,7 @@ and higher.")
 		  (lookup-def 'Header
 			      (list (post-order Content
 					  search-Header-rules))
-			      #f)))
+			      )))
 	     (post-order (make-navbar header-parms)
 			 universal-conversion-rules))))
      
@@ -1134,7 +1134,7 @@ and higher.")
 		  (lookup-def 'Header
 			      (list (post-order Content
 						search-Header-rules))
-			      #f)))
+			      )))
 	     (post-order (make-footer header-parms)
 			 universal-conversion-rules))))
      
@@ -1144,9 +1144,9 @@ and higher.")
 		  (lookup-def 'Header
 			      (list (post-order Content
 						search-Header-rules))
-			      #f)))
+			      )))
 	     `(h1 (@ align "center")
-		,(lookup-def 'long-title header-parms #f)))))
+		,(lookup-def 'long-title header-parms)))))
 
 
      (abstract			; The abstract of the document
@@ -1157,9 +1157,9 @@ and higher.")
 		    (lookup-def 'Header
 				(list (post-order Content
 						  search-Header-rules))
-				#f)))
+				)))
 	     (list "This page specifies <strong>revision "
-		   (lookup-def 'Revision header-parms #f)
+		   (lookup-def 'Revision header-parms)
 		   "</strong> of SXML. "))))
        (prod-note
 	 *macro*

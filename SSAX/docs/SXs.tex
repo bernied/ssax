@@ -496,7 +496,7 @@ pass will transform \texttt{(Resource-descr "OMF-SYNOP.html")} according to the 
      ; Locate a named resource and expand into its full description.
      (Resource-descr
       . ,(lambda (tag name)
-           (let-values* (((name title date version)
+           (let*-values (((name title date version)
                           (lookup-res name)))
              (generate-XML
               (list

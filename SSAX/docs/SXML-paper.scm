@@ -242,7 +242,7 @@ Postgraduate School.")))
 				; and create the revision record
 	     (let ((header-parms (find-Header Content)))
 	       (list "The present article specifies revision "
-		     (lookup-def 'Revision header-parms #f) " of SXML. "))))
+		     (lookup-def 'Revision header-parms) " of SXML. "))))
        (prod-note
 	. ,(lambda (tag . master-url)
 	     (list
@@ -251,7 +251,7 @@ Postgraduate School.")))
 	. ,(lambda (tag)
 	     (let ((header-parms (find-Header Content)))
 	       (list "\\\\Keywords: " 
-		     (lookup-def 'keywords header-parms #f) "."))))
+		     (lookup-def 'keywords header-parms) "."))))
 
        )
       . ,(lambda (tag . abstract-body)

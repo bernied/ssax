@@ -612,7 +612,7 @@ pass will transform " (code "(Resource-descr \"OMF-SYNOP.html\")") " according t
     "; Locate a named resource and expand into its full description."
     "(Resource-descr"
     " . ,(lambda (tag name)"
-    "      (let-values* (((name title date version)"
+    "      (let*-values (((name title date version)"
     "                     (lookup-res name)))"
     "        (generate-XML"
     "         (list"
@@ -1020,12 +1020,10 @@ W3C Recommendation November 16, 1999."
      (page-title	
       . ,(lambda (tag) 
 	   (let* ((header-parms (find-Header Content))
-		  (title (lookup-def 'long-title header-parms #f))
-		  (authors (car (lookup-def 'Author header-parms #f)))
-		  (affiliations (car 
-				 (lookup-def 'Affiliation header-parms #f)))
-		  (emails (car 
-			   (lookup-def 'AuthorAddress header-parms #f))))
+		  (title (lookup-def 'long-title header-parms))
+		  (authors (lookup-def 'Author header-parms))
+		  (affiliations (lookup-def 'Affiliation header-parms))
+		  (emails (lookup-def 'AuthorAddress header-parms)))
 	     (if (pair? authors)
 		 ; several authors
 		 (list "\\title{" title "}" nl
@@ -1157,7 +1155,7 @@ W3C Recommendation November 16, 1999."
 				; and create the revision record
 	     (let ((header-parms (find-Header Content)))
 	       (list "The present article specifies revision "
-		     (lookup-def 'Revision header-parms #f) " of SXML. "))))
+		     (lookup-def 'Revision header-parms) " of SXML. "))))
        (prod-note
 	. ,(lambda (tag . master-url)
 	     (list
@@ -1166,7 +1164,7 @@ W3C Recommendation November 16, 1999."
 	. ,(lambda (tag)
 	     (let ((header-parms (find-Header Content)))
 	       (list "\\\\Keywords: " 
-		     (lookup-def 'keywords header-parms #f) "."))))
+		     (lookup-def 'keywords header-parms) "."))))
 
        )
       . ,(lambda (tag . abstract-body)
@@ -1324,12 +1322,12 @@ W3C Recommendation November 16, 1999."
        )
 			; (table [(@ attrib ...)] tr ...
       . ,(lambda (tag row . rows)
-	   (let-values* 
+	   (let*-values
 	    (((attrs rows)
 	      (if (and (pair? row) (eq? '@ (car row)))
 		  (values (cadr row) rows)
 		  (values '() (cons row rows))))
-	     (border?
+	     ((border?)
 	      (cond
 	       ((assq 'border attrs) => 
 		(lambda (border-attr) (not (equal? "0" (cadr border-attr)))))
@@ -1341,9 +1339,9 @@ W3C Recommendation November 16, 1999."
 			     ((assq name attrs) => cadr)
 			     (else #f)))
 			  '(caption key table-type align))))
-	     (dummy (assert (pair? rows))) ; at least one row must be given
-	     (ncols (length (car rows)))
-	     (tex-cols
+	     ((dummy) (assert (pair? rows))) ; at least one row must be given
+	     ((ncols) (length (car rows)))
+	     ((tex-cols)
 	      (let ((col-codes
 		     (map (lambda (_) (if border? "l|" "l")) (car rows))))
 		(if border?

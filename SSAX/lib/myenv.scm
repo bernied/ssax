@@ -219,41 +219,63 @@
 
 
 
-; assoc-primitives with a default clause
+; Look up a value associated with a symbolic key in alist 
+; ((key value) ...) or ((key . value) ...)
+; and return the associated value.
+; If the association has the form
+;   (key . value) where value is not a pair --> return value
+;   (key   value)                           --> return value
+;   (key value1 value2 value3 ...) -> return (value1 value2 value3 ...)
+; that is, the procedure tries to do the right thing for
+; both kinds of associative lists. 
+;
+; The form `lookup-def' is a special form rather than a regular
+; procedure. Its first two arguments are evaluated exactly once. The
+; default-value argument, if given, is evaluated only if the desired key
+; is not found. I have not seen any need to pass `lookup-def' as an
+; argument to other functions. If the latter is desired, it is not
+; difficult to accomplish by explicitly wrapping `lookup-def' into a
+; lambda form.
+;
+; We use a pseudo-keyword argument warn: as a modifier.
+; This is not really a keyword argument (although it may be,
+; if the Scheme system turns out DSSSL-compatible)
+; 
+; (lookup-def key alist)  -- lookup the key in the alist and return the
+;                        associated value. Raise an error if the key is not
+;                        found.
+; (lookup-def key alist default-exp)
+;                     -- lookup the key in the alist and return the associated
+;                        value. If the the key is not found, evaluate
+;                        the default-exp and return its result.
+; (lookup-def key alist warn: default-exp)
+;                     -- the same as above. In addition, write a warning
+;                        (using cerr above) if the key is not found.
 
-; If the search in the assoc list fails, the default action argument
-; is returned. If this default action turns out to be a thunk,
-; the result of its evaluation is returned.
-; If the default action is not given, an error is signaled
-
-(define-macro (assq-def key alist . default-action-arg)
-  (let ((default-action
-        (if (null? default-action-arg)
-          `(error "failed to assq key '" ,key "' in a list " ,alist)
-          (let ((defact-symb (gensym)))
-	    `(let ((,defact-symb ,(car default-action-arg)))
-               (if (procedure? ,defact-symb) (,defact-symb) ,defact-symb))))))
-    `(or (assq ,key ,alist) ,default-action)))
-
-(define-macro (assv-def key alist . default-action-arg)
-  (let ((default-action
-        (if (null? default-action-arg)
-          `(error "failed to assv key '" ,key "' in a list " ,alist)
-          (let ((defact-symb (gensym)))
-	    `(let ((,defact-symb ,(car default-action-arg)))
-               (if (procedure? ,defact-symb) (,defact-symb) ,defact-symb))))))
-    `(or (assv ,key ,alist) ,default-action)))
-
-(define-macro (assoc-def key alist . default-action-arg)
-  (let ((default-action
-        (if (null? default-action-arg)
-          `(error "failed to assoc key '" ,key "' in a list " ,alist)
-          (let ((defact-symb (gensym)))
-	    `(let ((,defact-symb ,(car default-action-arg)))
-               (if (procedure? ,defact-symb) (,defact-symb) ,defact-symb))))))
-    `(or (assoc ,key ,alist) ,default-action)))
+(define-macro (lookup-def key alist . others)
+  (let ((nkey (gensym))
+	(nalist (gensym))
+	(res (gensym))
+	)
+    `(let ((,nkey ,key) (,nalist ,alist))
+       (let ((,res (assq ,nkey ,nalist)))
+	 (if ,res
+	   (let ((,res (cdr ,res)))
+	     (cond
+	       ((not (pair? ,res)) ,res)
+	       ((null? (cdr ,res)) (car ,res))
+	       (else ,res)))
+	   ,(cond
+	      ((null? others)
+		`(error "Failed to find " ,nkey " in " ,nalist))
+	      ((eq? (car others) 'warn:)
+		`(begin
+		   (cerr "Failed to find " ,nkey " in " ,nalist #\newline)
+		   ,(cadr others)))
+	      (else (car others))))))))
 
 
+; Retain for backwards compatibility for the time being...
 			; Convenience macros to avoid quoting of symbols
 			; being deposited/looked up in the environment
 (define-macro (env.find key) `(%%env.find ',key))

@@ -125,6 +125,18 @@
 ; (k!reverse (x) () '!) ;==> '(x)
 
 
+; Trace the expansion of a macro
+(define-syntax mtrace
+  (lambda (x)
+    (syntax-case x ()
+      ((_ form)
+	(begin 
+	  (display "trace: ")
+	  (display (syntax-object->datum #'form))
+	  (newline)
+	  #'form)))))
+
+
 ; assert the truth of an expression (or of a sequence of expressions)
 ;
 ; syntax: assert ?expr ?expr ... [report: ?r-exp ?r-exp ...]
@@ -350,52 +362,74 @@
       (call-with-values (lambda () initializer) ; the most generic case
 	(lambda vars (let*-values rest . bodies))))))
 
-			; assoc-primitives with a default clause
-			; If the search in the assoc list fails, the
-			; default action argument is returned. If this
-			; default action turns out to be a thunk,
-			; the result of its evaluation is returned.
-			; If the default action is not given, an error
-			; is signaled
 
-(define-syntax assq-def
-  (syntax-rules ()
-    ((assq-def key alist)
-      (or (assq key alist)
-	(error "failed to assq key '" key "' in a list " alist)))
-    ((assq-def key alist #f)
-      (assq key alist))
-    ((assq-def key alist default)
-      (or (assq key alist) (if (procedure? default) (default) default)))))
+; Look up a value associated with a symbolic key in alist 
+; ((key value) ...) or ((key . value) ...)
+; and return the associated value.
+; If the association has the form
+;   (key . value) where value is not a pair --> return value
+;   (key   value)                           --> return value
+;   (key value1 value2 value3 ...) -> return (value1 value2 value3 ...)
+; that is, the procedure tries to do the right thing for
+; both kinds of associative lists. 
+;
+; The form `lookup-def' is a special form rather than a regular
+; procedure. Its first two arguments are evaluated exactly once. The
+; default-value argument, if given, is evaluated only if the desired key
+; is not found. I have not seen any need to pass `lookup-def' as an
+; argument to other functions. If the latter is desired, it is not
+; difficult to accomplish by explicitly wrapping `lookup-def' into a
+; lambda form.
+;
+; We use a pseudo-keyword argument warn: as a modifier.
+; This is not really a keyword argument (although it may be,
+; if the Scheme system turns out DSSSL-compatible)
+; 
+; (lookup-def key alist)  -- lookup the key in the alist and return the
+;                        associated value. Raise an error if the key is not
+;                        found.
+; (lookup-def key alist default-exp)
+;                     -- lookup the key in the alist and return the associated
+;                        value. If the the key is not found, evaluate
+;                        the default-exp and return its result.
+; (lookup-def key alist warn: default-exp)
+;                     -- the same as above. In addition, write a warning
+;                        (using cerr above) if the key is not found.
 
-(define-syntax assv-def
-  (syntax-rules ()
-    ((assv-def key alist)
-      (or (assv key alist)
-	(error "failed to assv key '" key "' in a list " alist)))
-    ((assv-def key alist #f)
-      (assv key alist))
-    ((assv-def key alist default)
-      (or (assv key alist) (if (procedure? default) (default) default)))))
-
-(define-syntax assoc-def
-  (syntax-rules ()
-    ((assoc-def key alist)
-      (or (assoc key alist)
-	(error "failed to assoc key '" key "' in a list " alist)))
-    ((assoc-def key alist #f)
-      (assoc key alist))
-    ((assoc-def key alist default)
-      (or (assoc key alist) (if (procedure? default) (default) default)))))
-
-			; Convenience macros to avoid quoting of symbols
-			; being deposited/looked up in the environment
-(define-syntax env.find
-  (syntax-rules () ((env.find key) (%%env.find 'key))))
-(define-syntax env.demand
-  (syntax-rules () ((env.demand key) (%%env.demand 'key))))
-(define-syntax env.bind
-  (syntax-rules () ((env.bind key value) (%%env.bind 'key value))))
+(define-syntax lookup-def 
+  (syntax-rules (warn:)
+    ((lookup-def key alist)
+      (let ((nkey key) (nalist alist)) ; evaluate them only once
+	(let ((res (assq nkey nalist)))
+	  (if res
+	    (let ((res (cdr res)))
+	     (cond
+	       ((not (pair? res)) res)
+	       ((null? (cdr res)) (car res))
+	       (else res)))
+	    (error "Failed to find " nkey " in " nalist)))))
+    ((lookup-def key alist default-exp)
+      (let ((res (assq key alist)))
+	(if res
+	  (let ((res (cdr res)))
+	    (cond
+	      ((not (pair? res)) res)
+	      ((null? (cdr res)) (car res))
+	      (else res)))
+	  default-exp)))
+    ((lookup-def key alist warn: default-exp)
+      (let ((nkey key) (nalist alist)) ; evaluate them only once
+	(let ((res (assq nkey nalist)))
+	  (if res
+	    (let ((res (cdr res)))
+	     (cond
+	       ((not (pair? res)) res)
+	       ((null? (cdr res)) (car res))
+	       (else res)))
+	    (begin
+	      (cerr "Failed to find " nkey " in " nalist #\newline)
+	      default-exp)))))
+    ))
 
 			; Implementation of SRFI-0
 			; Only feature-identifiers srfi-0, chez, and
