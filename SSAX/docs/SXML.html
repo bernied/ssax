@@ -1,0 +1,486 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN""http://www.w3.org/TR/REC-html40/loose.dtd">
+<html>
+<head><title>SXML</title>
+<meta name="description" content="Definition of SXML: an instance of XML Infoset as
+S-expressions, an Abstract Syntax Tree of an XML document.">
+<meta name="AuthorAddress" content="oleg@pobox.com">
+<meta name="keywords" content="XML, XML parsing, XML Infoset, XPath, SXML, Scheme">
+<meta name="Date-Revision-yyyymmdd" content="20010610">
+<meta name="Date-Creation-yyyymmdd" content="20010207">
+<link rel="start" href="index.html" title="Scheme Hash">
+<link rel="contents" href="../README.html">
+<link rel="prev" href="xml.html">
+<link rel="next" href="web.html">
+</head>
+<body bgcolor="#FFFFFF">
+<div align="center" class="navbar">  <a href="xml.html">previous</a>
+ &nbsp; <a href="web.html">next</a>
+ &nbsp; <a href="../README.html">contents</a>
+ &nbsp; <a href="index.html">top</a>
+<hr>
+</div>
+<h1 align=center>SXML</h1>
+<p>SXML is an instance of XML Infoset as S-expressions. SXML is an
+Abstract Syntax Tree of an XML document.</p>
+<p><b>Revision: 2.0</b>
+</p>
+<div><ol><li><a href="#Introduction">Introduction</a>
+<li><a href="#Notation">Notation</a>
+<li><a href="#Grammar">Grammar</a>
+<li><a href="#SXML Tree">SXML Tree</a>
+<li><a href="#Namespaces">Namespaces</a>
+<li><a href="#Case-sensitivity of SXML names">Case-sensitivity of SXML names</a>
+<li><a href="#Normalized SXML">Normalized SXML</a>
+<li><a href="#Examples">Examples</a>
+<li><a href="#Acknowledgment">Acknowledgment</a>
+<li><a href="#References">References</a>
+</ol></div>
+<br>&nbsp;<a name="Introduction">&nbsp;</a>
+<h2>Introduction</h2>
+<p>An XML information set (Infoset) is an abstract data set that
+describes information available in a well-formed XML document. 
+Infoset is made of &quot;information items&quot;, which denote components of
+the document: elements, attributes, character data, processing
+instructions, etc. Each information item has a number of associated
+properties, e.g., name, namespace URI. Some properties -- for example,
+'children' and 'attributes' -- are (ordered) collections of other
+information items. Infoset describes only the information in an XML
+document that is relevant to applications. Element declarations from
+DTD, XML version, parameter entities, etc. data used merely for
+parsing or validation are not included. XML Infoset is described in [<a href="#XML Infoset">XML Infoset</a>]. Although technically Infoset is specified for
+XML, it largely applies to HTML as well.</p>
+<p>SXML is a concrete instance of the XML Infoset. Infoset's goal is
+to present in some form all relevant pieces of data and their <em>abstract</em>
+, container-slot relationships to each other.  SXML gives
+the nest of containers a concrete implementation as S-expressions, and
+provides means of accessing items and their properties. SXML is a
+&quot;relative&quot; of XPath and DOM, whose data models are two other
+instances of the XML Infoset. SXML is particularly suitable for
+Scheme-based XML/HTML authoring, SXPath queries, and tree
+transformations. In John Hughes' terminology, SXML is a term
+implementation of evaluation of the XML document.</p>
+<br>&nbsp;<a name="Notation">&nbsp;</a>
+<h2>Notation</h2>
+<p>We will use both an Extended BNF Notation (EBNF) employed in the XML
+Recommendation [<a href="#XML">XML</a>] and syntactic conventions of the
+Revised Reports on Scheme. The following table summarizes the
+differences:</p>
+<table align="center"><tr><td>&nbsp;</td>
+<th>EBNF notation</th>
+<th>R5RS notation</th>
+</tr>
+<tr><td>An optional <em>thing</em>
+</td>
+<td><code>thing?</code>
+</td>
+<td><code>[thing]</code>
+</td>
+</tr>
+<tr><td>Zero or more <em>thing</em>
+s</td>
+<td><code>thing*</code>
+</td>
+<td><code>thing ...</code>
+</td>
+</tr>
+<tr><td>One or more <em>thing</em>
+s</td>
+<td><code>thing+</code>
+</td>
+<td><code>thing thing ...</code>
+</td>
+</tr>
+</table>
+<p>Furthermore, <ul><li><code>&lt;thing&gt;</code>
+&nbsp; stands for a non-terminal of a grammar</li>
+<li><code>thing</code>
+&nbsp; denotes a terminal that is a Scheme identifier</li>
+<li><code>"thing"</code>
+&nbsp; is a terminal of the grammar that is a Scheme string</li>
+<li><code><em>thing</em></code>
+&nbsp; is a literal Scheme symbol</li>
+</ul>
+</p>
+<br>&nbsp;<a name="Grammar">&nbsp;</a>
+<h2>Grammar</h2>
+<p><table border=0 bgcolor="#f5dcb3">
+<tr valign=top><td align=right><a name="prod-1">[1]</a>&nbsp;</td><td align=right><code>&lt;TOP&gt;</code></td><td align=center><code> ::= </code></td><td align=left><code><em>*TOP*</em> &lt;namespaces&gt;? &lt;PI&gt;* &lt;comment&gt;* &lt;Element&gt;</code> </td></tr>
+</table></p>
+<p>This S-expression stands for the root of the SXML tree, a
+document information item of the Infoset. It contains the root element
+of the XML document as its only child element.</p>
+<p><table border=0 bgcolor="#f5dcb3">
+<tr valign=top><td align=right><a name="prod-2">[2]</a>&nbsp;</td><td align=right><code>&lt;Element&gt;</code></td><td align=center><code> ::= </code></td><td align=left><code>&lt;name&gt; &lt;attributes-list&gt;? &lt;namespaces&gt;? &lt;child-of-element&gt;*</code> </td></tr>
+<tr valign=top><td align=right><a name="prod-3">[3]</a>&nbsp;</td><td align=right><code>&lt;attributes-list&gt;</code></td><td align=center><code> ::= </code></td><td align=left><code><em>@</em> &lt;attribute&gt;*</code> </td></tr>
+<tr valign=top><td align=right><a name="prod-4">[4]</a>&nbsp;</td><td align=right><code>&lt;attribute&gt;</code></td><td align=center><code> ::= </code></td><td align=left><code>&lt;name&gt; "value"?</code> </td></tr>
+<tr valign=top><td align=right><a name="prod-5">[5]</a>&nbsp;</td><td align=right><code>&lt;child-of-element&gt;</code></td><td align=center><code> ::= </code></td><td align=left><code>&lt;Element&gt; | "character data" | &lt;PI&gt; | &lt;comment&gt; | &lt;entity&gt;</code> </td></tr>
+</table></p>
+<p>These are the basic constructs of SXML.</p>
+<p><table border=0 bgcolor="#f5dcb3">
+<tr valign=top><td align=right><a name="prod-6">[6]</a>&nbsp;</td><td align=right><code>&lt;PI&gt;</code></td><td align=center><code> ::= </code></td><td align=left><code><em>*PI*</em> pi-target "processing instruction content string"</code> </td></tr>
+</table></p>
+<p>As the XML Recommendation mandates, processing instructions (PI) are
+not part of document's character data, but must be passed through
+to applications. PIs are therefore represented by SXML nodes of a
+dedicated type <code>*PI*</code>
+. DOM Level 2 treats PIs in a similar
+way.</p>
+<p><table border=0 bgcolor="#f5dcb3">
+<tr valign=top><td align=right><a name="prod-7">[7]</a>&nbsp;</td><td align=right><code>&lt;comment&gt;</code></td><td align=center><code> ::= </code></td><td align=left><code><em>*COMMENT*</em> "comment string"</code> </td></tr>
+<tr valign=top><td align=right><a name="prod-8">[8]</a>&nbsp;</td><td align=right><code>&lt;entity&gt;</code></td><td align=center><code> ::= </code></td><td align=left><code><em>*ENTITY*</em> "public-id" "system-id"</code> </td></tr>
+</table></p>
+<p>Comments are mentioned for completeness only. A SSAX parser,
+among others, transparently skips the comments -- as it should and as
+the Infoset Recommendation says. However, the Recommendation also
+permits retaining of the comments. DOM has a provision for
+COMMENT nodes, too. The present SXML grammar allows comment nodes but does
+not mandate them by any means.</p>
+<p><table border=0 bgcolor="#f5dcb3">
+<tr valign=top><td align=right><a name="prod-9">[9]</a>&nbsp;</td><td align=right><code>&lt;name&gt;</code></td><td align=center><code> ::= </code></td><td align=left><code>&lt;LocalName&gt; | &lt;ExpName&gt;</code> ; An XML QName</td></tr>
+<tr valign=top><td align=right><a name="prod-10">[10]</a>&nbsp;</td><td align=right><code>&lt;LocalName&gt;</code></td><td align=center><code> ::= </code></td><td align=left><code>NCName</code> </td></tr>
+<tr valign=top><td align=right><a name="prod-11">[11]</a>&nbsp;</td><td align=right><code>&lt;ExpName&gt;</code></td><td align=center><code> ::= </code></td><td align=left><code>URI : &lt;LocalName&gt; | user-ns-prefix : &lt;LocalName&gt;</code> ; An expanded name</td></tr>
+</table></p>
+<p><code>NCName</code>
+ is a Scheme symbol which conforms to
+Prod. [4] of [<a href="#XML Namespaces">XML Namespaces</a>]. <code>&lt;ExpName&gt;</code>
+ is also a Scheme symbol, with an embedded colon that joins a local
+part of the name and a prefix. A <code>URI</code>
+ is a
+Namespace URI converted to a Scheme symbol. As the URI specification
+allows symbols in URI which are not permitted in Scheme identifiers,
+the forbidden symbols should be %-quoted during the conversion from a
+URI string to <code>URI</code>
+. Universal resource
+identifiers are normally long and unwieldy strings. Therefore, a SSAX
+parser lets a user set his own prefixes to represent Namespace
+URIs. Thus <code>user-ns-prefix</code>
+ is also a Scheme
+identifier, which is typically far shorter than <code>URI</code>
+.</p>
+<p><table border=0 bgcolor="#f5dcb3">
+<tr valign=top><td align=right><a name="prod-12">[12]</a>&nbsp;</td><td align=right><code>&lt;namespaces&gt;</code></td><td align=center><code> ::= </code></td><td align=left><code><em>*NAMESPACES*</em> &lt;namespace-assoc&gt;*</code> </td></tr>
+<tr valign=top><td align=right><a name="prod-13">[13]</a>&nbsp;</td><td align=right><code>&lt;namespace-assoc&gt;</code></td><td align=center><code> ::= </code></td><td align=left><code>URI "URI" | user-ns-prefix "URI"</code> </td></tr>
+</table></p>
+<br>&nbsp;<a name="SXML Tree">&nbsp;</a>
+<h2>SXML Tree</h2>
+<p>Infoset's information item is a sum of its properties. This makes
+a list a particularly suitable data structure to represent an
+item. The head of the list, a Scheme identifier, <em>names</em>
+ the
+item. For many items this is their (expanded) name, a core
+property. For an information item that denotes an XML Element, the
+corresponding list starts with element's expanded name, optionally
+followed by collections of attributes and effective namespaces. The
+rest of the element item list is an ordered sequence of element's
+children -- character data, processing instructions, and other
+elements. Every child is unique; items never share their children even
+if the latter have the identical content.</p>
+<p>Just as XPath does and Infoset specification explicitly allows,
+we group character information items into maximal text strings.  The
+value of an attribute is normally a string; it may also be omitted (in
+case of HTML) to denote a singular attribute, 
+e.g., <code>&lt;option checked&gt;</code>
+.</p>
+<p>We consider a collection of attributes an information item in its
+own right, tagged with a special name <code>@</code>
+. The '@'
+character may not occur in a valid XML name; therefore
+an <code>&lt;attributes-list&gt;</code>
+ can not be mistaken for a list that represents an element. An XML
+document renders attributes, processing instructions, namespace
+specifications and other meta-data differently from the element
+markup. In contrast, SXML represents element content and meta-data
+uniformly -- as tagged lists.  SXML was a beneficiary of the fact that
+every XML name is also a valid Scheme identifier; but not every Scheme
+identifier is a valid XML name. This observation let us introduce
+administrative names such as <code>@</code>
+, <code>*PI*</code>
+, <code>*NAMESPACES*</code>
+ without worrying about potential name
+clashes. The observation also makes the relationship between XML and SXML
+well-defined. An XML document converted to SXML can be reconstructed
+into an equivalent (in terms of the Infoset) XML document. Moreover, due
+to the implementation freedom given by the Infoset specification, SXML
+itself is an instance of the Infoset.</p>
+<p>SXML grammar therefore can also be represented in the following, more uniform view, as an SXML tree:</p>
+<p><table border=0 bgcolor="#f5dcb3">
+<tr valign=top><td align=right><a name="prod-N">[N]</a>&nbsp;</td><td align=right><code>&lt;Node&gt;</code></td><td align=center><code> ::= </code></td><td align=left><code>&lt;Element&gt; | &lt;attributes-list&gt; | &lt;attribute&gt; | "character data" | &lt;namespaces&gt; | &lt;TOP&gt; | &lt;PI&gt; | &lt;comment&gt; | &lt;entity&gt;</code> </td></tr>
+</table></p>
+<p>We can represent this production by a set of two mutually-recursive datatypes:</p>
+<p><table border=0 bgcolor="#f5dcb3">
+<tr valign=top><td align=right><a name="prod-N1">[N1]</a>&nbsp;</td><td align=right><code>&lt;Node&gt;</code></td><td align=center><code> ::= </code></td><td align=left><code>( &lt;name&gt; . &lt;Nodeset&gt; ) | "text string"</code> </td></tr>
+<tr valign=top><td align=right><a name="prod-N2">[N2]</a>&nbsp;</td><td align=right><code>&lt;Nodeset&gt;</code></td><td align=center><code> ::= </code></td><td align=left><code>( &lt;Node&gt; ... )</code> ;; An ordered set of nodes</td></tr>
+<tr valign=top><td align=right><a name="prod-N3">[N3]</a>&nbsp;</td><td align=right><code>&lt;name&gt;</code></td><td align=center><code> ::= </code></td><td align=left><code>&lt;LocalName&gt; | &lt;ExpName&gt; | <em>@</em> | <em>*TOP*</em> | <em>*PI*</em> | <em>*COMMENT*</em> | <em>*ENTITY*</em> | <em>*NAMESPACES*</em></code> </td></tr>
+</table></p>
+<p>The uniformity of representation of elements, attributes, and
+processing instructions in SXML simplifies its queries and
+transformations. In our formulation, attributes and processing instructions
+are just like regular elements but with a distinguished
+name. Therefore, query and transformation functions dedicated to
+attributes become redundant.</p>
+<p>A function SSAX:XML-&gt;SXML of a functional Scheme XML parsing
+framework SSAX [<a href="#SSAX">SSAX</a>] can convert an XML document or a
+well-formed part of it into the corresponding SXML form. The parser
+supports namespaces, character and parsed entities, xml:space,
+attribute value normalization, processing instructions and CDATA
+sections.  The result of the that function is in conformance with the
+XML Infoset.</p>
+<br>&nbsp;<a name="Namespaces">&nbsp;</a>
+<h2>Namespaces</h2>
+<p>Goals and the motivation for XML Namespaces are explained in an excellent article by James Clark [<a href="#Clark1999">Clark1999</a>]. He says in part: </p>
+<blockquote><p>The XML Namespaces Recommendation tries to improve this
+situation by extending the data model to allow element type names and
+attribute names to be qualified with a URI. Thus a document that
+describes parts of cars can use <code>part</code>
+ qualified by one URI; and a
+document that describes parts of books can use <code>part</code>
+ qualified by
+another URI. I'll call the combination of a local name and a
+qualifying URI a universal name. The role of the URI in a universal
+name is purely to allow applications to recognize the name. There are
+no guarantees about the resource identified by the URI. The XML
+Namespaces Recommendation does not require element type names and
+attribute names to be universal names; they are also allowed to be
+local names.<br>
+...<br>
+The XML Namespaces Recommendation expresses universal names in an
+indirect way that is compatible with XML 1.0. In effect the XML
+Namespaces Recommendation defines a mapping from an XML 1.0 tree where
+element type names and attribute names are local names into a tree
+where element type names and attribute names can be universal
+names. The mapping is based on the idea of a prefix. If an element
+type name or attribute name contains a colon, then the mapping treats
+the part of the name before the colon as a prefix, and the part of the
+name after the colon as the local name. A prefix <code>foo</code>
+
+refers to the URI specified in the value of the <code>xmlns:foo</code>
+
+attribute. So, for example<pre>     &lt;cars:part xmlns:cars='http://www.cars.com/xml'/&gt;
+</pre>maps to<pre>     &lt;{http://www.cars.com/xml}part/&gt;
+</pre>Note that the <code>xmlns:cars</code>
+ attribute has been removed by the mapping.</p>
+</blockquote>
+<p>Using James Clark's terminology, SXML is precisely that tree where element
+type names and attribute names can be universal names.  Production <code>&lt;name&gt;</code>
+ above defines such a universal name, a
+Scheme symbol. The universal name is either a local name (a symbol
+with no embedded colons in its string) or an expanded name, <code>&lt;ExpName&gt;</code>
+. The latter is also a Scheme symbol, albeit a weird one. In
+SXML, James Clark's example cited above will be represented as <pre>     (http://www.cars.com/xml:part)
+</pre>or, somewhat redundantly, <pre>     (http://www.cars.com/xml:part (@)
+        (*NAMESPACES* (cars &quot;http://www.cars.com/xml&quot;)))
+</pre></p>
+<p>Such a representation also agrees with the Namespaces Recommendation [<a href="#XML Namespaces">XML Namespaces</a>], which says &quot;Note that the prefix
+functions only as a placeholder for a namespace name. Applications
+should use the namespace name, not the prefix, in constructing names
+whose scope extends beyond the containing document.&quot;</p>
+<p>Of course, it is unwieldy to deal with identifiers
+like <code>http://www.cars.com/xml:part</code>
+. Therefore, an application that
+invokes the SSAX parser may tell the parser to map the
+URI <code>http://www.cars.com/xml</code>
+ to a prefix,
+e.g., <code>c</code>
+. The parser will then produce<pre>     (c:part (*NAMESPACES* (c &quot;http://www.cars.com/xml&quot;)))
+</pre>To be more precise, the parser will return just<pre>     (c:part)
+</pre>If an application told the parser how to map <code>http://www.cars.com/xml</code>
+, the application can keep this mapping in
+its mind and will not need additional reminders.</p>
+<br>&nbsp;<a name="Case-sensitivity of SXML names">&nbsp;</a>
+<h2>Case-sensitivity of SXML names</h2>
+<p>XML is a case-sensitive language. The names of XML elements,
+attributes, targets of PI, etc. may be distinguished solely by their
+case. These names however are represented as Scheme identifiers in SXML. Although Scheme is traditionally a case-insensitive language, the use of Scheme symbols to represent XML names poses no contradictions. As R5RS says, <blockquote>(symbol-&gt;string symbol) returns the name of symbol as a string. If
+the symbol was part of an object returned as the value of a literal
+expression (section 4.1.2) or by a call to the read procedure, and its
+name contains alphabetic characters, then the string returned will
+contain characters in the implementation's preferred standard
+case -- some implementations will prefer upper case, others lower
+case. If the symbol was returned by string-&gt;symbol, the case of
+characters in the string returned will be the same as the case in the
+string that was passed to string-&gt;symbol.</blockquote>
+</p>
+<p>Therefore, <code>(string-&gt;symbol &quot;a&quot;)</code>
+ is always
+different from <code>(string-&gt;symbol &quot;A&quot;)</code>
+. R5RS thus
+explicitly permits case-sensitive symbols. Such symbols must be used
+in SXML to represent XML names.  SXML-compliant XML parsers must
+preserve the case of all names when converting them into symbols. A
+parser may use the R5RS procedure <code>string-&gt;symbol</code>
+ or other
+available means.</p>
+<p>The DSSSL standard says:<blockquote>7.3.1. Case Sensitivity. Upper- and lower-case forms of a
+letter are always distinguished. NOTE 5: Traditionally Lisp systems
+are case-insensitive.</blockquote>
+</p>
+<p>Therefore, any Scheme system that supports DSSSL should include
+a case-sensitive reader. For example, Gambit has such a reader (which
+is default), Bigloo also has one (albeit it is not default). On such a
+system, using Scheme symbols for XML names is not only possible but
+convenient as well. Entering SXML names on a case-insensitive system
+requires the use of a bar notation, <code>string-&gt;symbol</code>
+ or
+other standard or non-standard way of producing case-sensitive
+symbols. This is the only inconvenience with SXML applications on
+case-insensitive Scheme systems. A web page [<a href="#Scheme-case-sensitivity">Scheme-case-sensitivity</a>] discusses case sensitivity of various Scheme systems in detail.</p>
+<br>&nbsp;<a name="Normalized SXML">&nbsp;</a>
+<h2>Normalized SXML</h2>
+<p>For the sake of effective processing an SXML element may be
+represented in a normalized form. A normalized SXML is a proper subset
+of SXML; it follows the same grammar and additional restrictions. One
+restriction concerns <code>&lt;attributes-list&gt;</code>
+. Although it
+is declared optional in SXML grammar, production 2, it must always be
+present in a normalized SXML document. If an element has no attributes,
+<code>&lt;attributes-list&gt;</code>
+ is then an s-expression <code>(@)</code>
+. Furthermore, in a normalized SXML, <code>&lt;comment&gt;</code>
+ nodes should be absent. <code>&lt;entity&gt;</code>
+ nodes should be absent as well: parsed entities should be
+expanded, even if they are external. <code>&lt;namespaces&gt;</code>
+ nodes should only appear in a <code>*TOP*</code>
+ element.</p>
+<p>SGML provides two equal forms for boolean attributes:<ol><li>Minimized -  <code>&lt;OPTION checked&gt;</code>
+</li>
+<li>Full      -  <code>&lt;OPTION checked=&quot;checked&quot;&gt;</code>
+</li>
+</ol>
+XML mandates the full form only, whereas HTML allows both,
+preferring the former. SXML supports the minimized form along with the
+full one: <code>(OPTION (@ (checked)))</code>
+ and <code>(OPTION (@ (checked &quot;checked&quot;)))</code>
+. The normalized SXML however accepts only the full form.</p>
+<br>&nbsp;<a name="Examples">&nbsp;</a>
+<h2>Examples</h2>
+<p>Simple examples:<pre>     (some-name)                  ; An empty element without attributes
+     (some-name (@))              ; The same but in the normalized form
+</pre></p>
+<p>Progressively more complex examples:</p>
+<p><table border="1"><tr><th>XML</th>
+<th>SXML</th>
+</tr>
+<tr><td align="left"><pre>     &lt;WEIGHT unit=&quot;pound&quot;&gt;
+       &lt;NET certified=&quot;certified&quot;&gt; 67 &lt;/NET&gt;
+       &lt;GROSS&gt; 95 &lt;/GROSS&gt;
+     &lt;/WEIGHT&gt;
+</pre></td>
+<td align="left"><pre>     (WEIGHT (@ (unit &quot;pound&quot;))
+       (NET (@ (certified)) 67)
+       (GROSS 95)
+     )
+</pre></td>
+</tr>
+<tr><td align="left"><pre>      &lt;BR/&gt;
+</pre></td>
+<td align="left"><pre>     (BR)
+</pre></td>
+</tr>
+<tr><td align="left"><pre>      &lt;BR&gt;&lt;/BR&gt;
+</pre></td>
+<td align="left"><pre>     (BR)
+</pre></td>
+</tr>
+<tr><td align="left"><pre>        &lt;A HREF='URL'
+           xml:space='preserve'&gt;  link
+     &lt;I xml:space='default'&gt;
+          itlink &lt;/I&gt; &amp;amp;amp;&lt;/A&gt;
+</pre></td>
+<td align="left"><pre>     (*TOP*
+       (A (@ (XML:space &quot;preserve&quot;)
+             (HREF &quot;URL&quot;))
+       &quot;  link &quot;
+       (I (@ (XML:space &quot;default&quot;)) 
+          &quot;itlink&quot;) &quot; &amp;amp;&quot;))
+</pre></td>
+</tr>
+<tr><td colspan="2" align="center"><br>
+&nbsp;An example from the XML Namespaces Recommendation</td>
+</tr>
+<tr><td align="left"><pre>     &lt;!-- initially, the default
+          namespace is 'books' --&gt;
+     &lt;book xmlns='urn:loc.gov:books'
+       xmlns:isbn='urn:ISBN:0-395-36341-6'&gt;
+       &lt;title&gt;Cheaper by the Dozen&lt;/title&gt;
+       &lt;isbn:number&gt;1568491379&lt;/isbn:number&gt;
+       &lt;notes&gt;
+       &lt;!-- make HTML the default namespace 
+            for some commentary --&gt;
+          &lt;p xmlns='urn:w3-org-ns:HTML'&gt;
+            This is a &lt;i&gt;funny&lt;/i&gt; book!
+          &lt;/p&gt;
+       &lt;/notes&gt;
+     &lt;/book&gt;
+</pre></td>
+<td align="left"><pre>     (*TOP*
+       (urn:loc.gov:books:book
+         (urn:loc.gov:books:title &quot;Cheaper by the Dozen&quot;)
+         (urn:ISBN:0-395-36341-6:number &quot;1568491379&quot;)
+         (urn:loc.gov:books:notes
+           (urn:w3-org-ns:HTML:p
+              &quot;This is a&quot; (urn:w3-org-ns:HTML:i &quot;funny&quot;)
+              &quot;book!&quot;))))
+</pre></td>
+</tr>
+<tr><td colspan="2" align="center"><br>
+&nbsp;Another example from the XML Namespaces Recommendation</td>
+</tr>
+<tr><td align="left"><pre>     &lt;RESERVATION 
+       xmlns:HTML=
+        'http://www.w3.org/TR/REC-html40'&gt;
+     &lt;NAME HTML:CLASS=&quot;largeSansSerif&quot;&gt;
+         Layman, A&lt;/NAME&gt;
+     &lt;SEAT CLASS='Y' 
+       HTML:CLASS=&quot;largeMonotype&quot;&gt;33B&lt;/SEAT&gt;
+     &lt;HTML:A HREF='/cgi-bin/ResStatus'&gt;
+         Check Status&lt;/HTML:A&gt;
+     &lt;DEPARTURE&gt;1997-05-24T07:55:00+1
+     &lt;/DEPARTURE&gt;&lt;/RESERVATION&gt;
+</pre></td>
+<td align="left"><pre>     (*TOP*
+       (*NAMESPACES* (HTML &quot;http://www.w3.org/TR/REC-html40&quot;))
+       (RESERVATION
+         (NAME (@ (HTML:CLASS &quot;largeSansSerif&quot;))
+           &quot;Layman, A&quot;)
+         (SEAT (@ (HTML:CLASS &quot;largeMonotype&quot;)
+                  (CLASS &quot;Y&quot;))
+            &quot;33B&quot;)
+         (HTML:A (@ (HREF &quot;/cgi-bin/ResStatus&quot;))
+            &quot;Check Status&quot;)
+         (DEPARTURE &quot;1997-05-24T07:55:00+1&quot;)))
+</pre></td>
+</tr>
+</table>
+</p>
+<br>&nbsp;<a name="Acknowledgment">&nbsp;</a>
+<h2>Acknowledgment</h2>
+<p>Discussions with Kirill Lisovsky of MISA University are gratefully acknowledged. He shares the credit for this page. The errors are all mine.</p>
+<br>&nbsp;<a name="References">&nbsp;</a>
+<h2>References</h2>
+
+<p><a name="Clark1999">[Clark1999]</a> Jim Clark. XML Namespaces. Feb 4, 1999<br>&lt;<a href="http://www.jclark.com/xml/xmlns.htm">http://www.jclark.com/xml/xmlns.htm</a>&gt;
+<p><a name="DOM">[DOM]</a> World Wide Web Consortium. Document Object Model (DOM) Level 1
+Specification. W3C Recommendation.<br>&lt;<a href="http://www.w3.org/TR/REC-DOM-Level-1">http://www.w3.org/TR/REC-DOM-Level-1</a>&gt;
+<p><a name="Scheme-case-sensitivity">[Scheme-case-sensitivity]</a> Kirill Lisovsky. Case sensitivity of Scheme systems.<br>&lt;<a href="http://pair.com/lisovsky/scheme/case-sensitivity.html">http://pair.com/lisovsky/scheme/case-sensitivity.html</a>&gt;
+<p><a name="SSAX">[SSAX]</a> Functional XML parsing framework: SAX/DOM and SXML parsers
+with support for XML Namespaces and validation.<br>&lt;<a href="http://pobox.com/~oleg/ftp/Scheme/SSAX.scm">http://pobox.com/~oleg/ftp/Scheme/SSAX.scm</a>&gt;
+<p><a name="SXML-short-paper">[SXML-short-paper]</a> XML and Scheme. An introduction to SXML and SXPath;
+illustration of SXPath expressiveness and comparison with
+XPath. September 17, 2000.<br>&lt;<a href="SXML-short-paper.html">SXML-short-paper.html</a>&gt;
+<p><a name="XML">[XML]</a> World Wide Web Consortium. Extensible Markup Language (XML)
+Version 1.0. W3C Recommendation 10 February 1998.<br>&lt;<a href="http://www.w3.org/TR/1998/REC-xml-19980210">http://www.w3.org/TR/1998/REC-xml-19980210</a>&gt;
+<p><a name="XML Infoset">[XML Infoset]</a> World Wide Web Consortium. XML Information Set. W3C Working
+Draft 2 February 2001<br>&lt;<a href="http://www.w3.org/TR/xml-infoset">http://www.w3.org/TR/xml-infoset</a>&gt;
+<p><a name="XML Namespaces">[XML Namespaces]</a> Namespaces in XML. W3C Recommendation. 14-January-1999<br>&lt;<a href="http://www.w3.org/TR/REC-xml-names/">http://www.w3.org/TR/REC-xml-names/</a>&gt;
+<p><a name="XPath">[XPath]</a> World Wide Web Consortium. XML Path Language (XPath).
+Version 1.0. W3C Recommendation 16 November 1999.<br>&lt;<a href="http://www.w3.org/TR/xpath">http://www.w3.org/TR/xpath</a>&gt;<br>
+<p><hr>
+</p>
+<h3>Last updated June 10, 2001</h3>
+<p>This site's top page is <a href="http://pobox.com/~oleg/ftp/"><strong>http://pobox.com/~oleg/ftp/</strong>
+</a>
+</p>
+<p><address>oleg@pobox.com or oleg@acm.org  or oleg@computer.org<br>
+Your comments, problem reports, questions are very welcome!</address>
+</p>
+</body></html>
