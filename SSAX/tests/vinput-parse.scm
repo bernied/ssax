@@ -2,17 +2,23 @@
 ;   This is a test driver for input parsing functions, to make sure they
 ;                       really work as intended
 ;
+; IMPORT
+; appropriate prelude: myenv.scm, myenv-bigloo.scm, myenv-scm.scm
+;	depending on your system
+; catch-error.scm -- for procedure, for-syntax
+; util.scm
+; look-for-str.scm
+; input-parse.scm
+;
 ; $Id$
 
 	; To run this code under SCM, do
-	; scm myenv-scm.scm util.scm look-for-str.scm \
+	; scm myenv-scm.scm catch-error.scm util.scm look-for-str.scm \
 	;     input-parse.scm vinput-parse.scm
 
 	; For Bigloo, you should evaluate or compile vinput-parse-bigloo.scm,
 	; which contains a module declaration that includes the present file.
 
-(include "myenv.scm")
-(include "catch-error.scm")
 
 ; This function is imported into the input-parse.scm module
 (define (parser-error port msg . specializing-msgs)
@@ -45,7 +51,8 @@
     (newline)
     (with-input-from-string ,str
       (lambda ()
-        (let* ((real-result ,form) (real-next-char (read-char)))
+        (let* ((real-result ,form) (real-next-char
+				    (read-char (current-input-port))))
           (if (equal? (cons real-result real-next-char) ,expected-result)
             (cout "... gave the expected result: " real-result nl
               "    the next read character, " real-next-char
@@ -338,7 +345,7 @@
 
 (cerr nl "Verifying skipping of characters ..." nl)
 (let (
-      (eof (with-input-from-string "" read-char)))
+      (eof (with-input-from-string "" read)))
 
   (expect-parse-result " abcd" (skip-until 1) '(#f . #\a))
   (assert (failed? (expect-parse-result " abcd" (skip-until 10) '(#f . #f))))
@@ -367,7 +374,7 @@
 
 
 (cerr nl "Verifying tokenizing of the input stream ..." nl)
-(let ((eof (with-input-from-string "" read-char)))
+(let ((eof (with-input-from-string "" read)))
 
   (expect-parse-result "xxxd"
     (next-token '(#\a #\space #\x) '(#\d) "next token" (current-input-port))
@@ -399,7 +406,7 @@
 )
 
 (cerr nl "Verifying tokenizing of the input stream: next-token-of ..." nl)
-(let ((eof (with-input-from-string "" read-char)))
+(let ((eof (with-input-from-string "" read)))
 
   (expect-parse-result "" (next-token-of '(#\a #\space #\x))
     `("" . ,eof))
@@ -444,7 +451,7 @@
 )
 
 (cerr nl "Verifying read-line ..." nl)
-(let ((eof (with-input-from-string "" read-char)))
+(let ((eof (with-input-from-string "" read)))
 
   (expect-parse-result "" (read-line)
     `(,eof . ,eof))
@@ -474,7 +481,7 @@
 )
 
 (cerr nl "Verifying read-string ..." nl)
-(let ((eof (with-input-from-string "" read-char)))
+(let ((eof (with-input-from-string "" read)))
 
   (expect-parse-result "" (read-string 1)
     `("" . ,eof))
@@ -500,7 +507,7 @@
 
 
 (cerr nl "Verifying find-string-from-port? ..." nl)
-(let ((eof (with-input-from-string "" read-char)))
+(let ((eof (with-input-from-string "" read)))
 
   (expect-parse-result "bacacabd"
     (find-string-from-port? "acab" (current-input-port) 100)
