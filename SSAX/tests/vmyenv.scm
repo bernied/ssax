@@ -4,13 +4,15 @@
 ; which contains a module declaration that includes the present file.
 ; For SCM, (load "myenv-scm.scm") as well as env.scm and util.scm
 ; before evaluating this file
-
+;
+; IMPORT
+; appropriate prelude: myenv.scm, myenv-bigloo.scm, myenv-scm.scm
+;	depending on your system
+; catch-error.scm -- for procedure, for-syntax
+; env.scm
+; util.scm
+;
 ; $Id$
-
-(include "myenv.scm")
-
-(include "catch-error.scm")
-
 
 (cerr nl "Verifying increment/decrement operators: ++, ++! etc..." nl)
 (let
@@ -66,7 +68,7 @@
 		     ))))
 )
 
-(cerr nl "Verifying values and let-values*" nl)
+(cerr nl "Verifying values and let*-values" nl)
 (let
   ()
   ; R5RS example
@@ -85,29 +87,62 @@
   ;(call-with-values * -)
   (assert (= -1
 	     (call-with-values (lambda () (values (*))) -)))
+  ; let*-values
+  ; On some system, pp (pretty-printer) can print out closures
   (pp
-   (lambda () (let-values* ((a 1) (b 2)) (+ a b))))
+   (lambda () (let*-values (((a) 1) ((b) 2)) (+ a b))))
   (assert (= 3
-	     (let-values* ((a 1) (b 2)) (+ a b))))
-  (pp
-   (lambda () (let-values* ((a 1) ((b) 2)) (+ a b))))
-  (assert (= 3
-	     (let-values* ((a 1) (b 2)) (+ a b))))
+	     (let*-values (((a) 1) ((b) 2)) (+ a b))))
+;   (assert (= 3
+; 	     (let*-values ((a 1) (b 2)) (+ a b))))
   (pp
    (lambda () 
-     (let-values* ((a 1) ((b) 2) ((c d) (values 3 4))) (+ a b (* c d)))))
+     (let*-values (((a) 1) ((b) 2) ((c d) (values 3 4))) (+ a b (* c d)))))
   (assert (= 15
-     (let-values* ((a 1) ((b) 2) ((c d) (values 3 4))) (+ a b (* c d)))))
+     (let*-values (((a) 1) ((b) 2) ((c d) (values 3 4))) (+ a b (* c d)))))
   (pp
    (lambda () 
-     (let-values* ((a 1) ((b) 2) ((c d e) (values 1 2 3))) (+ a b (* c d e)))))
+     (let*-values (((a) 1) ((b) 2) ((c d e)
+				    (values 1 2 3))) (+ a b (* c d e)))))
   (assert (= 63
-     (let-values* ((a 1) ((b) 2) ((c d e) (values 3 4 5))) (+ a b (* c d e)))))
+     (let*-values (((a) 1) ((b) 2) ((c d e)
+				    (values 3 4 5))) (+ a b (* c d e)))))
   (pp
    (lambda () 
-     (let-values* ((a 1) ((c d e) (values 3 4 5)) ((b) d)) (+ a b (* c d e)))))
+     (let*-values (((a) (values 1)) ((c d e) (values 3 4 5))
+		   ((b) d)) (+ a b (* c d e)))))
   (assert (= 65
-     (let-values* ((a 1) ((c d e) (values 3 4 5)) ((b) d)) (+ a b (* c d e)))))
+     (let*-values (((a) 1) ((c d e) (values 3 4 5))
+		   ((b) d)) (+ a b (* c d e)))))
+  ; Two examples from MzScheme reference
+  (let ((x 0))
+    (assert (= 5
+	       (let*-values (((x) 5) ((y) x)) y))))
+  (let ((x 0))
+    (assert (= 0
+	       (let*-values (((x y) (values 5 x))) y))))
+  ; Examples from SRFI-11
+  (let ((result (let*-values (((a b . c) (values 1 2 3 4)))
+			     (list a b c))))
+    (assert
+     (equal? result '(1 2 (3 4)))))
+
+  (let ((result
+	 (let ((a 'a) (b 'b) (x 'x) (y 'y))
+	   (let*-values (((a b) (values x y))
+			 ((x y) (values a b)))
+			(list a b x y)))))
+    (assert (equal? result '(x y x y))))
+  ; An examples of 0,1,n values -> list
+(cond-expand
+ ((not gambit)
+  (let ((result
+	 (let*-values ((a (values)) (b (values 1)) (c 2)
+		       (d (values 3 4)))
+		      (list a b c d))))
+    (assert (equal? result '(() (1) (2) (3 4)))))
+  )
+ (else #f))
 )
 
 (cerr nl "Verifying cond-expand: SRFI-0" nl)
