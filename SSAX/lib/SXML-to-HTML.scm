@@ -47,6 +47,7 @@
 ;(load "myenv-scm.scm")		; For use with SCM v5d2
 (include "myenv.scm")		; For use with Gambit-C 3.0
 
+(include "util.scm")
 
 ; You can find SXML-tree-trans.scm in the same directory (web site)
 ; where you found the present file
