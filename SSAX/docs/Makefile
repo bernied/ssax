@@ -3,6 +3,7 @@
 # The targets to make:
 #	SXML.html (implicit)    Make the SXML Specification in HTML
 #	SXML-paper.tex          Make the SXML Specification in TeX
+#	SXs.tex			Make the SXSLT/SXPath paper in LaTeX
 
 # $Id$
 
@@ -15,6 +16,11 @@ CONV=bigloo -i -s -eval "(module html (include \"$(LIB)/myenv-bigloo.scm\") (inc
 # Convert SXML to HTML
 %.html: %.scm
 	$(CONV) $*.scm > $@
+
+# Convert SXML to LaTeX
+%.tex: %.scm
+	$(CONV) $*.scm > $@
+
 
 
 SXML-paper.tex: SXML-paper.scm SXML.scm
