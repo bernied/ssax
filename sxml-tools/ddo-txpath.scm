@@ -589,6 +589,27 @@
   (cond
     ((eq? (car op) 'range-to)
      (draft:signal-semantic-error "range-to function not implemented"))
+    ((eq? (car op) 'filter-expr)
+     (ddo:ast-filter-expr op num-anc single-level?))
+    ((eq? (car op) 'lambda-step)  ; created by sxpath
+     (let ((proc (cadr op)))
+       (list
+        (if
+         (and num-anc (zero? num-anc))  ; no ancestors required
+         (lambda (nodeset position+size var-binding)
+           (proc (draft:contextset->nodeset (as-nodeset nodeset))
+                 var-binding))
+         (lambda (nodeset position+size var-binding)
+           (draft:find-proper-context
+            (proc (draft:contextset->nodeset (as-nodeset nodeset))
+                  var-binding)
+            (map sxml:context->content   ; TODO: should add variables
+                 (as-nodeset nodeset))
+            num-anc)))
+        num-anc  ; num-ancestors
+        #f  ; single-level? after this step
+        #f  ; position-required?
+        ddo:type-any)))
     ((eq? (car op) 'step)
      (if
       (null? (cdddr op))  ; no Predicates
@@ -652,7 +673,9 @@
                             (res '()))
              (cond
                ((null? steps) res)
-               ((not sl?)  ; #f for the remaining steps
+               ((or (memq (caar steps) '(range-to filter-expr lambda-step))
+                    (not sl?))
+                ; #f for the remaining steps
                 (append (map
                          (lambda (step) #f)
                          steps)   ; DL: was: step-lst
@@ -1252,3 +1275,6 @@
 
 (define ddo:txpath (ddo:api-helper txp:xpath->ast ddo:ast-location-path))
 (define ddo:xpath-expr (ddo:api-helper txp:expr->ast ddo:ast-expr))
+
+; Support for native sxpath syntax
+(define ddo:sxpath (ddo:api-helper txp:sxpath->ast ddo:ast-expr))
