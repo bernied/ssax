@@ -42,8 +42,7 @@
 	    (p "I am indebted to Kirill Lisovsky of MISA
 University, Moscow, for insightful discussions and suggestions. This
 work has been supported in part by the National Research Council
-Research Associateship Program, Naval Postgraduate School, and the
-Army Research Office under contracts 38690-MA and 40473-MA-SP.")))
+Research Associateship Program and Naval Postgraduate School.")))
 
 	(step1
 	 (replace-range
@@ -112,6 +111,7 @@ Army Research Office under contracts 38690-MA and 40473-MA-SP.")))
 	    "\\documentclass[10pt]{article}" nl
 	    "\\usepackage[T1]{fontenc}" nl
 	    "\\usepackage[latin1]{inputenc}" nl
+	    "\\usepackage{times}" nl
 	    "\\pagestyle{empty}" nl
 	    "\\makeatletter" nl
 	    "\\makeatother" nl
@@ -141,7 +141,7 @@ Army Research Office under contracts 38690-MA and 40473-MA-SP.")))
       . ,(lambda (tag) 
 	   (list "\\title{" "SXML Specification" "}" nl
 		 "\\author{Oleg Kiselyov\\\\"
-		 "Software Engineering, Naval Postgraduate School, Monterey, CA 93943" "\\\\" "oleg@pobox.com, oleg@acm.org"
+		 "FNMOC, Monterey, CA 93943" "\\\\" "oleg@pobox.com, oleg@acm.org"
 		 "}" nl
 		 "\\maketitle" nl)))
 
@@ -216,7 +216,7 @@ Army Research Office under contracts 38690-MA and 40473-MA-SP.")))
       . ,(lambda (tag url) (list " \\texttt{" url "} ")))
 
      (LaTeX
-      . ,(lambda (tag) "\\LaTeX "))
+      . ,(lambda (tag) "\\LaTeX{} "))
 
      (blockquote
       . ,(lambda (tag . elems)
@@ -242,7 +242,7 @@ Army Research Office under contracts 38690-MA and 40473-MA-SP.")))
        (prod-note
 	. ,(lambda (tag . master-url)
 	     (list
-	      "\\\\The master SXML specification file is written in SXML itself. The present paper is the result of translating that SXML code into \\LaTeX, using an appropriate \"stylesheet\". A different stylesheet converted the specification to HTML. The master file, the stylesheets and the corresponding HTML and \\LaTeX documents are available at "  master-url ".")))
+	      "\\\\The master SXML specification file is written in SXML itself. The present paper is the result of translating that SXML code into \\LaTeX, using an appropriate \"stylesheet\". A different stylesheet converted the specification to HTML. The master file, the stylesheets and the corresponding HTML and \\LaTeX{} documents are available at "  master-url ".")))
        (keywords
 	. ,(lambda (tag)
 	     (let ((header-parms (find-Header Content)))
@@ -408,19 +408,19 @@ Army Research Office under contracts 38690-MA and 40473-MA-SP.")))
        )
 			; (table [(@ attrib ...)] tr ...
       . ,(lambda (tag row . rows)
-	   (let-values* 
+	   (let*-values
 	    (((attrs rows)
 	      (if (and (pair? row) (eq? '@ (car row)))
 		  (values (cadr row) rows)
 		  (values '() (cons row rows))))
-	     (border?
+	     ((border?)
 	      (cond
 	       ((assq 'border attrs) => 
 		(lambda (border-attr) (not (equal? "0" (cadr border-attr)))))
 	       (else #f)))
-	     (dummy (assert (pair? rows))) ; at least one row must be given
-	     (ncols (length (car rows)))
-	     (tex-cols
+	     ((dummy) (assert (pair? rows))) ; at least one row must be given
+	     ((ncols) (length (car rows)))
+	     ((tex-cols)
 	      (let ((col-codes
 		     (map (lambda (_) (if border? "l|" "l")) (car rows))))
 		(if border?
@@ -498,7 +498,7 @@ Army Research Office under contracts 38690-MA and 40473-MA-SP.")))
 
      (sexp-symb		; Symbol constructor
       . ,(lambda (tag . terms)
-	   (list "\\textbf{$MAKE-SYMBOL$(}" 
+	   (list "\\textbf{$MAKE{-}SYMBOL$(}" 
 		 terms "\\textbf{)}")))
 
      (production
