@@ -414,7 +414,7 @@
   (lambda (node)		; Nodeset or node
     (let loop ((parent node) (result '()))
       (if (null? parent) result
-	  (loop ((select-kids (ntype?? '*)) parent)
+	  (loop (sxml:child-elements parent)
 		(append result
 			((select-kids test-pred?) parent)))
 	  ))))
@@ -492,7 +492,7 @@
 				  (lambda (arg) (cons arg root-n))
 				  (append 
 				    (sxml:attr-list root-n)
-				    ((sxml:child sxml:node?) root-n))))
+				    (sxml:child-nodes root-n))))
                               (as-nodeset root-node)))
 		     ))
 	  (if (null? pairs)
@@ -505,9 +505,13 @@
 			  (lambda (arg) (cons arg (car pair)))
 			  (append 
 			    (sxml:attr-list (car pair))
-			    ((sxml:child sxml:node?) (car pair))))
+			    (sxml:child-nodes (car pair))))
 			(cdr pairs)
 			))))))))))
+
+
+;=============================================================================
+; Popular short cuts 
 
 ; node-parent:: RootNode -> Converter
 ; (node-parent rootnode) yields a converter that returns a parent of a
@@ -523,4 +527,8 @@
 ; with SXPath/SXPathlib ver. 3.5.x.x and earlier.
 ; Now it's a particular case of 'sxml:parent' application: 
 (define node-parent (sxml:parent (ntype?? '*any*)))
+
+(define sxml:child-nodes (sxml:child sxml:node?))
+
+(define sxml:child-elements (select-kids sxml:element?))
 
