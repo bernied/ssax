@@ -2,7 +2,7 @@ validate-doctype-simple-depend=assert.scm output.scm control.scm srfi-13-local.s
 
 parent-pointers-depend=assert.scm ppretty-prints.scm srfi-13-local.scm output.scm SXML-tree-trans.scm char-encoding.scm ssax-warn-vanilla.scm parser-errors-vanilla.scm define-opt.scm input-parse.scm catch-error.scm look-for-str.scm control.scm util.scm SSAX-code.scm SXPath-old.scm 
 
-sxslt-advanced-depend=srfi-13-local.scm util.scm assert.scm SXML-tree-trans.scm output.scm SXML-to-HTML.scm SXML-to-HTML-ext.scm 
+sxslt-advanced-depend=srfi-13-local.scm util.scm assert.scm SXML-tree-trans.scm output.scm SXML-to-HTML.scm lookup-def.scm SXML-to-HTML-ext.scm 
 
 sxml-to-sxml-depend=ppretty-prints.scm assert.scm 
 
