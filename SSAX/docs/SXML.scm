@@ -593,8 +593,10 @@ be specified as " (code "(@@)") ". In addition, all text strings must be
 joined into maximal text strings: no " (code (nonterm "Nodelist")) " shall
 contain two adjacent text-string nodes.")
 
-;A node " (code (nonterm "namespaces"))  " may appear only in
-;a " (code "*TOP*") " element.")
+; A node " (code (nonterm "namespaces"))  " may appear only in
+; a " (code "*TOP*") " element.")
+; Mention *NAMESPACES* in @@ of an attribute. It is allowed, in 0NF and
+; perhaps 1NF, but not in higher NF.
 
    (p
     "The normal forms make it possible to access SXML items in
