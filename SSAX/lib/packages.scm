@@ -3,7 +3,8 @@
 ;; Utilities
 
 (define-interface parser-errors-interface
-  (export parser-error))
+  (export parser-error
+	  parser-error?))
 
 (define-interface input-parses-interface
   (export peek-next-char
@@ -114,10 +115,19 @@
   (files define-opt))
 
 (define-structure parser-errors-vanilla parser-errors-interface
-  (open scheme signals)
+  (open scheme signals conditions formats)
   (begin
+    (define-condition-type 'parser-error '(error))
+    (define parser-error? (condition-predicate 'parser-error))
+
+    (define (format-list list)
+      (apply string-append (map format-x list)))
+
+    (define (format-x thing)
+      (format #f "~A" thing))
+    
     (define (parser-error port message . rest)
-      (apply error message rest))))
+      (signal 'parser-error port (format-list (cons message rest))))))
 
 (define (make-input-parses parser-errors-structure)
   (structure input-parses-interface
