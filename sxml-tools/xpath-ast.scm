@@ -387,9 +387,16 @@
                            ast-steps)
                      (cdr path)))))
                  ((number? (car reducing-path))
-                  (reducer (cdr reducing-path)
-                           (cons `(predicate (number ,(car reducing-path)))
-                                 filters)))
+                  (reducer
+                   (cdr reducing-path)
+                   (cons
+                    `(predicate
+                      ,(if
+                        (negative? (car reducing-path))  ; from end of nodeset
+                        `(- (function-call (function-name "last"))
+                            (number ,(- -1 (car reducing-path))))
+                        `(number ,(car reducing-path))))
+                    filters)))
                  (else
                   (and-let*
                    ((pred-ast
