@@ -13,10 +13,10 @@
 (define (ddo:or . args)
   (if (null? args) #f (or (car args) (apply ddo:or (cdr args)))))
 
-(define (ddo:foldl op init lst)
-  (if (null? lst)
-      init
-      (ddo:foldl op (op (car lst) init) (cdr lst))))
+;(define (ddo:foldl op init lst)
+;  (if (null? lst)
+;      init
+;      (ddo:foldl op (op (car lst) init) (cdr lst))))
 
 (define (ddo:foldr op init lst)
   (if (null? lst)
@@ -515,11 +515,10 @@
 
 ; Predicate value for a predicate that doesn't require position
 ; Predicate values are stored in the form of
-; pred-values ::= (cons  pred-id
-;                        (listof  (cons  node  pred-value)))
+; pred-values ::= (listof  (cons  node  pred-value))
 ; NOTE: A node (and not a context) is used as a key in the alist
 (define (ddo:get-pred-value pred-id)
-  (lambda (nodeset position+size var-binding)         
+  (lambda (nodeset position+size var-binding)
     (cond
       ((not (and (nodeset? nodeset)
                  (null? (cdr nodeset))))
@@ -527,34 +526,32 @@
         "internal DDO SXPath error - "
         "a predicate is supplied with a non-singleton nodeset: " pred-id)
        #f)
-      ((assq pred-id var-binding)
-       => (lambda (binding)
-            (cond
-              ((assq (sxml:context->node (car nodeset))
-                     (cdr binding))
-               => (lambda (pair) (force (cdr pair)))
-               ; => cdr   ; DL: was
-               )
-              (else
-               (sxml:xpointer-runtime-error
-                "internal DDO SXPath error - predicate value not found: "
-                pred-id)
-               #f))))
-      (else
+      ((or (null? var-binding)
+           (not (eq? (caar var-binding) '*var-vector*)))
        (sxml:xpointer-runtime-error
         "internal DDO SXPath error - predicate value not found: " pred-id)
+       #f)
+      ; predicate value as expected
+      ((assq (sxml:context->node (car nodeset))
+             (vector-ref (cdar var-binding) pred-id))
+       => (lambda (pair) (force (cdr pair)))
+       ; => cdr   ; DL: was
+       )
+      (else  ; predicate value for the given node not found
+       (sxml:xpointer-runtime-error
+        "internal DDO SXPath error - no predicate value for node: "
+        pred-id (sxml:context->node (car nodeset)))
        #f))))
 
 ; Predicate value for a predicate that requires position
 ; Predicate values are stored in the form of
 ; pred-values ::=
-;  (cons pred-id
 ;        (listof
 ;         (cons node
 ;               (listof
 ;                (cons size
 ;                      (listof
-;                       (cons position pred-value)))))))
+;                       (cons position pred-value))))))
 ; NOTE: A node (and not a context) is used as a key in the alist
 (define (ddo:get-pred-value-pos pred-id)
   (lambda (nodeset position+size var-binding)
@@ -565,41 +562,40 @@
         "internal DDO SXPath error - "
         "a predicate is supplied with a non-singleton nodeset: " pred-id)
        #f)
-      ((assq pred-id var-binding)
-       => (lambda (binding)
-            (cond
-              ((assq (sxml:context->node (car nodeset))
-                     (cdr binding))
-               => (lambda (size-pair)
-                    (if
-                     (> (cdr position+size)  ; context size
-                        (vector-length (cdr size-pair)))
-                     (begin
-                       (sxml:xpointer-runtime-error
-                        "internal DDO SXPath error - "
-                        "vector member for context size not found: " pred-id)
-                       #f)
-                     (let ((pos-vect (vector-ref (cdr size-pair)
-                                                 (- (cdr position+size) 1))))
-                       (if
-                        (> (car position+size)  ; context position
-                           (vector-length pos-vect))
-                        (begin
-                          (sxml:xpointer-runtime-error
-                           "internal DDO SXPath error - "
-                           "vector member for context position not found: "
-                           pred-id)
-                          #f)
-                        (force (vector-ref pos-vect
-                                           (- (car position+size) 1))))))))
-              (else
-               (sxml:xpointer-runtime-error
-                "internal DDO SXPath error - alist entry for node not found: "
-                pred-id)
-               #f))))
-      (else
+      ((or (null? var-binding)
+           (not (eq? (caar var-binding) '*var-vector*)))
        (sxml:xpointer-runtime-error
         "internal DDO SXPath error - predicate value not found: " pred-id)
+       #f)
+      ; predicate value as expected
+      ((assq (sxml:context->node (car nodeset))
+             (vector-ref (cdar var-binding) pred-id))
+       => (lambda (size-pair)
+            (if
+             (> (cdr position+size)  ; context size
+                (vector-length (cdr size-pair)))
+             (begin
+               (sxml:xpointer-runtime-error
+                "internal DDO SXPath error - "
+                "vector member for context size not found: " pred-id)
+               #f)
+             (let ((pos-vect (vector-ref (cdr size-pair)
+                                         (- (cdr position+size) 1))))
+               (if
+                (> (car position+size)  ; context position
+                   (vector-length pos-vect))
+                (begin
+                  (sxml:xpointer-runtime-error
+                   "internal DDO SXPath error - "
+                   "vector member for context position not found: "
+                   pred-id)
+                  #f)
+                (force (vector-ref pos-vect
+                                   (- (car position+size) 1))))))))
+      (else  ; predicate value for the given node not found
+       (sxml:xpointer-runtime-error
+        "internal DDO SXPath error - no predicate value for node: "
+        pred-id (sxml:context->node (car nodeset)))
        #f))))
 
 ;-------------------------------------------------
@@ -610,18 +606,16 @@
 ; context-set - set of contexts for all nodes in the source document
 ; var-bindings - include variables supplied by user and the ones formed by
 ;  deeper level predicates
-(define (ddo:construct-pred-values pred-id pred-impl context-set var-binding)  
-  (cons
-   pred-id
-   (map
-    (lambda (context)
-      (cons (sxml:context->node context)
-            (delay
-              (sxml:boolean  ; since return type cannot be number
-               (pred-impl (list context)
-                          (cons 1 1)  ; dummy context position and size
-                          var-binding)))))
-    context-set)))
+(define (ddo:construct-pred-values pred-impl context-set var-binding)  
+  (map
+   (lambda (context)
+     (cons (sxml:context->node context)
+           (delay
+             (sxml:boolean  ; since return type cannot be number
+              (pred-impl (list context)
+                         (cons 1 1)  ; dummy context position and size
+                         var-binding)))))
+   context-set))
          
 ; Construct alist of values for a predicate that requires position
 ;  pred-impl - lambda that implements the predicate
@@ -629,74 +623,268 @@
 ;  var-bindings - include variables supplied by user and the ones formed by
 ; deeper level predicates
 ;  max-size - maximal context size possible in the document
-(define (ddo:construct-pred-values-pos pred-id pred-impl context-set
-                                       var-binding max-size)
-  (cons
-   pred-id
-   (map
-    (lambda (context)      
-      (cons
-       (sxml:context->node context)
-       (let ((context (list context)))
-         (let iter-size ((size 1)
-                         (size-lst '()))
-           (if
-            (> size max-size)  ; iteration is over
-            (list->vector (reverse size-lst))
-            (let iter-pos ((position 1)
-                           (pos-lst '()))
-              ;(pp (list context position size))
-              (if
-               (> position size)  ; iteration is over               
-               (iter-size
-                (+ size 1)
-                (cons (list->vector (reverse pos-lst))
-                      size-lst))
-               (iter-pos
-                (+ position 1)
-                (cons
-                 (delay
-                   (let ((pred-value
-                          (pred-impl
-                           context (cons position size) var-binding)))
-                     (if (number? pred-value)
-                         (= pred-value position)
-                         (sxml:boolean pred-value))))
-                 pos-lst)))))))))
-    context-set)))
+(define (ddo:construct-pred-values-pos
+         pred-impl context-set var-binding max-size)
+  (map
+   (lambda (context)      
+     (cons
+      (sxml:context->node context)
+      (let ((context (list context)))
+        (let iter-size ((size 1)
+                        (size-lst '()))
+          (if
+           (> size max-size)  ; iteration is over
+           (list->vector (reverse size-lst))
+           (let iter-pos ((position 1)
+                          (pos-lst '()))
+             (if
+              (> position size)  ; iteration is over               
+              (iter-size
+               (+ size 1)
+               (cons (list->vector (reverse pos-lst))
+                     size-lst))
+              (iter-pos
+               (+ position 1)
+               (cons
+                (delay
+                  (let ((pred-value
+                         (pred-impl
+                          context (cons position size) var-binding)))
+                    (if (number? pred-value)
+                        (= pred-value position)
+                        (sxml:boolean pred-value))))
+                pos-lst)))))))))
+   context-set))
 
-; Evaluates all predicates specified in deep-predicates
-;  deep-predicates ::= (listof (list  pred-id  requires-position?  impl))
-; Returns var-bindings extended with predicate values evaluated
-; ATTENTION: in deep-predicates, each predicate must come after a predicate it
-; is dependent on.
-(define (ddo:evaluate-deep-predicates deep-predicates doc var-binding)
-  (let* ((context-set (ddo:all-contexts-in-doc doc))
-         (max-size (if
-                    ; position-required? for at least one deep predicate
-                    (not (null? (filter cadr deep-predicates)))
-                    (length context-set)
-                    1  ; dummy
-                    )))
-    (let iter-preds ((deep-predicates deep-predicates)
-                     (var-binding var-binding))
-      (if
-       (null? deep-predicates)  ; iteration is over
-       var-binding
-       (iter-preds
-        (cdr deep-predicates)
-        (cons
-         (if
-          (cadar deep-predicates)  ; requires-position?
-          (ddo:construct-pred-values-pos (caar deep-predicates)  ; pred-id
-                                         (caddar deep-predicates)  ; pred-impl
-                                         context-set
-                                         var-binding max-size)
-          (ddo:construct-pred-values (caar deep-predicates)  ; pred-id
-                                     (caddar deep-predicates)  ; pred-impl
-                                     context-set
-                                     var-binding))
-         var-binding))))))
+; DL: obsolete
+;; Evaluates all predicates specified in deep-predicates
+;;  deep-predicates ::= (listof (list  pred-id  requires-position?  impl))
+;; Returns var-bindings extended with predicate values evaluated
+;; ATTENTION: in deep-predicates, each predicate must come after a predicate it
+;; is dependent on.
+;(define (ddo:evaluate-deep-predicates deep-predicates doc var-binding)
+;  (let* ((context-set (ddo:all-contexts-in-doc doc))
+;         (max-size (if
+;                    ; position-required? for at least one deep predicate
+;                    (not (null? (filter cadr deep-predicates)))
+;                    (length context-set)
+;                    1  ; dummy
+;                    )))
+;    (let iter-preds ((deep-predicates deep-predicates)
+;                     (var-binding var-binding))
+;      (if
+;       (null? deep-predicates)  ; iteration is over
+;       var-binding
+;       (iter-preds
+;        (cdr deep-predicates)
+;        (cons
+;         (if
+;          (cadar deep-predicates)  ; requires-position?
+;          (ddo:construct-pred-values-pos (caar deep-predicates)  ; pred-id
+;                                         (caddar deep-predicates)  ; pred-impl
+;                                         context-set
+;                                         var-binding max-size)
+;          (ddo:construct-pred-values (caar deep-predicates)  ; pred-id
+;                                     (caddar deep-predicates)  ; pred-impl
+;                                     context-set
+;                                     var-binding))
+;         var-binding))))))
+
+
+;=========================================================================
+; Optimization for achieving constant access time to XPath variables
+
+; Allocates the new vector from `vect' with the exception of position `k' which
+; is replaced with `obj'
+(define (ddo:vector-copy-set vect k obj)
+  (let loop ((src (vector->list vect))
+             (pos 0)
+             (res '()))
+    (if
+     (null? src)  ; iteration is over
+     (list->vector (reverse res))
+     (loop (cdr src)
+           (+ pos 1)
+           (cons
+            (if (= pos k) obj (car src))
+            res)))))
+
+; Extends `var-binding' with a vector data structure for binding variable
+; values and values for deep predicates.
+; Returns extended var-binding, which is constructed as follows:
+; (cons (cons '*var-vector* ,vector)
+;       var-binding)
+(define (ddo:add-vector-to-var-binding
+         vars2offsets deep-predicates doc var-binding)
+  (let ((cons-var-vector  ; cons var-vector to var-binding
+         (lambda (var-vector var-binding)
+           (cons (cons '*var-vector* var-vector)
+                 var-binding))))
+    (if
+     (and (null? deep-predicates) (null? var-binding))
+     var-binding  ; nothing to add
+     (let* ((var-tree
+             (if
+              (< (length var-binding) 100)  ; not too many variables
+              #f  ; do not need any tree
+              (ddo:var-binding->tree var-binding)))
+            (var-vector
+             (let iter-offsets ((pos (- (car vars2offsets) 1))
+                                (vars-alist (cdr vars2offsets))
+                                (lst '()))
+               (cond
+                 ((< pos 0)  ; iteration is over
+                  (list->vector lst))
+                 ((or (null? vars-alist)  ; no more vars in the alist
+                      (not (= pos (cdar vars-alist))))
+                  (iter-offsets (- pos 1)
+                                vars-alist
+                                (cons #f lst)  ; cons a dummy value
+                                ))
+                 (else  ; this position is in the 1st member of vars-alist
+                  (iter-offsets
+                   (- pos 1)
+                   (cdr vars-alist)
+                   (cons
+                    (cond  ; more sophisticated way of searching for value
+                      (var-tree  ; access variables through var-tree
+                       (ddo:get-var-value-from-tree  ; checks for declared var
+                        (caar vars-alist) var-tree))
+                      ((assq (caar vars-alist) var-binding)
+                       => cdr)
+                      (else
+                       (sxml:xpointer-runtime-error "unbound variable - "
+                                                    (cdar vars-alist))
+                       '()))
+                    lst)))))))
+       (if
+        (null? deep-predicates)
+        (cons-var-vector var-vector var-binding)
+        (let* ((context-set (ddo:all-contexts-in-doc doc))
+               (max-size (if
+                          ; position-required? for at least one deep predicate
+                          (not (null? (filter cadr deep-predicates)))
+                          (length context-set)
+                          1  ; dummy
+                          )))
+          (let iter-preds ((deep-predicates deep-predicates)
+                           (var-vector var-vector))
+            (if
+             (null? deep-predicates)  ; iteration is over
+             (cons-var-vector var-vector var-binding)
+             (iter-preds
+              (cdr deep-predicates)
+              (ddo:vector-copy-set
+               var-vector
+               (caar deep-predicates)  ; pred-id
+               (if
+                (cadar deep-predicates)  ; requires-position?
+                (ddo:construct-pred-values-pos 
+                 (caddar deep-predicates)  ; pred-impl
+                 context-set
+                 (cons-var-vector var-vector var-binding)
+                 max-size)
+                (ddo:construct-pred-values
+                 (caddar deep-predicates)  ; pred-impl
+                 context-set
+                 (cons-var-vector var-vector var-binding)))))))))))))
+
+;-------------------------------------------------
+; Methods similar to radix sort for linear access time for all variables
+
+; Represents a list of chars as a branch in the string-tree
+; The list of chars must be non-empty
+(define (ddo:charlst->branch lst value)
+  (if (null? (cdr lst))  ; this is the last character in the lst
+      (list (car lst) (cons 'value value))
+      `(,(car lst) #f ,(ddo:charlst->branch (cdr lst) value))))
+
+; Adds a new string to string-tree
+(define (ddo:add-var-to-tree var-name var-value tree)
+  (letrec
+      ((add-lst-to-tree   ; adds the list of chars to tree
+        (lambda (lst tree)
+          (if
+           (null? lst)  ; the lst is over
+           (cons (car tree)
+                 (cons (cons 'value var-value)  ; replace variable value
+                       (cddr tree)))
+           (let ((curr-char (car lst)))
+             (let iter-alist ((alist (cddr tree))
+                              (res (list (cadr tree) (car tree))))
+               (cond
+                 ((null? alist)  ; branch not in a tree
+                  (reverse
+                   (cons
+                    (ddo:charlst->branch lst var-value)
+                    res)))
+                 ((char=? (caar alist) curr-char)  ; entry found
+                  (if
+                   (null? (cdr alist))  ; nothing more in the alist
+                   (reverse
+                    (cons
+                     (add-lst-to-tree (cdr lst) (car alist))
+                     res))
+                   (append
+                    (reverse
+                     (cons
+                      (add-lst-to-tree (cdr lst) (car alist))
+                      res))
+                    (cdr alist))))
+                 ((char>? (caar alist) curr-char)
+                  (if
+                   (null? (cdr alist))  ; nothing more in the alist
+                   (reverse
+                    (cons
+                     (car alist)
+                     (cons (ddo:charlst->branch lst var-value)
+                           res)))
+                   (append
+                    (reverse
+                     (cons
+                      (ddo:charlst->branch lst var-value)
+                      res))
+                    alist)))
+                 (else
+                  (iter-alist (cdr alist)
+                              (cons (car alist) res))))))))))
+    (add-lst-to-tree (string->list (symbol->string var-name))
+                     tree)))
+
+; Convert var-binding to their tree representation
+; var-binding is supposed to be non-null
+(define (ddo:var-binding->tree var-binding)
+  (let loop ((var-binding (cdr var-binding))
+             (tree
+              (list '*top*
+                    #f
+                    (ddo:charlst->branch
+                     (string->list
+                      (symbol->string (caar var-binding)))  ; var name
+                     (cdar var-binding)))))
+    (if (null? var-binding)
+        tree
+        (loop (cdr var-binding)
+              (ddo:add-var-to-tree
+               (caar var-binding) (cdar var-binding) tree)))))
+
+; Obtain variable value from the tree
+(define (ddo:get-var-value-from-tree var-name tree)
+  (let loop ((lst (string->list (symbol->string var-name)))
+             (tree tree))
+    (cond
+      ((and (not (null? lst))
+            (assv (car lst) (cddr tree)))
+       => (lambda (new-tree)
+            (loop (cdr lst) new-tree)))
+      ((and (null? lst)  ; lst is over
+            (cadr tree)  ; value for variable in the tree supplied
+            )
+       (cdadr tree))
+      (else
+       (sxml:xpointer-runtime-error "unbound variable - " var-name)
+       '()  ; dummy value
+       ))))
 
 
 ;=========================================================================
@@ -992,11 +1180,15 @@
          (and num-anc (zero? num-anc))  ; no ancestors required
          (lambda (nodeset position+size var-binding)
            (proc (draft:contextset->nodeset (as-nodeset nodeset))
-                 var-binding))
+                 (if (and (pair? var-binding)  ; non-null
+                          (eq? (caar var-binding) '*var-vector*))
+                     (cdr var-binding) var-binding)))
          (lambda (nodeset position+size var-binding)
            (draft:find-proper-context
             (proc (draft:contextset->nodeset (as-nodeset nodeset))
-                  var-binding)
+                  (if (and (pair? var-binding)  ; non-null
+                           (eq? (caar var-binding) '*var-vector*))
+                      (cdr var-binding) var-binding))
             (map sxml:context->content   ; TODO: should add variables
                  (as-nodeset nodeset))
             num-anc)))
@@ -1148,15 +1340,15 @@
     (let ((requires-position?
            (or (cadddr expr-res)  ; predicate expression requires position
                (memq (list-ref expr-res 4)  ; involves position implicitly
-                     '(ddo:type-number ddo:type-any)))))      
+                     '(ddo:type-number ddo:type-any))))
+          (vars2offsets (list-ref expr-res 6)))
       (let-values*
-       (((pred-impl deep-predicates)
+       (((pred-impl deep-predicates vars2offsets)
        (if        
         (> pred-nesting 3)  ; this is a deep predicate
-        (let ((pred-id (ddo:generate-pred-id)
-                       ; TODO: DL: should be (car vars2offsets) i.e. vacant-pos
+        (let ((pred-id (car vars2offsets)
+                       ; was: (ddo:generate-pred-id)
                        ))
-          ; TODO: SHOULD INCREASE VACANT-POS
           (values
            ((if requires-position?
                 ddo:get-pred-value-pos ddo:get-pred-value)
@@ -1167,17 +1359,19 @@
                   (car expr-res)  ; implementation
                   )
             (list-ref expr-res 5)  ; deep-predicates
-            )))
+            )
+           (cons (+ (car vars2offsets) 1)
+                 (cdr vars2offsets))))
         (values (car expr-res)  ; implementation
-                (list-ref expr-res 5)))))
+                (list-ref expr-res 5)
+                vars2offsets))))
        (list pred-impl
              (cadr expr-res)  ; num-ancestors required
              (caddr expr-res)  ; single-level? - we don't care
              requires-position?
              (list-ref expr-res 4)  ; return type
              deep-predicates
-             (list-ref expr-res 6)  ; vars2offsets             
-             ))))))
+             vars2offsets))))))
 
 ; {8a} ( <Predicate>+ )
 ; Returns (list (listof pred-impl)
@@ -1661,24 +1855,36 @@
 (define (ddo:ast-variable-reference
          op num-anc single-level? pred-nesting vars2offsets)
   (let ((name (string->symbol (cadr op))))
-    (list
-     (lambda (nodeset position+size var-binding)
+    (let-values*
+     (((var-offset new-vars2offsets)
        (cond
-         ((assoc name var-binding)
-          => cdr)
-         (else
-          (sxml:xpointer-runtime-error "unbound variable - " name)
-          '())))
-     0
-     #t  ; ATTENTION: in is not generally on the single-level
-     #f
-     ddo:type-any  ; type cannot be statically determined
-     '()  ; deep-predicates     
-     (cons    ; TODO: proper handling of variable names
-      (+ (car vars2offsets) 1)
-      (cons (cons name (car vars2offsets))      
-            (cdr vars2offsets)))
-     )))
+         ((assq name (cdr vars2offsets))  ; this variable already in alist
+          => (lambda (pair)
+               (values (cdr pair) vars2offsets)))
+         (else  ; this is a new variable
+          (values (car vars2offsets)
+                  (cons
+                   (+ (car vars2offsets) 1)
+                   (cons (cons name (car vars2offsets))      
+                         (cdr vars2offsets))))))))
+     (list
+      (lambda (nodeset position+size var-binding)
+        (cond
+          ((and (not (null? var-binding))
+                (eq? (caar var-binding) '*var-vector*))
+           (vector-ref (cdar var-binding) var-offset))
+          ; For backward compatibility
+          ((assq name var-binding)
+           => cdr)
+          (else
+           (sxml:xpointer-runtime-error "unbound variable - " name)
+           '())))
+      0
+      #t  ; ATTENTION: in is not generally on the single-level
+      #f
+      ddo:type-any  ; type cannot be statically determined
+      '()  ; deep-predicates     
+      new-vars2offsets))))
 
 ; {20} <Literal> ::= (literal  <String> )
 (define (ddo:ast-literal op num-anc single-level? pred-nesting vars2offsets)
@@ -1872,7 +2078,6 @@
                               0  ; predicate nesting is zero
                               '(0)  ; initial vars2offsets
                               )))
-       ;(pp (list-ref impl-lst 6))
        (let ((impl-lambda
               (if
                (and num-anc (zero? num-anc))
@@ -1881,24 +2086,16 @@
                    (draft:contextset->nodeset
                     (impl-car node position+size var-binding))))                
                (car impl-lst))))
-         (if
-          (null? (list-ref impl-lst 5))   ; no deep predicates         
-          (lambda (node . var-binding)   ; common implementation
-            (impl-lambda
-             (as-nodeset node)
-             (cons 1 1)
-             (if (null? var-binding) var-binding (car var-binding))))
-          (let ((deep-predicates  ; NOTE: need to reverse
-                 (reverse (list-ref impl-lst 5))))
-            (lambda (node . var-binding)
-              (impl-lambda
-               (as-nodeset node)
-               (cons 1 1)
-               (ddo:evaluate-deep-predicates
-                deep-predicates
-                node
-                (if (null? var-binding)
-                    var-binding (car var-binding))))))))))))
+         (lambda (node . var-binding)   ; common implementation
+           (impl-lambda
+            (as-nodeset node)
+            (cons 1 1)
+            (ddo:add-vector-to-var-binding
+             (list-ref impl-lst 6)  ; vars2offsets
+             (reverse  ; deep-predicates: need to reverse
+              (list-ref impl-lst 5))
+             node
+             (if (null? var-binding) var-binding (car var-binding))))))))))
 
 (define ddo:txpath (ddo:api-helper txp:xpath->ast ddo:ast-location-path))
 (define ddo:xpath-expr (ddo:api-helper txp:expr->ast ddo:ast-expr))
