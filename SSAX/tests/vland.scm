@@ -121,7 +121,7 @@
 ;
 ; (or
 ;  (and-let* ((c (read-char)) ((not (eof-object? c))))
-;	(string-set! some-str i c) (++! i))
+;	(string-set! some-str i c) (inc! i))
 ;  (begin (do-process-eof)))
 ;
 ; Another concept AND-LET* is reminiscent of is programming with guards:

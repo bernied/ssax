@@ -107,6 +107,9 @@
 ;(##define-macro (nl) '(newline))
 (define nl (string #\newline))
 
+; Legacy re-direction
+(define-macro (read-line . x) `(read-text-line . ,x))
+
 ; Some useful increment/decrement operators
 ; Note, ##fixnum prefix is Gambit-specific, it means that the
 ; operands assumed FIXNUM (as they ought to be anyway).
@@ -114,15 +117,19 @@
 ; correct, but more portable (and less efficient)
 
 				; Mutable increment
+(define-macro (inc! x) `(set! ,x (##fixnum.+ 1 ,x)))
 (define-macro (++! x) `(set! ,x (##fixnum.+ 1 ,x)))
 
 				; Read-only increment
+(define-macro (inc x) `(##fixnum.+ 1 ,x))
 (define-macro (++ x) `(##fixnum.+ 1 ,x))
 
 				; Mutable decrement
+(define-macro (dec! x) `(set! ,x (##fixnum.- ,x 1)))
 (define-macro (--! x) `(set! ,x (##fixnum.- ,x 1)))
 
 				; Read-only decrement
+(define-macro (dec x) `(##fixnum.- ,x 1))
 (define-macro (-- x) `(##fixnum.- ,x 1))
 
 

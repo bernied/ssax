@@ -14,13 +14,13 @@
 ;
 ; $Id$
 
-(cerr nl "Verifying increment/decrement operators: ++, ++! etc..." nl)
+(cerr nl "Verifying increment/decrement operators: inc, inc! etc..." nl)
 (let
   ((x 0))
-  (assert (= (++ x) 1))
-  (assert (= (-- x) -1))
-  (assert (begin (++! x) (= x 1)))
-  (assert (begin (--! x) (--! x) (zero? (++ x))))
+  (assert (= (inc x) 1))
+  (assert (= (dec x) -1))
+  (assert (begin (inc! x) (= x 1)))
+  (assert (begin (dec! x) (dec! x) (zero? (inc x))))
 )
 
 (cerr nl "Verifying begin0..." nl)
@@ -29,8 +29,8 @@
   (assert (= x (begin0 x)))
   (assert (= 0 (begin0 x 1)))
   (assert (= 1 (begin x 1)))
-  (assert (= 0 (begin0 x (++! x) x)))
-  (assert (= 2 (begin x (++! x) x)))
+  (assert (= 0 (begin0 x (inc! x) x)))
+  (assert (= 2 (begin x (inc! x) x)))
 )
 
 
@@ -38,12 +38,12 @@
 (let
   ((x 0))
 
-  (assert (= 2 (begin (when (zero? x) (++! x)) (++ x))))
-  (assert (begin (when (zero? x) (++! x)) (= x 1)))
-  (whennot (zero? x) (--! x))
+  (assert (= 2 (begin (when (zero? x) (inc! x)) (inc x))))
+  (assert (begin (when (zero? x) (inc! x)) (= x 1)))
+  (whennot (zero? x) (dec! x))
   (assert (zero? x))
-  (assert (zero? (begin (whennot (positive? x) (--! x)) (++ x))))
-  (assert (= -1 (begin (whennot (negative? x) (++! x)) x)))
+  (assert (zero? (begin (whennot (positive? x) (dec! x)) (inc x))))
+  (assert (= -1 (begin (whennot (negative? x) (inc! x)) x)))
 )
 
 (cerr nl "Verifying assert..." nl)

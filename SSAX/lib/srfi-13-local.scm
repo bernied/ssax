@@ -21,7 +21,7 @@
       (blit-string! s sfrom target tstart (- sto sfrom))))
   (else
     (define (string-xcopy! target tstart s sfrom sto)
-      (do ((i sfrom (++ i)) (j tstart (++ j)))
+      (do ((i sfrom (inc i)) (j tstart (inc j)))
 	((>= i sto))
 	(string-set! target j (string-ref s i)))))
 )
@@ -85,18 +85,18 @@
     (cond
       ((>= pos (string-length str)) #f) ; whole string has been searched, in vain
       ((char=? a-char (string-ref str pos)) pos)
-      (else (loop (++ pos))))))
+      (else (loop (inc pos))))))
 
 ; Return the index of the last occurence of a-char in str, or #f
 ; This is a subset of the corresponding SRFI-13 function.
 ; The latter is more generic.
 
 (define (string-index-right str a-char)
-  (let loop ((pos (-- (string-length str))))
+  (let loop ((pos (dec (string-length str))))
     (cond
       ((negative? pos) #f) 	; whole string has been searched, in vain
       ((char=? a-char (string-ref str pos)) pos)
-      (else (loop (-- pos))))))
+      (else (loop (dec pos))))))
 
 
 ; string-contains    s1 s2 [start1 end1 start2 end2] -> integer or false
@@ -149,7 +149,7 @@
       ((>= i (string-length pattern)) #t)
       ((>= i (string-length str)) #f)
       ((char=? (string-ref pattern i) (string-ref str i))
-        (loop (++ i)))
+        (loop (inc i)))
       (else #f))))
 
 (define (string-prefix-ci? pattern str)
@@ -158,7 +158,7 @@
       ((>= i (string-length pattern)) #t)
       ((>= i (string-length str)) #f)
       ((char-ci=? (string-ref pattern i) (string-ref str i))
-        (loop (++ i)))
+        (loop (inc i)))
       (else #f))))
 
 ; -- procedure+: string-suffix? PATTERN STRING
@@ -171,21 +171,21 @@
 ;          (string-suffix? any-string any-string)      =>  #t
 
 (define (string-suffix? pattern str)
-  (let loop ((i (-- (string-length pattern))) (j (-- (string-length str))))
+  (let loop ((i (dec (string-length pattern))) (j (dec (string-length str))))
     (cond
       ((negative? i) #t)
       ((negative? j) #f)
       ((char=? (string-ref pattern i) (string-ref str j))
-        (loop (-- i) (-- j)))
+        (loop (dec i) (dec j)))
       (else #f))))
 
 (define (string-suffix-ci? pattern str)
-  (let loop ((i (-- (string-length pattern))) (j (-- (string-length str))))
+  (let loop ((i (dec (string-length pattern))) (j (dec (string-length str))))
     (cond
       ((negative? i) #t)
       ((negative? j) #f)
       ((char-ci=? (string-ref pattern i) (string-ref str j))
-        (loop (-- i) (-- j)))
+        (loop (dec i) (dec j)))
       (else #f))))
 
 
@@ -198,25 +198,25 @@
 ; Return a new string made of characters of the
 ; original string in the lower case
 (define (string-downcase str)
-  (do ((target-str (make-string (string-length str))) (i 0 (++ i)))
+  (do ((target-str (make-string (string-length str))) (i 0 (inc i)))
       ((>= i (string-length str)) target-str)
       (string-set! target-str i (char-downcase (string-ref str i)))))
 
 ; Return a new string made of characters of the
 ; original string in the upper case
 (define (string-upcase str)
-  (do ((target-str (make-string (string-length str))) (i 0 (++ i)))
+  (do ((target-str (make-string (string-length str))) (i 0 (inc i)))
       ((>= i (string-length str)) target-str)
       (string-set! target-str i (char-upcase (string-ref str i)))))
 
 ; Lower the case of string's characters inplace
 (define (string-downcase! str)
-  (do ((i 0 (++ i))) ((>= i (string-length str)))
+  (do ((i 0 (inc i))) ((>= i (string-length str)))
     (string-set! str i (char-downcase (string-ref str i)))))
 
 ; Raise the case of string's characters inplace
 (define (string-upcase! str)
-  (do ((i 0 (++ i))) ((>= i (string-length str)))
+  (do ((i 0 (inc i))) ((>= i (string-length str)))
     (string-set! str i (char-upcase (string-ref str i)))))
 ))
 

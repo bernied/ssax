@@ -124,6 +124,9 @@
 ;(define-macro (nl) '(newline))
 (define nl (string #\newline))
 
+; Legacy re-direction
+(define-macro (read-line . x) `(read-text-line . ,x))
+
 ; Some useful increment/decrement operators
 ; Note, fixnum prefix is Gambit-specific, it means that the
 ; operands assumed FIXNUM (as they ought to be anyway).
@@ -131,15 +134,19 @@
 ; correct, but more portable (and less efficient)
 
 				; Mutable increment
+(define-macro (inc! x) `(set! ,x (+fx 1 ,x)))
 (define-macro (++! x) `(set! ,x (+fx 1 ,x)))
 
 				; Read-only increment
+(define-macro (inc x) `(+fx 1 ,x))
 (define-macro (++ x) `(+fx 1 ,x))
 
 				; Mutable decrement
+(define-macro (dec! x) `(set! ,x (-fx ,x 1)))
 (define-macro (--! x) `(set! ,x (-fx ,x 1)))
 
 				; Read-only decrement
+(define-macro (dec x) `(-fx ,x 1))
 (define-macro (-- x) `(-fx ,x 1))
 
 ; Some useful control operators
@@ -197,6 +204,32 @@
 	   (else			; the most generic case
 	    `(receive ,vars ,initializer ,cont)))))
        (car bindings))))
+
+; Look up a value associated with a symbolic key in alist 
+; ((key value) ...) or ((key . value) ...)
+; and return the associated value.
+; If the association has the form
+;   (key . value) where value is not a pair --> return value
+;   (key   value) where value is not a pair --> return value
+;   (key value1 value2 value3 ...) -> return (value1 value2 value3 ...)
+; that is, the procedure tries to do the right thing for
+; both kinds of associative lists. The downside is that the result
+; is never the list of one element (that is, the (list value) is
+; synonymous with value for this procedure).
+; We use a pseudo-keyword argument warn: as a modifier.
+; These are not really keyword arguments (although they may be,
+; if the Scheme system turns out DSSSL-compatible)
+; 
+; (lookup key alist)  -- lookup the key in the alist and return the
+;                        associated value. Raise an error if key is not
+;                        found.
+; (lookup key alist default-exp)
+;                     -- lookup the key in the alist and return the associated
+;                        value. If the key is not found, evaluate
+;                        the default-exp and return its result.
+; (lookup key alist warn: default-exp)
+;                     -- the same as above. In addition, write a warning
+;                        (using cerr above) if the key is not found.
 
 
 ; assoc-primitives with a default clause
@@ -356,7 +389,8 @@
 ; 'and' and 'let'.
 ; See vland.scm for the denotational semantics and
 ; extensive validation tests.
-
+; Bigloo has its own and-let* now -- alas, that and-let* fails
+; many vland tests.
 (define-macro (and-let* claws . body)
   (if (null? body)
       (cond 

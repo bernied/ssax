@@ -264,19 +264,19 @@
 
 ; Some useful increment/decrement operators
 
-(define-syntax ++!		; Mutable increment
+(define-syntax inc!		; Mutable increment
   (syntax-rules ()
-    ((++! x) (set! x (+ 1 x)))))
-(define-syntax ++               ; Read-only increment
+    ((inc! x) (set! x (+ 1 x)))))
+(define-syntax inc               ; Read-only increment
   (syntax-rules ()
-    ((++ x) (+ 1 x))))
+    ((inc x) (+ 1 x))))
 
-(define-syntax --!		; Mutable decrement
+(define-syntax dec!		; Mutable decrement
   (syntax-rules ()
-    ((--! x) (set! x (- x 1)))))
-(define-syntax --		; Read-only decrement
+    ((dec! x) (set! x (- x 1)))))
+(define-syntax dec		; Read-only decrement
   (syntax-rules ()
-    ((-- x) (- x 1))))
+    ((dec x) (- x 1))))
 
 ; Some useful control operators
 

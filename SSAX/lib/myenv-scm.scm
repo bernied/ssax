@@ -259,20 +259,20 @@
 ; Some useful increment/decrement (aka predecessor/successor) operators
 
 				; Mutable increment
-(define-syntax ++!
-  (syntax-rules () ((++! x) (set! x (+ 1 x)))))
+(define-syntax inc!
+  (syntax-rules () ((inc! x) (set! x (+ 1 x)))))
 
 				; Read-only increment
-(define-syntax ++
-  (syntax-rules () ((++ x) (+ 1 x))))
+(define-syntax inc
+  (syntax-rules () ((inc x) (+ 1 x))))
 
 				; Mutable decrement
-(define-syntax --!
-  (syntax-rules () ((--! x) (set! x (- x 1)))))
+(define-syntax dec!
+  (syntax-rules () ((dec! x) (set! x (- x 1)))))
 
 				; Read-only decrement
-(define-syntax --
-  (syntax-rules () ((-- x) (- x 1))))
+(define-syntax dec
+  (syntax-rules () ((dec x) (- x 1))))
 
 ; Some useful control operators
 
