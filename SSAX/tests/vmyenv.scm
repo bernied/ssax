@@ -125,6 +125,14 @@
 			     (list a b c))))
     (assert
      (equal? result '(1 2 (3 4)))))
+  (let ((result (let*-values (((a . b) (values 1 2 3 4)))
+			     (list a b))))
+    (assert
+     (equal? result '(1 (2 3 4)))))
+  (let ((result (let*-values ((a (values 1 2 3 4)))
+			     (list a))))
+    (assert
+     (equal? result '((1 2 3 4)))))
 
   (let ((result
 	 (let ((a 'a) (b 'b) (x 'x) (y 'y))

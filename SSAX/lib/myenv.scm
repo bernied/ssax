@@ -192,7 +192,7 @@
 
 ; Like let* but allowing for multiple-value bindings: SRFI-11
 (define-macro (let*-values bindings . body)
-  (if (null? bindings) (cons 'begin body)
+  (if (null? bindings) (cons 'let (cons '() body))
       (let
 	  ((vars (caar bindings))
 	   (binding-rest (cdar bindings))
@@ -202,8 +202,8 @@
 	(cond				; single var, treat like let*
 	 ((and (pair? vars) (null? (cdr vars))) 
 	  `(let ((,(car vars) . ,binding-rest)) ,cont))
-	 ((and (pair? vars) (null? (cddr vars)))	; two variables
-	  (let ((val (gensym)))
+	 ((and (pair? vars) (pair? (cdr vars)) (null? (cddr vars)))
+	  (let ((val (gensym)))		; two proper variables
 	    `(let* ((,val . ,binding-rest)
 		    (,(car vars) (car ,val))
 		    (,(cadr vars) (cadr ,val))) ,cont)))
