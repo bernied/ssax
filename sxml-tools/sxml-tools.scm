@@ -59,6 +59,7 @@
      '((@)))
     (else '())))
 
+
 ; Returns aux-list node for a given obj 
 ;   or #f if it is absent
 (define (sxml:aux-list-node obj)
@@ -223,6 +224,20 @@
        ((ntype?? '*) x)))) 
    obj))
 
+; Returns a string which combines all the character data 
+; from text node childrens of the given SXML element
+; or "" if there is no text node children
+(define (sxml:text obj)
+  (let ((tnodes
+	 ((select-kids
+	   string?) 
+	   obj)))
+    (cond 
+      ((null? tnodes) "")
+      ((null? (cdr tnodes))
+       (car tnodes))
+      (else (apply string-append tnodes)))))
+
 ;------------------------------------------------------------------------------
 ; Normalization-dependent accessors
 ;
@@ -305,6 +320,12 @@
      => cadr)
     (else #f)))
 
+; Extracts a value of attribute with given name from attr-list
+(define (sxml:attr-from-list attr-list name)
+	    (cond 
+	      ((assq name attr-list) 
+	       => cadr)
+	      (else #f)))
 
 ; Accessor for a numerical attribute <attr-name> of given SXML element <obj> 
 ; which It returns: 
@@ -748,7 +769,6 @@
       (set-cdr! h b)
       h)))
 
-
 ; Lookup an element using its ID 
 (define (sxml:lookup id index)
     (cond
@@ -758,33 +778,6 @@
 
 ;==============================================================================
 ; Markup generation
-
-; Filter the 'fragments'
-; The fragments are a list of strings, characters,
-; numbers, thunks, #f -- and other fragments.
-; The function traverses the tree depth-first, and returns a list
-; of strings, characters and executed thunks, and ignores #f and '().
-;
-; If all the meaningful fragments are strings, then
-;  (apply string-append ... )
-; to a result of this function will return its string-value 
-;
-; It may be considered as a variant of Oleg Kiselyov's SRV:send-reply:
-; While SRV:send-reply displays fragments, this function returns the list 
-; of meaningful fragments and filter out the garbage.
-(define (sxml:clean-feed . fragments)
-  (reverse
-  (let loop ((fragments fragments) (result '()))
-    (cond
-      ((null? fragments) result)
-      ((not (car fragments)) (loop (cdr fragments) result))
-      ((null? (car fragments)) (loop (cdr fragments) result))
-      ((pair? (car fragments))
-        (loop (cdr fragments) 
-	      (loop (car fragments) result)))
-      (else
-        (loop (cdr fragments) 
-	      (cons (car fragments) result)))))))
 
 ;------------------------------------------------------------------------------
 ; XML
@@ -830,6 +823,8 @@
              (list " " (sxml:ncname attr))
              (list " " (sxml:ncname attr) "='" (cadr attr) "'")))
 
+
+
 ; Given a string, check to make sure it does not contain characters
 ; < > & " that require encoding. Return either the original
 ; string, or a list of string fragments with special characters
@@ -841,7 +836,7 @@
    '((#\< . "&lt;") (#\> . "&gt;") (#\& . "&amp;") (#\" . "&quot;"))))
 
 
-; This predicate yields #t for "non-terminated" HTML 4.0 tags
+; This predicate yields #t for "unterminated" HTML 4.0 tags
 (define (sxml:non-terminated-html-tag? tag) 
   (memq tag 
      '(area base basefont br col frame hr img input isindex link meta param)))
