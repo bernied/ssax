@@ -186,7 +186,8 @@
 ; rules that drop out everything but the 'Header' node.
 ; We use the _breadth-first_ traversal of the Content tree.
 (define (find-Header Content)
-  (let ((search-rules
+  (letrec 
+    ((search-rules
 	 `((*default*
 	    *preorder*
 	    . ,(lambda (tag . elems)
