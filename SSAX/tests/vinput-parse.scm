@@ -77,7 +77,7 @@
 		 ((char? component) (string component))
 		 ((number? component) (string (integer->char component)))
 		 ((eq? 'lf component) (string #\newline))
-		 ((eq? 'cr component) (string #\return))
+		 ((eq? 'cr component) (string (integer->char 13)))
 		 (else (error "bad component: " component))))
 	      components)))
 
@@ -403,6 +403,48 @@
   (assert (failed? (expect-parse-result "cccx"
     (next-token '(#\c #\space #\x) '(#\d))
     '(#f . #f))))
+)
+
+(cerr nl "Verifying tokenizing of the input stream, big tokens ..." nl)
+(let ((eof (with-input-from-string "" read))
+      (big-token (make-string 512 #\!))
+      (big-token1 (make-string 2047 #\?))
+      (term-list '(#\space #\newline *eof*)))
+
+  (call-with-input-string big-token
+    (lambda (port)
+      (let ((token (next-token '(#\space) term-list "" port)))
+	(assert (equal? token big-token) (eof-object? (peek-char port))))))
+
+  (call-with-input-string big-token1
+    (lambda (port)
+      (let ((token (next-token '() term-list "" port)))
+	(assert (equal? token big-token1) (eof-object? (read-char port))))))
+
+  (call-with-input-string (string-append "     " big-token "     ")
+    (lambda (port)
+      (let ((token (next-token '(#\space) term-list "comment" port)))
+	(assert (equal? token big-token) 
+	  (memv (peek-char port) term-list)))))
+
+  (call-with-input-string (string-append big-token1 (string #\newline))
+    (lambda (port)
+      (let ((token (next-token '(#\space) term-list "" port)))
+	(assert (equal? token big-token1) 
+	  (memv (peek-char port) term-list)))))
+
+  (call-with-input-string (string-append big-token)
+    (lambda (port)
+      (let ((token (next-token-of 
+		     (lambda (c) (and (not (eof-object? c)) c))  port)))
+	(assert (equal? token big-token) 
+	  (eof-object? (peek-char port))))))
+
+  (call-with-input-string (string-append big-token1 (string #\newline))
+    (lambda (port)
+      (let ((token (next-token-of '(#\a #\! #\?) port)))
+	(assert (equal? token big-token1) 
+	  (memv (peek-char port) term-list)))))
 )
 
 (cerr nl "Verifying tokenizing of the input stream: next-token-of ..." nl)
