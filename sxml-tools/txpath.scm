@@ -630,17 +630,19 @@
                    (((axis node-test-res) root-node) nodeset)
                    ((axis node-test-res) nodeset)))
              (lambda (nodeset root-node context var-binding)
-               (sxml:xpath-nodeset-filter 
-                predicate-res-lst
-                ((if root-node-required
-                     ((axis node-test-res) root-node)
-                     (axis node-test-res))
-                 nodeset)
-                root-node var-binding))))))
+               (map-union
+                (lambda (node)
+                  (sxml:xpath-nodeset-filter 
+                   predicate-res-lst
+                   ((if root-node-required
+                        ((axis node-test-res) root-node)
+                        (axis node-test-res))
+                    node)
+                   root-node var-binding))
+                nodeset))))))
       (range-to
        ,(lambda (expr-res predicate-res-lst add-on)
-          (txp:signal-semantic-error
-           "range-to function not implemented")))))
+          (txp:signal-semantic-error "range-to function not implemented")))))
     
     ; Relative location path implementation
     (relative-lpath
@@ -1047,6 +1049,8 @@
   (sxml:api-helper (cadr (assq 'xpath sxml:classic-res))))
 (define sxml:xpointer
   (sxml:api-helper (cadr (assq 'xpointer sxml:classic-res))))
+(define sxml:xpath-expr
+  (sxml:api-helper (cadr (assq 'expr sxml:classic-res))))
 
 ; Some (deprecated!) aliases for backward compatibility
 ; which will be eventually removed
