@@ -164,7 +164,7 @@
     (if
      (or (null? lst) (null? (cdr lst)))  ; already sorted
      lst
-     (let ((middle (round (/ (length lst) 2))))
+     (let ((middle (inexact->exact (round (/ (length lst) 2)))))
        (merge-sorted-lists
         (sxml:merge-sort less-than?-pred (sxml:list-head lst middle))
         (sxml:merge-sort less-than?-pred (list-tail lst middle)))))))
