@@ -9,7 +9,7 @@
 
 
 ;==========================================================================
-; Helper functions
+; W3C textual XPath/XPointer -> AST
 
 ; Writing operations as an S-expression in an infix notation
 (define (txp:ast-operation-helper expr-lst op-lst add-on)
@@ -20,10 +20,9 @@
       (if (null? ops)
           res
           (loop (cdr exprs) (cdr ops)
-                (list (car ops) (car exprs) res))))))                              
-  
+                (list (car ops) (car exprs) res))))))
 
-;==========================================================================
+;-------------------------------------------------
 ; Parameters for TXPath -> AST implementation
 
 (define txp:ast-params
@@ -253,8 +252,7 @@
      
 (define txp:ast-res (txp:parameterize-parser txp:ast-params))
 
-
-;=========================================================================
+;-------------------------------------------------
 ; Highest level API functions
 ;
 ;  xpath-string - an XPath location path (a string)
@@ -285,3 +283,120 @@
   (txp:ast-api-helper (cadr (assq 'xpointer txp:ast-res))))
 (define txp:expr->ast
   (txp:ast-api-helper (cadr (assq 'expr txp:ast-res))))
+
+
+;==========================================================================
+; SXPath native syntax -> AST
+; Additional features added to AST by native SXPath
+; Operator += below denotes additional alternatives to AST grammar rules
+; {7} <NodeTest> += (node-test (equal?  <SXML-node> ))
+;                   | (node-test (eq?  <SXML-node> ))
+;                   | (node-test (names  <String>+ ))
+;                   | (node-test (not-names  <String>+ ))
+; {4} <Step> += (lambda-step  <Lambda> )
+;               | <FilterExpr>
+
+(define (txp:sxpath->ast path . ns-binding)
+  (let ((ns-binding (if (null? ns-binding) ns-binding (car ns-binding))))
+    (if
+     (string? path)  ; Just a textual XPath
+     (txp:expr->ast path ns-binding)
+     (let loop ((ast-steps '())              
+                (path path))
+       (cond
+         ((null? path)  ; parsing is finished
+          (if (null? ast-steps)  ; empty path
+              '(absolute-location-path)
+              (let ((forward-steps (reverse ast-steps)))
+                (cons
+                 (if (eq? (caar forward-steps) 'filter-expr)
+                     'path-expr 'relative-location-path)
+                 forward-steps))))
+         ((procedure? (car path))
+          (loop (cons (list 'lambda-step (car path))
+                      ast-steps)
+                (cdr path)))
+         ((assq (car path) '((// . descendant-or-self) (.. . parent)))          
+          => (lambda (pair)
+                     (loop (cons
+                            `(step (axis-specifier (,(cdr pair)))
+                                   (node-test (node)))
+                            ast-steps)
+                           (cdr path))))
+         ((symbol? (car path))
+          (loop (cons
+                 `(step (axis-specifier (child))
+                        (node-test
+                         ,(cond
+                            ((assq (car path) '((* . (*)) (*text* . (text))))
+                             => cdr)
+                            (else
+                             `(local-name ,(symbol->string (car path)))))))
+                 ast-steps)
+                (cdr path)))
+         ((string? (car path))
+          (and-let*   ; only for the location path for the moment
+           ((txt-ast (txp:expr->ast (car path))))
+           (loop (if (eq? (car txt-ast) 'relative-location-path)
+                     (append (reverse (cdr txt-ast)) ast-steps)
+                     (cons
+                      `(filter-expr (primary-expr ,txt-ast))
+                      ast-steps))
+                 (cdr path))))
+         ((and (pair? (car path)) (not (null? (car path))))
+          (cond
+            ((assq (caar path) '((*or* . names) (*not* . not-names)))
+             => (lambda (pair)
+                  (loop
+                   (cons
+                    `(step (axis-specifier (child))
+                           (node-test
+                            ,(cons (cdr pair)
+                                   (map symbol->string (cdar path)))))
+                    ast-steps)
+                   (cdr path))))
+            ((assq (caar path) '((equal? . equal?) (eq? . eq?)
+                                 (ns-id:* . namespace-uri)))
+             => (lambda (pair)
+                  (loop
+                   (cons `(step (axis-specifier (child))
+                                (node-test ,(list (cdr pair) (cadar path))))
+                         ast-steps)
+                   (cdr path))))
+            (else
+             (let reducer ((reducing-path (cdar path))
+                           (filters '()))
+               (cond
+                 ((null? reducing-path)
+                  (if
+                   (symbol? (caar path))  ; just a child axis
+                   (loop
+                    (cons
+                     `(step
+                       (axis-specifier (child))
+                       (node-test (local-name ,(symbol->string (caar path))))
+                       ,@(reverse filters))
+                     ast-steps)
+                    (cdr path))
+                   (and-let*
+                    ((select (txp:sxpath->ast (caar path) ns-binding)))
+                    (loop
+                     (cons `(filter-expr
+                             (primary-expr ,select)                       
+                             ,@(reverse filters))
+                           ast-steps)
+                     (cdr path)))))
+                 ((number? (car reducing-path))
+                  (reducer (cdr reducing-path)
+                           (cons `(predicate (number ,(car reducing-path)))
+                                 filters)))
+                 (else
+                  (and-let*
+                   ((pred-ast
+                     (txp:sxpath->ast (car reducing-path) ns-binding)))
+                   (reducer
+                    (cdr reducing-path)
+                    (cons `(predicate ,pred-ast) filters)))))))))
+          (else
+           (cerr "Invalid path step: " (car path))
+           #f))))))
