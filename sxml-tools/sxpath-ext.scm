@@ -23,7 +23,10 @@
     ((nodeset? object) (if (null? object)
 			 ""
 			 (sxml:string-value (car object))))
-    ((number? object) (number->string object))
+    ((number? object)
+     (if (and (rational? object) (not (integer? object)))  ; like 1/2
+         (number->string (exact->inexact object))
+         (number->string object)))
     ((boolean? object) (if object "true" "false"))
     (else "")))  ; Unknown type -> empty string. 
                  ; Option: write its value to string port?
