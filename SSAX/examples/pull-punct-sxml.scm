@@ -37,6 +37,8 @@
 ; Other Scheme systems have something similar.
 ; (module pull-punct-sxml
 ; 	(include "myenv-bigloo.scm")
+; 	(include "srfi-13-local.scm") ; or import from SRFI-13 if available
+;	(include "char-encoding.scm")
 ; 	(include "util.scm")
 ; 	(include "look-for-str.scm")
 ; 	(include "input-parse.scm")

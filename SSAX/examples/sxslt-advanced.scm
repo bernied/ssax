@@ -59,6 +59,7 @@
 ;
 ; (module sxslt-advanced
 ; 	(include "myenv-bigloo.scm")
+; 	(include "srfi-13-local.scm") ; or import from SRFI-13 if available
 ; 	(include "util.scm")
 ; 	(include "SXML-tree-trans.scm")
 ; 	(include "SXML-to-HTML.scm")

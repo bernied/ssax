@@ -35,25 +35,6 @@
 		     (cons string2 seed))))
 	     )
 	    xml-port '())))
-      (string-concatenate-reverse result)
+      (string-concatenate-reverse/shared result)
     ))
-
-; Implementation of string-concatenate-reverse from SRFI-13
-(define (string-concatenate-reverse string-list)
-  (let* ((final-size
-	 ; total the length of strings in string-list
-	  (let loop ((size 0) (lst string-list))
-	    (if (pair? lst)
-		(loop (+ size (string-length (car lst))) (cdr lst))
-		size)))
-	 (final-str (make-string final-size))
-	 (dest-i (-- final-size)))
-    (let outer ((lst string-list))
-      (if (pair? lst)
-	  (let ((str (car lst)))
-	    (do ((i (-- (string-length str)) (-- i)))
-		((negative? i) (outer (cdr lst)))
-	      (string-set! final-str dest-i (string-ref str i))
-	      (--! dest-i)))
-	  final-str))))
 
