@@ -2010,7 +2010,7 @@
 ;------------------------------------------------
 ; 'sxml:xpath' and 'sxml:xpointer' functions
 ;
-;  xpath-string - an XPath query (a string)
+;  xpath-string - an XPath location path (a string)
 ;  ns-binding - declared namespace prefixes (an optional argument)
 ;  ns-binding = (list  (prefix . uri)
 ;                      (prefix . uri)
@@ -2018,12 +2018,23 @@
 ;  prefix - a symbol
 ;  uri - a string
 ;
-; The returned result:   (lambda (node) ...)  
+; The returned result:   (lambda (node . var-binding) ...)  
 ;                   or   #f
 ;  #f - signals of a parse error (error message is printed as a side effect
 ; during parsing)
-;  (lambda (node) ...)  - an SXPath function
-;  node - a root node of the SXML document
+;  (lambda (node . var-binding) ...)  - an SXPath function
+;  node - a node (or a node-set) of the SXML document
+;  var-binding - XPath variable bindings (an optional argument)
+;  var-binding = (list  (var-name . value)
+;                       (var-name . value)
+;                       ...)
+;  var-name - (a symbol) a name of a variable
+;  value - its value. The value can have the following type: boolean, number,
+; string, nodeset. NOTE: a node must be represented as a singleton nodeset
+; 
+; Administrative SXPath variables:
+;  *root* - if present in the 'var-binding' then its value (a node or a nodeset)
+; specifies the root of the SXML document
 
 (define (sxml:api-helper parse-proc)
   (lambda (xpath-string . ns-binding)
@@ -2031,20 +2042,35 @@
      ((res (parse-proc
             (string->list xpath-string)
             (if (null? ns-binding) ns-binding (car ns-binding)))))
-     (let ((func (car res)))    
-       (lambda (node)
-         (let ((node (if (nodeset? node) node (list node))))
-           (func node node (cons 1 1) '())))))))
-
+     (let ((func (car res)))
+       (lambda (node . var-binding)
+          (let ((node (as-nodeset node)))
+            (if
+             (null? var-binding)  ; no variables supplied
+             (func node node (cons 1 1) '())
+             (let ((var-binding (car var-binding)))
+               (func
+                node
+                (cond ((assq '*root* var-binding)
+                       => (lambda (pair) (as-nodeset (cdr pair))))
+                      (else node))
+                (cons 1 1)
+                var-binding)))))))))
+              
 (define sxml:xpath (sxml:api-helper sxml:parse-xpath))
-
 (define sxml:xpointer (sxml:api-helper sxml:parse-xpointer))
+
+; For backward compatibility:
+(define sxml:xpath+root+vars sxml:xpath)
+(define sxml:xpointer+root+vars sxml:xpointer)
+(define sxml:xpath+root sxml:xpath)
+(define txpath sxml:xpath)
 
 
 ;------------------------------------------------
 ; 'sxml:xpath+index' and 'sxml:xpointer+index' functions
 ; 
-;  xpath-string - an XPath query (a string)
+;  xpath-string - an XPath location path (a string)
 ;  ns-binding - declared namespace prefixes (an optional argument)
 ;  ns-binding = (list  (prefix . uri)
 ;                      (prefix . uri)
@@ -2070,62 +2096,9 @@
      (let ((func (car res)))
        (cons
         (lambda (node)
-          (let ((node (if (nodeset? node) node (list node))))
+          (let ((node (as-nodeset node)))
             (func node node (cons 1 1) '())))
         (caddr res))))))
      
 (define sxml:xpath+index (sxml:api-index-helper sxml:parse-xpath))
-
 (define sxml:xpointer+index (sxml:api-index-helper sxml:parse-xpointer))
-
-
-;------------------------------------------------
-; 'sxml:xpath+root+vars' and 'sxml:xpointer+root+vars' functions
-; 
-;  xpath-string - an XPath query (a string)
-;  ns-binding - declared namespace prefixes (an optional argument)
-;  ns-binding = (list  (prefix . uri)
-;                      (prefix . uri)
-;                      ...)
-;  prefix - a symbol
-;  uri - a string
-;
-; The returned result:   (lambda (node root-node . var-binding) ...)
-;                   or   #f
-;  #f - signals of a parse error (error message is printed as a side effect
-; during parsing)
-;  (lambda (node root-node . var-binding) ...)  - an SXPath function
-;  node - a node (or a node-set) of the SXML document
-;  root-node - the root of the document
-;  var-binding = (list  (var-name . value)
-;                       (var-name . value)
-;                       ...)
-;  var-name - (a symbol) a name of a variable
-;  value - its value. The value can have the following type: boolean, number,
-; string, nodeset. NOTE: a node must be represented as a singleton nodeset
-
-(define (sxml:api-root-vars-helper parse-proc)
-  (lambda (xpath-string . ns-binding)
-    (and-let*
-     ((res (parse-proc
-            (string->list xpath-string)
-            (if (null? ns-binding) ns-binding (car ns-binding)))))
-     (let ((func (car res)))
-       (lambda (node . root-var-binding)
-         (let ((root-node
-                (if (null? root-var-binding) node (car root-var-binding))))
-         (func
-          (if (nodeset? node) node (list node))
-          (if (nodeset? root-node) root-node (list root-node))
-          (cons 1 1)
-          (if (or (null? root-var-binding) (null? (cdr root-var-binding)))
-              '() (cadr root-var-binding)))))))))
-      
-(define sxml:xpath+root+vars (sxml:api-root-vars-helper sxml:parse-xpath))
-
-(define sxml:xpointer+root+vars (sxml:api-root-vars-helper sxml:parse-xpointer))
-      
-; A stub
-(define sxml:xpath+root sxml:xpath+root+vars)
-
-(define txpath sxml:xpath+root+vars)
