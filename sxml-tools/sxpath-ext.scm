@@ -254,9 +254,8 @@
                   (if
                    (null? (cdr alist))  ; nothing more in the alist
                    (reverse
-                    (cons
-                     (sxml:charlst->branch lst)
-                     (cons (car alist) res)))
+                    (cons (car alist)
+                          (cons (sxml:charlst->branch lst) res)))
                    (append
                     (reverse
                      (cons
