@@ -84,7 +84,6 @@
 (define xlink:namespace-uri 'http://www.w3.org/1999/xlink)
 (define xlink:linkbase-uri "http://www.w3.org/1999/xlink/properties/linkbase")
 
-
 ;=========================================================================
 ; A 'seed' datatype
 ;  xlink:seed = (list  mode  sxlink-arcs  sxpointer  stack
@@ -973,6 +972,73 @@
 (define xlink:append-branch
   (xlink:branch-helper
    (lambda (elem content-nodeset) (append elem content-nodeset))))
+
+;------------------------------------------------
+; Processing the document URI
+; (borrowed from "xlink.scm")
+
+; Given a document, returns its URI (a string)
+; #f is returned if there is no "@@/uri" subtree in the document
+(define (xlink:get-uri doc)
+  (let ((nodeset ((select-kids (ntype?? 'uri))
+                  ((select-kids (ntype?? '@@)) doc))))
+    (if (null? nodeset)  ; there is no "@@/uri" subtree
+        #f
+        (cadar nodeset))))
+
+; Adds the URI of the document where the arcs were declared, to sxlink-arcs
+; Returns modified sxlink-arcs
+(define (xlink:set-uri-for-sxlink-arcs uri sxlink-arcs)
+  (letrec
+      ((process-arc
+        ; uri-alist ::= (listof (cons uri resolved-uri))
+        ; association between the URI and the corresponding resolved one
+        ; Returns: (values new-node new-uri-alist)
+        (lambda (node uri-alist)
+          (case (car node)  ; a node is always an SXML element
+            ((linkbase simple inbound outbound third-party local-to-local
+              from to declaration)
+             ; Recursive application to children
+             (let-values*
+                 (((new-children new-uri-alist)
+                   (process-nodeset (cdr node) uri-alist)))
+               (values (cons (car node) new-children)
+                       new-uri-alist)))
+            ((uri)
+             (cond
+               ((null? (cdr node))  ; no URI is set
+                (values `(uri ,uri) uri-alist))
+               ((assoc (cadr node) uri-alist)
+                => (lambda (pair)
+                     (values `(uri ,(cdr pair)) uri-alist)))
+               (else
+                (let ((resolved-uri
+                       (ar:resolve-uri-according-base uri (cadr node))))
+                  (values `(uri ,resolved-uri)
+                          (cons
+                           (cons (cadr node) resolved-uri)
+                           uri-alist))))))
+            (else
+             (values node uri-alist)))))
+       ; Applies the previous function to a nodeset
+       (process-nodeset
+        (lambda (nodeset uri-alist)
+          (let loop ((nset nodeset)
+                     (res '())
+                     (uri-alist uri-alist))
+            (if
+             (null? nset)
+             (values (reverse res) uri-alist)
+             (let-values*
+                 (((new-node new-uri-alist)
+                   (process-arc (car nset) uri-alist)))
+               (loop (cdr nset)
+                     (cons new-node res)
+                     new-uri-alist)))))))
+    (let-values*
+        (((new-sxlink-arcs dummy)
+          (process-nodeset sxlink-arcs '())))
+      new-sxlink-arcs)))
                  
 
 ;=========================================================================
