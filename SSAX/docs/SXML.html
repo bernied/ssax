@@ -1,7 +1,8 @@
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN""http://www.w3.org/TR/REC-html40/loose.dtd">
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
 <html>
 <head><title>SXML</title><meta name="description" content="Definition of SXML: an instance of XML Infoset as
-S-expressions, an Abstract Syntax Tree of an XML document."><meta name="AuthorAddress" content="oleg-at-pobox.com"><meta name="keywords" content="XML, XML parsing, XML Infoset, XML Namespaces, AST, SXML, Scheme"><meta name="Date-Revision-yyyymmdd" content="20040219"><meta name="Date-Creation-yyyymmdd" content="20010207"><link rel="start" href="index.html" title="Scheme Hash"><link rel="contents" href="../README.html"><link rel="prev" href="xml.html"><link rel="next" href="web.html"></head><body bgcolor="#FFFFFF">
+S-expressions, an Abstract Syntax Tree of an XML document."><meta name="AuthorAddress" content="oleg-at-pobox.com"><meta name="keywords" content="XML, XML parsing, XML Infoset, XML Namespaces, AST, SXML, Scheme"><meta name="Date-Revision-yyyymmdd" content="20040312"><meta name="Date-Creation-yyyymmdd" content="20010207"><link rel="start" href="index.html" title="Scheme Hash"><link rel="contents" href="../README.html"><link rel="prev" href="xml.html"><link rel="next" href="web.html"></head><body bgcolor="#FFFFFF">
 
 <div align="center" class="navbar">  <a href="xml.html">previous</a> &nbsp; <a href="web.html">next</a> &nbsp; <a href="../README.html">contents</a> &nbsp; <a href="index.html">top</a>
 <hr></div>
@@ -215,7 +216,7 @@ the root element of the XML document.</p>
 </table>
 
 <p>The XML Recommendation specifies that processing instructions
-(PI) are distinct from elements and character data; processing
+ (PI) are distinct from elements and character data; processing
 instructions must be passed through to applications. In SXML, PIs are
 therefore represented by nodes of a dedicated type <code>*PI*</code>. DOM Level 2 treats processing instructions in a similar way.</p>
 
@@ -720,7 +721,7 @@ former. 0NF SXML supports the minimized form along with the full one:
 <p>In the 1NF, optional <code>&lt;annot-attributes&gt;</code> if
 present must precede all other components of an <code>&lt;Element&gt;</code> SXML node. This is the order reflected in Production [2].  Boolean
 attributes must appear in their full form, e.g., <code>(OPTION (@
-(checked &quot;checked&quot;)))</code>. The 1NF is the &quot;recommended&quot; normal
+ (checked &quot;checked&quot;)))</code>. The 1NF is the &quot;recommended&quot; normal
 form.</p>
 
 <p>The 2NF makes <code>&lt;annot-attributes&gt;</code> a required
@@ -1047,17 +1048,17 @@ element also has no attributes, the empty <code>annot-attributes</code> list <co
 and higher.</p>
 
 <br>
-<p>
-<hr></p>
+<div>
+<hr></div>
 
-<h3>Last updated February 19, 2004</h3>
+<h3>Last updated March 12, 2004</h3>
 
 <p>This site's top page is <a href="http://pobox.com/~oleg/ftp/"><strong>http://pobox.com/~oleg/ftp/</strong></a></p>
 
-<p>
+<div>
 <address>oleg-at-pobox.com or oleg-at-acm.org or oleg-at-computer.org
 <br>Your comments, problem reports, questions are very welcome!</address>
-</p>
+</div>
 
 <p><font size="-2">Converted from SXML by SXML-&gt;HTML</font></p>
 </body></html>

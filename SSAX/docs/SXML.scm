@@ -7,7 +7,7 @@
     (title "SXML")
     (description "Definition of SXML: an instance of XML Infoset as
 S-expressions, an Abstract Syntax Tree of an XML document.")
-    (Date-Revision-yyyymmdd "20040219")
+    (Date-Revision-yyyymmdd "20040312")
     (Date-Creation-yyyymmdd "20010207")
     (keywords "XML, XML parsing, XML Infoset, XML Namespaces, AST, SXML, Scheme")
     (AuthorAddress "oleg-at-pobox.com")
@@ -195,7 +195,7 @@ the root element of the XML document.")
        (ebnf-opt (nonterm "annotations"))
        (term-str "processing instruction content string")))))
    (p "The XML Recommendation specifies that processing instructions
-\(PI) are distinct from elements and character data; processing
+ (PI) are distinct from elements and character data; processing
 instructions must be passed through to applications. In SXML, PIs are
 therefore represented by nodes of a dedicated type " (code "*PI*")
 ". DOM Level 2 treats processing instructions in a similar way.")
@@ -684,7 +684,7 @@ former. 0NF SXML supports the minimized form along with the full one:
 present must precede all other components of an " (nonterm "Element")
 " SXML node. This is the order reflected in Production [2].  Boolean
 attributes must appear in their full form, e.g., " (code "(OPTION (@
-\(checked \"checked\")))") ". The 1NF is the \"recommended\" normal
+ (checked \"checked\")))") ". The 1NF is the \"recommended\" normal
 form.")
 
    (p
@@ -1102,8 +1102,9 @@ and higher.")
      (html:begin
       . ,(lambda (tag . elems)
 	   (list
-	     "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0 Transitional//EN\""
-	     "\"http://www.w3.org/TR/REC-html40/loose.dtd\">" nl
+	     "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\""
+	     nl 
+	     "\"http://www.w3.org/TR/html4/loose.dtd\">" nl
 	     "<html>" nl
 	     elems
 	     "</html>" nl)))

@@ -39,10 +39,10 @@
 (define Content
   (let* ((acknowledgment
 	  '((Acknowledgment "Acknowledgments")
-	    (p "I am indebted to Kirill Lisovsky of MISA
-University, Moscow, for insightful discussions and suggestions. This
-work has been supported in part by the National Research Council
-Research Associateship Program and Naval Postgraduate School.")))
+	    (p "I am indebted to Kirill Lisovsky for insightful
+discussions and suggestions. This work has been supported in part by
+the National Research Council Research Associateship Program and Naval
+Postgraduate School.")))
 
 	(step1
 	 (replace-range
@@ -157,6 +157,10 @@ Research Associateship Program and Naval Postgraduate School.")))
      (div
       . ,(lambda (tag . elems)
 	   (list elems nl nl)))
+
+     (strong
+       . ,(lambda (tag . elems)
+	    (list "\\textbf{" elems "}")))
 
      (br
       . ,(lambda (tag)
@@ -500,6 +504,13 @@ Research Associateship Program and Naval Postgraduate School.")))
       . ,(lambda (tag . terms)
 	   (list "\\textbf{$MAKE{-}SYMBOL$(}" 
 		 terms "\\textbf{)}")))
+
+     (sset		; A tagged unordered S-expression (i.e., a set)
+      *macro*
+      . ,(lambda (tag set-tag . terms)
+	   `((code (strong "{")) ,(list-intersperse
+					(cons set-tag terms) " ")
+	      (code " " (strong "}")))))
 
      (production
       . ,(lambda (tag number lhs rhs . comment)
