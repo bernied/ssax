@@ -230,6 +230,18 @@
     (else #f)))
 )
 
+(cerr nl "Verifying cons*..." nl)
+(let ()
+  (assert (equal? '(1 2 3 . 4) (cons* 1 2 3 4)))
+  (assert (equal? '(1 2 3 4) (cons* 1 2 3 '(4))))
+  (assert (equal? '(1 2 3 4) (cons* 1 2 '(3 4))))
+  (assert (equal? '(1 2 3 4) (cons* 1 '(2 3 4))))
+  (assert (equal? '(1 2 3 4) (cons* '(1 2 3 4))))
+  (assert (equal? 1 (cons* 1)))
+)
+
+
+
 (cerr nl "Verifying assoc-functions with a default clause..." nl)
 (let
   ((alist '((a 1) (b 2) (3 4) ("cde" f))))
