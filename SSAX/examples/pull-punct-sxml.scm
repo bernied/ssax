@@ -48,10 +48,7 @@
 ; $Id$
 
 
-; The following is a Bigloo-specific module declaration.
-; Please replace with an appropriate inclusion form if using Scheme48
-; or other Scheme system.
-; The rest of the code is portable.
+; The following two declarations satisfy SSAX imports
 
 (define (parser-error port message . specialising-msgs)
   (apply cerr (cons message specialising-msgs))
