@@ -55,7 +55,7 @@
   (export SXML->HTML
 	  enattr
 	  entag
-	  string->goodhtml))
+	  string->goodHTML))
 
 (define-interface sxml-to-html-ext-interface
   (export make-header
@@ -125,7 +125,7 @@
 (define-structure sxml-tree-trans sxml-tree-trans-interface
   (open scheme
 	assertions run-test
-	big-util srfi-11
+	signals srfi-11
 	pp)
   (begin
     (define pp p))
