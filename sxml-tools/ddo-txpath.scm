@@ -495,6 +495,43 @@
 
 
 ;=========================================================================
+; Some simple rewrites for XPath AST
+
+; Whether a given AST node is the representation of the location step
+; "descendant-or-self::node()", which is the full syntax for its abbreviated
+; equivalent "//"
+(define ddo:check-ast-desc-os?
+  (let ((ddo:ast-for-desc-os   ; evaluate just once
+         (cadr  ; selects the first location step
+          (txp:xpath->ast "//dummy"))))
+    (lambda (op)
+      (equal? op ddo:ast-for-desc-os))))
+
+; Rewrites the sequence of location steps, by combining the two consecutive
+; steps "//para" into a single one "descendant::para"
+; Returns the reconstructed list of steps
+(define (ddo:rewrite-step* op-lst)
+  (cond
+    ((or (null? op-lst) (null? (cdr op-lst)))  ; nothing to rewrite
+     op-lst)
+    ; There are at least 2 steps in a sequence of steps
+    ((and (ddo:check-ast-desc-os? (car op-lst))
+          ; Next step uses a child axis specifier
+          (equal? (txp:step-axis (cadr op-lst)) '(child))
+          ; Next step doesn't use any predicates
+          (null? (txp:step-preds (cadr op-lst))))
+     (cons
+      (txp:construct-step
+       '(descendant)  ; rewrite into descendant axis
+       (txp:step-node-test (cadr op-lst))  ; Node test of the next step
+       )
+      (ddo:rewrite-step* (cddr op-lst))))
+    (else  ; Any other case
+     (cons (car op-lst)
+           (ddo:rewrite-step* (cdr op-lst))))))
+
+
+;=========================================================================
 ; Optimization for deeply nested predicates
 ; For predicates whose level of nesting exceeds 3, these predicates are likely
 ; to be called for more than n^3 times, where n is the number of nodes in an
@@ -1269,7 +1306,8 @@
 ; order. This thus has to be implemented in 2 passes
 (define (ddo:ast-step-list
          step-lst num-anc single-level? pred-nesting vars2offsets)
-  (let (; Calculates single-level? for each step in the step-lst
+  (let ((step-lst (ddo:rewrite-step* step-lst))
+        ; Calculates single-level? for each step in the step-lst
         ; Returns: (listof single-level?)
         ; where each member of the REVERSED result list corresponds to the step
         ; in the corresponding position of a step-lst

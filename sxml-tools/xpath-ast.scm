@@ -407,3 +407,56 @@
           (else
            (cerr "Invalid path step: " (car path))
            #f))))))
+
+
+;==========================================================================
+; Several popular accessors and constructors for AST steps
+
+; Whether a representation for location step
+(define (txp:step? op)
+  (and (pair? op) (eq? (car op) 'step)))
+
+; Returns the axis specifier of the location step
+; Argument: the AST representation of a location step
+; Result: either '(child) and the like, or #f if the AST contains syntactic
+; error
+(define (txp:step-axis op)
+  (and (txp:step? op)
+       (not (null? (cdr op)))
+       (pair? (cadr op)) (eq? (caadr op) 'axis-specifier)
+       (cadadr op)))
+
+; Returns the node test of the location step
+; Argument: the AST representation of a location step
+; Result: either '(*) and the like, or #f if the AST contains syntactic
+; error
+(define (txp:step-node-test op)
+  (and (txp:step? op)
+       (not (null? (cdr op))) (not (null? (cddr op)))
+       (pair? (caddr op)) (eq? (caaddr op) 'node-test)
+       (cadr (caddr op))))
+
+; Returns predicate expressions of the location step
+; Argument: the AST representation of a location step
+; Result: either (listof  ast-expr)
+;         or #f if syntactic error detected in a location step AST
+(define (txp:step-preds op)
+  (and (txp:step? op)
+       (not (null? (cdr op))) (not (null? (cddr op)))
+       (null? (filter
+               (lambda (sub)  ; not a predicate representation
+                 (not (and (pair? sub) (eq? (car sub) 'predicate))))
+               (cdddr op)))
+       (map cadr (cdddr op))))
+
+; Constructs the AST representation for a given axis, node-test and
+; a list of predicate expressions
+; axis ::= '(child) and the like
+; node-test ::= '(*) and the like
+; pred-expr-list ::= (listof ast-expr)
+(define (txp:construct-step axis node-test . pred-expr-list)
+  `(step (axis-specifier ,axis)
+         (node-test ,node-test)
+         ,@(map
+            (lambda (pred-expr) `(predicate ,pred-expr))
+            pred-expr-list)))
