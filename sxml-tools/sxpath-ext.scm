@@ -324,9 +324,13 @@
              (lng2 (length obj2)))
          (cond
            ((and (< lng1 100000) (< lng2 100000))
-            (sxml:merge-sort-join (map sxml:string-value obj1)
-                                  (map sxml:string-value obj2)
-                                  string-op))
+            ((if  ; either nodeset is a short one              
+              (or (<= lng1 2) (<= lng2 2))
+              sxml:nested-loop-join
+              sxml:merge-sort-join)
+             (map sxml:string-value obj1)
+             (map sxml:string-value obj2)
+             string-op))
            ((< lng1 lng2)            
             (sxml:radix-sort-join (map sxml:string-value obj1)
                                   (map sxml:string-value obj2)
