@@ -559,30 +559,28 @@
             (cond
               ((assq (sxml:context->node (car nodeset))
                      (cdr binding))
-               => (lambda (size-alist)
-                    (cond
-                      ((assq (cdr position+size)  ; context size
-                             (cdr size-alist))
-                       => (lambda (position-alist)
-                            (cond
-                              ((assq (car position+size)  ; context position
-                                     (cdr position-alist))
-                               => (lambda (pair)  ; predicate value at last
-                                    (force (cdr pair)))
-                               ; => cdr   ; DL: was
-                               )
-                              (else
-                               (sxml:xpointer-runtime-error
-                                "internal DDO SXPath error - "
-                                "alist entry for context position not found: "
-                                pred-id)
-                               #f))))
-                      (else
+               => (lambda (size-pair)
+                    (if
+                     (> (cdr position+size)  ; context size
+                        (vector-length (cdr size-pair)))
+                     (begin
                        (sxml:xpointer-runtime-error
                         "internal DDO SXPath error - "
-                        "alist entry for context size not found: "
-                        pred-id)
-                       #f))))
+                        "vector member for context size not found: " pred-id)
+                       #f)
+                     (let ((pos-vect (vector-ref (cdr size-pair)
+                                                 (- (cdr position+size) 1))))
+                       (if
+                        (> (car position+size)  ; context position
+                           (vector-length pos-vect))
+                        (begin
+                          (sxml:xpointer-runtime-error
+                           "internal DDO SXPath error - "
+                           "vector member for context position not found: "
+                           pred-id)
+                          #f)
+                        (force (vector-ref pos-vect
+                                           (- (car position+size) 1))))))))
               (else
                (sxml:xpointer-runtime-error
                 "internal DDO SXPath error - alist entry for node not found: "
@@ -622,39 +620,39 @@
 ;  max-size - maximal context size possible in the document
 (define (ddo:construct-pred-values-pos pred-id pred-impl context-set
                                        var-binding max-size)
-  (letrec
-      ((construct-positions-alist
-        (lambda (context position size)
-          (if
-           (> position size)  ; iteration is over
-           '()
-           (cons
-            (cons
-             position
-             (delay
-               (let ((pred-value
-                      (pred-impl context (cons position size) var-binding)))
-                 (if (number? pred-value)
-                     (= pred-value position)
-                     (sxml:boolean pred-value)))))
-            (construct-positions-alist context (+ position 1) size)))))
-       (construct-size-alist
-        (lambda (context size)
-          (if
-           (> size max-size)  ; iteration is over
-           '()
-           (cons
-            (cons size
-                  (construct-positions-alist context 1 size))
-            (construct-size-alist context (+ size 1)))))))
-    (cons
-     pred-id
-     (map
-      (lambda (context)
-        ;(pp (sxml:context->node context))
-        (cons (sxml:context->node context)
-              (construct-size-alist (list context) 1)))
-      context-set))))
+  (cons
+   pred-id
+   (map
+    (lambda (context)      
+      (cons
+       (sxml:context->node context)
+       (let ((context (list context)))
+         (let iter-size ((size 1)
+                         (size-lst '()))
+           (if
+            (> size max-size)  ; iteration is over
+            (list->vector (reverse size-lst))
+            (let iter-pos ((position 1)
+                           (pos-lst '()))
+              ;(pp (list context position size))
+              (if
+               (> position size)  ; iteration is over               
+               (iter-size
+                (+ size 1)
+                (cons (list->vector (reverse pos-lst))
+                      size-lst))
+               (iter-pos
+                (+ position 1)
+                (cons
+                 (delay
+                   (let ((pred-value
+                          (pred-impl
+                           context (cons position size) var-binding)))
+                     (if (number? pred-value)
+                         (= pred-value position)
+                         (sxml:boolean pred-value))))
+                 pos-lst)))))))))
+    context-set)))
 
 ; Evaluates all predicates specified in deep-predicates
 ;  deep-predicates ::= (listof (list  pred-id  requires-position?  impl))
