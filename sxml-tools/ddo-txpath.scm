@@ -35,6 +35,9 @@
 
 
 ;=========================================================================
+; Different cases of nodeset filtering
+
+;------------------------------------------------
 ; Filtering pos-result with (position-based) predicates and combining
 ; a filtered pos-result into a distinct document order nodeset
 ;  pos-result ::= (listof pos-nodeset)
@@ -113,7 +116,7 @@
            (if
             (null? preds)
             nset
-            (let ((size (length nodeset)))  ; context size
+            (let ((size (length nset)))  ; context size
               (let iter-pairs ((nset nset)
                             (res '())
                             (pos 1))                          
@@ -189,6 +192,144 @@
                          var-binding)))
            nset)
           (cdr preds)))))))
+
+;------------------------------------------------
+; Implementations for FilterExpr
+
+; Implementing FilterExpr in the general case, for position-based predicates
+(define (ddo:filter-expr-general expr-impl pred-impl-lst)
+  (lambda (nodeset position+size var-binding)
+    (let ((prim-res (expr-impl nodeset position+size var-binding)))
+      (cond
+        ((not (nodeset? prim-res))
+         (sxml:xpointer-runtime-error 
+          "expected - nodeset instead of " prim-res)
+         '())
+        (else
+         (let iter-preds ((nset prim-res)
+                          (preds pred-impl-lst))
+           (if
+            (null? preds)
+            nset
+            (let ((size (length nset)))  ; context size
+              (let iter-nodes ((nset nset)
+                               (res '())
+                               (pos 1))
+                (if
+                 (null? nset)  ; continue with the next predicate
+                 (iter-preds (reverse res) (cdr preds))
+                 (let ((val ((car preds)  ; predicate value
+                             (list (car nset)) (cons pos size) var-binding)))
+                   (iter-nodes (cdr nset)
+                               (if (if (number? val)
+                                       (= val pos)
+                                       (sxml:boolean val))
+                                   (cons (car nset) res)
+                                   res)
+                               (+ pos 1)))))))))))))
+
+; A FilterExpr doesn't contain position-based predicates
+; NOTE: This function is very similar to 'ddo:location-step-non-pos'
+;  Should think of combining them.
+(define (ddo:filter-expr-non-pos expr-impl pred-impl-lst)
+  (lambda (nodeset position+size var-binding)
+    (let ((prim-res (expr-impl nodeset position+size var-binding)))
+      (cond
+        ((not (nodeset? prim-res))
+         (sxml:xpointer-runtime-error 
+          "expected - nodeset instead of " prim-res)
+         '())
+        (else
+         (let iter-preds ((nset prim-res)
+                          (preds pred-impl-lst))
+           (if
+            (null? preds)
+            nset
+            (let ((curr-pred (car preds)))
+              (iter-preds
+               (filter
+                (lambda (node)
+                  (sxml:boolean
+                   (curr-pred (list node)
+                              (cons 1 1)  ; dummy
+                              var-binding)))
+                nset)
+               (cdr preds))))))))))
+
+
+;=========================================================================
+; Uniting context-sets, preserving distinct document order
+; Is required for XPath UnionExpr
+
+; Every context in both context-sets must contain all the ancestors of the
+; context node (this corresponds to the num-ancestors=#f)
+; All nodes must have one and the same root node (i.e. this function cannot
+; correctly unite context-sets whose members belong to different documents)
+; Returns the context-set that is a distinct-document-order union of the
+; argument context-sets
+(define (ddo:unite-2-contextsets cntset1 cntset2)
+  (cond
+    ((null? cntset1) cntset2)
+    ((null? cntset2) cntset1)
+    ; none of the context-sets is empty
+    ((eq? (sxml:context->node (car cntset1))
+          (sxml:context->node (car cntset2)))
+     (cons
+      (car cntset1)
+      (ddo:unite-2-contextsets (cdr cntset1) (cdr cntset2))))
+    (else
+     (let ((rev1 (reverse (sxml:context->content (car cntset1))))
+           (rev2 (reverse (sxml:context->content (car cntset2)))))
+       (if
+        (not (eq? (car rev1) (car rev2)))  ; different roots
+        (cons  ; can't order properly - probably better raise an error
+         (car cntset1)
+         (cons
+          (car cntset2)
+          (ddo:unite-2-contextsets (cdr cntset1) (cdr cntset2))))
+        (let iter-ancs ((parent (car rev1))
+                        (rev1 (cdr rev1))
+                        (rev2 (cdr rev2)))
+          (cond
+            ((null? rev1)  ; => node2 is the child of node1
+             (cons
+              (car cntset1)
+              (ddo:unite-2-contextsets (cdr cntset1) cntset2)))
+            ((null? rev2)  ; => node1 is the child of node2
+             (cons
+              (car cntset2)
+              (ddo:unite-2-contextsets cntset1 (cdr cntset2))))
+            ((eq? (car rev1) (car rev2))  ; the same branch
+             (iter-ancs (car rev1) (cdr rev1) (cdr rev2)))
+            ; nodes are located in different branches of 'parent'
+            ((memq (car rev1) (cdr parent))
+             ; 'parent' is an element => cdr gives its children
+             => (lambda (foll-siblings-or-self)
+                  (if
+                   (memq (car rev2) foll-siblings-or-self)
+                   ; node2 is after node1
+                   (cons
+                    (car cntset1)
+                    (ddo:unite-2-contextsets (cdr cntset1) cntset2))
+                   (cons
+                    (car cntset2)
+                    (ddo:unite-2-contextsets cntset1 (cdr cntset2))))))
+            (else  ; node1 is an attribute => it is before node2
+             (cons
+              (car cntset1)
+              (ddo:unite-2-contextsets (cdr cntset1) cntset2))))))))))
+
+; Based on the function for uniting 2 context-sets, unites multiple
+; context-sets
+(define (ddo:unite-multiple-context-sets . context-sets)
+  (if (null? context-sets)  ; nothing to do
+      '()
+      (let loop ((res (car context-sets))
+                 (more (cdr context-sets)))
+        (if (null? more)
+            res
+            (loop (ddo:unite-2-contextsets res (car more))
+                  (cdr more))))))
 
 
 ;=========================================================================
@@ -384,7 +525,9 @@
      (draft:signal-semantic-error "improper LocationPath - " op))))
 
 ; {2} <AbsoluteLocationPath> ::= (absolute-location-path  <Step>* )
-(define (ddo:ast-absolute-location-path op num-anc)    
+; NOTE: single-level? is dummy here, since AbsoluteLocationPath always
+; starts from a single node - the root of the document
+(define (ddo:ast-absolute-location-path op num-anc single-level?)
   (cond
     ((not (eq? (car op) 'absolute-location-path))
      (draft:signal-semantic-error "not an AbsoluteLocationPath - " op))
@@ -398,7 +541,7 @@
       ddo:type-nodeset))
     (else
      (and-let*
-      ((steps-res (draft:ast-step-list (cdr op) num-anc #t)))      
+      ((steps-res (ddo:ast-step-list (cdr op) num-anc #t)))
       (cons
        (if
         (null? (cdar steps-res))  ; only a single step
@@ -559,8 +702,9 @@
      (cadr expr-res)  ; num-ancestors required
      (caddr expr-res)  ; single-level? - we don't care
      (or (cadddr expr-res)  ; requires position
-         (eq? (list-ref expr-res 4)  ; involves position implicitly
-              ddo:type-number))
+         ; involves position implicitly
+         (eq? (list-ref expr-res 4) ddo:type-number)
+         (eq? (list-ref expr-res 4) ddo:type-any))
      (list-ref expr-res 4)  ; return type
      ))))
 
@@ -785,8 +929,129 @@
       #t     ; single-level? after this step
       (or (cadddr left-lst) (cadddr right-lst))  ; position-required?
       ddo:type-number))))
-      
-; TODO: UNION EXPR
+
+; {16} <UnionExpr> ::= (union-expr  <Expr> <Expr>+ )
+; TECHNICAL NOTE: For implementing the union while supporting distinct document
+; order, we need num-ancestors=#f for the arguments of the union-expr. This
+; operation is time-consuming and should be avoided
+(define (ddo:ast-union-expr op num-anc single-level?)
+  (let ((expr-res-lst
+         (map
+          (lambda (expr)
+            (let ((expr-res (ddo:ast-expr expr #f single-level?)))
+              (if
+               (not (or (eq? (list-ref expr-res 4) ddo:type-nodeset)
+                        (eq? (list-ref expr-res 4) ddo:type-any)))
+               (draft:signal-semantic-error
+                "expression to be unioned evaluates to a non-nodeset - "
+                expr)
+               expr-res)))
+          (cdr op))))
+    (if
+     (member #f expr-res-lst)  ; error detected
+     #f
+     (let ((expr-impls (map car expr-res-lst)))
+     (list
+      (lambda (nodeset position+size var-binding)
+        (let rpt ((res '())
+                  (fs expr-impls))
+          (if
+           (null? fs)
+           res
+           (let ((nset ((car fs) nodeset position+size var-binding)))
+             (rpt
+              (ddo:unite-2-contextsets 
+               res
+               (cond
+                 ((not (nodeset? nset))
+                  (sxml:xpointer-runtime-error
+                   "expected - nodeset instead of " nset)
+                  '())
+                 (else nset)))
+              (cdr fs))))))
+      #f  ; num-ancestors
+      #f     ; single-level? after this step
+      (apply ddo:or (map cadddr expr-res-lst))  ; position-required?
+      ddo:type-nodeset)))))
+
+; {17} <PathExpr> ::= (path-expr  <FilterExpr> <Step>+ )
+; TECHNICAL NOTE: To calculate 'single-level?', we need to process components
+; in straight orger. To calculate 'num-anc', we need to process steps in reverse
+; order. It is too expensive to make the 2 passes, that's why we consider
+; single-level?=#f for steps
+(define (ddo:ast-path-expr op num-anc single-level?)  
+  (and-let*
+    ((steps-res (ddo:ast-step-list
+                 (cddr op) num-anc
+                 #f  ; consider single-level?=#f after FilterExpr
+                 ))
+     (filter-lst (ddo:ast-filter-expr
+                  (cadr op)
+                  (cadr steps-res)  ; num-ancestors
+                  single-level?
+                  )))
+    (if
+     (not (or (eq? (list-ref filter-lst 4) ddo:type-nodeset)
+              (eq? (list-ref filter-lst 4) ddo:type-any)))
+     (draft:signal-semantic-error
+      "location steps are applied to a non-nodeset result - " (cadr op))
+     (let ((init-impl (car filter-lst))
+           (converters (car steps-res)))
+       (list
+        (lambda (nodeset position+size var-binding)
+          (let ((nset
+                 (init-impl nodeset position+size var-binding)))
+            (let rpt ((nset
+                       (cond
+                         ((nodeset? nset) nset)
+                         (else
+                          (sxml:xpointer-runtime-error 
+                           "expected - nodeset instead of " nset)
+                          '())))
+                      (fs converters))
+              (if (null? fs)
+                  nset
+                  (rpt ((car fs) nset position+size var-binding)
+                       (cdr fs))))))
+        (cadr filter-lst)  ; num-ancestors
+        (cadddr steps-res)     ; single-level?, =#f in our assumption
+        (cadddr filter-lst)  ; position-required?
+        ddo:type-nodeset)))))
+
+; {18} <FilterExpr> ::= (filter-expr (primary-expr  <Expr> )
+;                                    <Predicate>* )
+(define (ddo:ast-filter-expr op num-anc single-level?)
+  (cond
+    ((not (eq? (car op) 'filter-expr))
+     (draft:signal-semantic-error "not an FilterExpr - " op))
+    ((not (eq? (caadr op) 'primary-expr))
+     (draft:signal-semantic-error "not an PrimaryExpr - " (cadr op)))
+    ((null? (cddr op))  ; no Predicates
+     (ddo:ast-expr (cadadr op) num-anc single-level?))
+    (else
+     (and-let*
+       ((preds-res (ddo:ast-predicate-list (cddr op) 0 #t))
+        (expr-lst (ddo:ast-expr
+                   (cadadr op)
+                   (draft:na-max num-anc (cadr preds-res))  ; num-anc
+                   single-level?)))
+       ;(pp (list-ref preds-res 3))
+       (if
+        (not (or (eq? (list-ref expr-lst 4) ddo:type-nodeset)
+                 (eq? (list-ref expr-lst 4) ddo:type-any)))
+        (draft:signal-semantic-error
+         "expression to be filtered evaluates to a non-nodeset - " (cadr op)) 
+        (let ((expr-impl (car expr-lst))
+              (pred-impl-lst (car preds-res)))
+          (list
+           (if
+            (list-ref preds-res 3)  ; position required
+            (ddo:filter-expr-general expr-impl pred-impl-lst)
+            (ddo:filter-expr-non-pos expr-impl pred-impl-lst))
+           (cadr expr-lst)  ; num-ancestors
+           (caddr expr-lst)  ; single-level? after this step
+           (cadddr expr-lst)  ; position-required?
+           ddo:type-nodeset)))))))          
 
 ; {19} <VariableReference> ::= (variable-reference  <String> )
 (define (ddo:ast-variable-reference op num-anc single-level?)
@@ -799,7 +1064,9 @@
          (else
           (sxml:xpointer-runtime-error "unbound variable - " name)
           '())))
-     0 #t #f
+     0
+     #t  ; ATTENTION: in is not generally on the single-level
+     #f
      ddo:type-any  ; type cannot be statically determined
      )))
 
@@ -937,7 +1204,6 @@
      (member #f arg-res-lst)  ; semantic error detected
      #f
      arg-res-lst)))
-
 
 
 ;=========================================================================
