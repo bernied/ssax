@@ -1,5 +1,11 @@
-;; The module provides the implementation of SXPath axes with support for
-;; distinct document order
+;; The implementation of SXPath axes with support for distinct document order
+;
+; This software is in Public Domain.
+; IT IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+;
+; Please send bug reports and comments to:
+;   lizorkin@hotbox.ru    Dmitry Lizorkin
+;
 ; The implementation of axes is based on the idea of context
 
 ;=========================================================================

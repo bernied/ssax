@@ -1,4 +1,11 @@
 ;; This module implements lazy SXPath evaluation over lazy SXML documents
+;
+; This software is in Public Domain.
+; IT IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+;
+; Please send bug reports and comments to:
+;   lizorkin@hotbox.ru    Dmitry Lizorkin
+;
 ; In a lazy SXML document, each node may be a promise. If forced, the promise
 ; results into an SXML node or a nodeset. For a nodeset, its members are SXML
 ; nodes and promises in turn.

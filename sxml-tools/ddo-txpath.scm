@@ -1,4 +1,10 @@
 ;; XPath implementation with distinct document order support
+;
+; This software is in Public Domain.
+; IT IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+;
+; Please send bug reports and comments to:
+;   lizorkin@hotbox.ru    Dmitry Lizorkin
 
 ;=========================================================================
 ; Miscellaneous

@@ -1,4 +1,11 @@
 ;; A tool for making functional-style modifications to SXML documents
+;
+; This software is in Public Domain.
+; IT IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+;
+; Please send bug reports and comments to:
+;   lizorkin@hotbox.ru    Dmitry Lizorkin
+;
 ; The basics of modification language design was inspired by Patrick Lehti
 ; and his data manipulation processor for XML Query Language:
 ;  http://www.ipsi.fraunhofer.de/~lehti/
