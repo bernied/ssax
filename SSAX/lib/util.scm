@@ -9,7 +9,7 @@
  (standard-bindings)
  (fixnum)
 )
-(include "myenv.scm") ; include target dependent stuff
+(include "myenv.scm") ; include my standard prelude
 
 
 ;------------------------------------------------------------------------
@@ -25,6 +25,7 @@
 ;       If none of the elements of the COLLECTION satisfy the predicate,
 ;       the return value from the procedure is #f
 ;       COLLECTION can be a list, a vector, a string, or an input port.
+; See vmyenv.scm for validation tests.
 
 (define (any? <pred?> coll)
   (cond
@@ -51,36 +52,6 @@
           (or (<pred?> c) (loop (read-char coll))))))
 
     (else (error "any? on an invalid collection"))))
-
-(define (test-any?)
-
-  (define (test-driver pred? coll expected-result)
-    (let ((res (any? pred? coll)))
-      (if (not (eqv? res expected-result))
-        (error "computed result " res "differs from the expected one "
-               expected-result))))
-  (define (eq-a? x) (if (char=? x #\a) x #f))
-  (define (gt1? x) (if (> x 1) x #f))
-  
-  (cout "finding an element in a list" nl)
-  (test-driver gt1? '(1 2 3 4 5) 2)
-  (test-driver gt1? '(1 1 1 1 1) #f)
-  (test-driver gt1? '(4 1 1 1 1) 4)
-  (test-driver gt1? '(4 5 6 1 9) 4)
-  (test-driver gt1? '(-4 -5 -6 1 9) 9)
-  (test-driver eq-a? '(#\b #\c #\a #\k) #\a)
-  
-  (cout "finding an element in a vector" nl)
-  (test-driver gt1? '#(1 2 3 4 5) 2)
-  (test-driver gt1? '#(1 1 1 1 1) #f)
-  (test-driver gt1? '#(4 1 1 1 1) 4)
-  (test-driver gt1? '#(4 5 6 1 9) 4)
-  (test-driver gt1? '#(-4 -5 -6 1 9) 9)
-  (test-driver eq-a? '#(#\b #\c #\a #\k) #\a)
-  
-  (cout "done" nl nl)
-)
-
 
 
 ;------------------------------------------------------------------------
@@ -124,9 +95,10 @@
 
 
 ;------------------------------------------------------------------------
+;			String utilities
 
+; Return the index of the first occurence of a-char in str, or #f
 
-         	; Return the index of the first occurence of a-char in str, or #f
 (define (string-index str a-char)
   (let loop ((pos 0))
     (cond
@@ -134,17 +106,16 @@
       ((char=? a-char (string-ref str pos)) pos)
       (else (loop (+ 1 pos))))))
 
-         	; Return the index of the last occurence of a-char in str, or #f
+; Return the index of the last occurence of a-char in str, or #f
 (define (string-rindex str a-char)
   (let loop ((pos (-- (string-length str))))
     (cond
-      ((negative? pos) #f) 		; whole string has been searched, in vain
+      ((negative? pos) #f) 	; whole string has been searched, in vain
       ((char=? a-char (string-ref str pos)) pos)
       (else (loop (-- pos))))))
 
 
 
-; 
 ; -- procedure+: substring? PATTERN STRING
 ;     Searches STRING to see if it contains the substring PATTERN.
 ;     Returns the index of the first substring of STRING that is equal
@@ -238,26 +209,26 @@
 
 ; 		String case modification functions
 
-			; Return a new string made of characters of the
-			; original string in the lower case
+; Return a new string made of characters of the
+; original string in the lower case
 (define (string-downcase str)
   (do ((target-str (make-string (string-length str))) (i 0 (++ i)))
       ((>= i (string-length str)) target-str)
       (string-set! target-str i (char-downcase (string-ref str i)))))
 
-			; Return a new string made of characters of the
-			; original string in the upper case
+; Return a new string made of characters of the
+; original string in the upper case
 (define (string-upcase str)
   (do ((target-str (make-string (string-length str))) (i 0 (++ i)))
       ((>= i (string-length str)) target-str)
       (string-set! target-str i (char-upcase (string-ref str i)))))
 
-			; Lower the case of string's characters inplace
+; Lower the case of string's characters inplace
 (define (string-downcase! str)
   (do ((i 0 (++ i))) ((>= i (string-length str)))
     (string-set! str i (char-downcase (string-ref str i)))))
 
-			; Raise the case of string's characters inplace
+; Raise the case of string's characters inplace
 (define (string-upcase! str)
   (do ((i 0 (++ i))) ((>= i (string-length str)))
     (string-set! str i (char-upcase (string-ref str i)))))
@@ -266,19 +237,19 @@
 ; 
 ; -- procedure+: string->integer STR START END
 ;
-; Makes sure a substring of the STR from START (inclusive) till END (exclusive)
-; is a representation of a non-negative integer in decimal notation. If so, this
-; integer is returned. Otherwise -- when the substring contains non-decimal
-; characters, or when the range from START till END is not within STR, the
-; result is #f.
+; Makes sure a substring of the STR from START (inclusive) till END
+; (exclusive) is a representation of a non-negative integer in decimal
+; notation. If so, this integer is returned. Otherwise -- when the
+; substring contains non-decimal characters, or when the range from
+; START till END is not within STR, the result is #f.
 ;
 ; This procedure is a simplification of the standard string->number.
 ; The latter is far more generic: for example, it will try to read
 ; strings like "1/2" "1S2" "1.34" and even "1/0" (the latter causing
 ; a zero-divide error). Note that to string->number,  "1S2" is a valid
 ; representation of an _inexact_ integer (100 to be precise).
-; Oftentimes we want to be more restrictive about what we consider a number; we
-; want merely to read an integral label.
+; Oftentimes we want to be more restrictive about what we consider a
+; number; we want merely to read an integral label.
 
 (define (string->integer str start end)
   (and (< -1 start end (++ (string-length str)))
@@ -299,11 +270,12 @@
 ; Returns a list of whitespace delimited words in STRING.
 ; If STRING is empty or contains only whitespace, then the empty list
 ; is returned. Leading and trailing whitespaces are trimmed.
-; If MAXSPLIT is specified and positive, the resulting list will contain at most
-; MAXSPLIT elements, the last of which is the string remaining after
-; (MAXSPLIT - 1) splits. If MAXSPLIT is specified and non-positive,
-; the empty list is returned. "In time critical applications it behooves
-; you not to split into more fields than you really need."
+; If MAXSPLIT is specified and positive, the resulting list will
+; contain at most MAXSPLIT elements, the last of which is the string
+; remaining after (MAXSPLIT - 1) splits. If MAXSPLIT is specified and
+; non-positive, the empty list is returned. "In time critical
+; applications it behooves you not to split into more fields than you
+; really need."
 ;
 ; -- procedure+: string-split STRING CHARSET
 ; -- procedure+: string-split STRING CHARSET MAXSPLIT
@@ -314,11 +286,12 @@
 ; list will have as many initial empty string elements as there are
 ; leading delimiters in STRING.
 ;
-; If MAXSPLIT is specified and positive, the resulting list will contain at most
-; MAXSPLIT elements, the last of which is the string remaining after
-; (MAXSPLIT - 1) splits. If MAXSPLIT is specified and non-positive,
-; the empty list is returned. "In time critical applications it behooves
-; you not to split into more fields than you really need."
+; If MAXSPLIT is specified and positive, the resulting list will
+; contain at most MAXSPLIT elements, the last of which is the string
+; remaining after (MAXSPLIT - 1) splits. If MAXSPLIT is specified and
+; non-positive, the empty list is returned. "In time critical
+; applications it behooves you not to split into more fields than you
+; really need."
 ;
 ; This is based on the split function in Python/Perl
 ;
@@ -389,6 +362,58 @@
           ((null? charset) (split-by-whitespace str maxsplit))
           (else (split-by-charset str charset maxsplit))))))
 )
+
+
+; make-char-quotator QUOT-RULES
+;
+; Given QUOT-RULES, an assoc list of (char . string) pairs, return
+; a quotation procedure. The returned quotation procedure takes a string
+; and returns either a string or a list of strings. The quotation procedure
+; check to see if its argument string contains any instance of a character
+; that needs to be encoded (quoted). If the argument string is "clean",
+; it is returned unchanged. Otherwise, the quotation procedure will
+; return a list of string fragments. The input straing will be broken
+; at the places where the special characters occur. The special character
+; will be replaced by the corresponding encoding strings.
+;
+; For example, to make a procedure that quotes special HTML characters,
+; do
+;	(make-char-quotator
+;	    '((#\< . "&lt;") (#\> . "&gt;") (#\& . "&amp;") (#\" . "&quot;")))
+
+(define (make-char-quotator char-encoding)
+  (let ((bad-chars (map car char-encoding)))
+
+    ; Check to see if str contains one of the characters in charset,
+    ; from the position i onward. If so, return that character's index.
+    ; otherwise, return #f
+    (define (index-cset str i charset)
+      (let loop ((i i))
+	(and (< i (string-length str))
+	     (if (memv (string-ref str i) charset) i
+		 (loop (++ i))))))
+
+    ; The body of the function
+    (lambda (str)
+      (let ((bad-pos (index-cset str 0 bad-chars)))
+	(if (not bad-pos) str	; str had all good chars
+	    (let loop ((from 0) (to bad-pos))
+	      (cond
+	       ((>= from (string-length str)) '())
+	       ((not to)
+		(cons (substring str from (string-length str)) '()))
+	       (else
+		(let ((quoted-char
+		       (cdr (assv (string-ref str to) char-encoding)))
+		      (new-to 
+		       (index-cset str (++ to) bad-chars)))
+		  (if (< from to)
+		      (cons
+		       (substring str from to)
+		       (cons quoted-char (loop (++ to) new-to)))
+		      (cons quoted-char (loop (++ to) new-to))))))))))
+))
+
 
 ;------------------------------------------------------------------------
 ;			EXEC-PATH facility

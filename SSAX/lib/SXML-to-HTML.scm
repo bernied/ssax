@@ -112,58 +112,9 @@
 ; replaced by appropriate character entities.
 
 (define string->goodHTML
-  (let* ((char-encoding
-	  '((#\< . "&lt;") (#\> . "&gt;") (#\& . "&amp;")
-	    (#\" . "&quot;")))
-	 (bad-chars (map car char-encoding)))
+  (make-char-quotator
+   '((#\< . "&lt;") (#\> . "&gt;") (#\& . "&amp;") (#\" . "&quot;"))))
 
-    ; Check to see if str contains one of the characters in charset,
-    ; from the position i onward. If so, return that character's index.
-    ; otherwise, return #f
-    (define (index-cset str i charset)
-      (let loop ((i i))
-	(and (< i (string-length str))
-	     (if (memv (string-ref str i) charset) i
-		 (loop (++ i))))))
-
-    ; The body of the function
-    (lambda (str)
-      (let ((bad-pos (index-cset str 0 bad-chars)))
-	(if (not bad-pos) str	; str had all good chars
-	    (let loop ((from 0) (to bad-pos))
-	      (cond
-	       ((>= from (string-length str)) '())
-	       ((not to)
-		(cons (substring str from (string-length str)) '()))
-	       (else
-		(let ((tail 
-		       (cons
-			(cdr (assv (string-ref str to) char-encoding))
-			(loop (++ to) (index-cset str (++ to) bad-chars)))))
-		  (if (< from to) 
-		      (cons
-		       (substring str from to) tail)
-		      tail))))))))
-))
-
-(run-test
- (assert (equal? "abc!def " (string->goodHTML "abc!def ")))
- (assert (equal? "" (string->goodHTML "")))
- (assert (equal? '("&lt;")
-		(string->goodHTML "<"))) 
- (assert (equal? '("&lt;" "a")
-		 (string->goodHTML "<a")))
- (assert (equal? '("a" "&amp;" "b")
-		 (string->goodHTML "a&b")))
- (assert (equal? '("a b" "&gt;")
-		 (string->goodHTML "a b>")))
- (assert (equal? '("&lt;" "&gt;" "&amp;" "&quot;")
-		 (string->goodHTML "<>&\"")))
- (assert (equal? '(" " "&lt;" "&gt;" "&amp;" "\\" "&quot;")
-		 (string->goodHTML " <>&\\\"")))
- (assert (equal? '("&amp;" "amp;")
-		 (string->goodHTML "&amp;")))
-)
 
 ; tests
 (run-test

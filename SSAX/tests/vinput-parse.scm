@@ -305,6 +305,24 @@
   (expect (string-split "/usr/local/bin" '(#\/)) '("" "usr" "local" "bin"))
 )
 
+
+(cerr nl "Verifying make-char-quotator ..." nl)
+(let ((string->goodHTML
+       (make-char-quotator
+	'((#\< . "&lt;") (#\> . "&gt;") (#\& . "&amp;") (#\" . "&quot;")))))
+  (expect (string->goodHTML "abc!def ") "abc!def ")
+  (expect (string->goodHTML "") "")
+  (expect (string->goodHTML "<") '("&lt;"))
+  (expect (string->goodHTML "<a") '("&lt;" "a"))
+  (expect (string->goodHTML "a&b") '("a" "&amp;" "b"))
+  (expect (string->goodHTML "a b>") '("a b" "&gt;"))
+  (expect (string->goodHTML "<>&\"") '("&lt;" "&gt;" "&amp;" "&quot;"))
+  (expect (string->goodHTML " <>&\\\"")
+	  '(" " "&lt;" "&gt;" "&amp;" "\\" "&quot;"))
+  (expect (string->goodHTML "&amp;") '("&amp;" "amp;"))
+)
+
+
 (cerr nl "Verifying assert-curr-char ..." nl)
 (let ()
   (define (test-assert-curr-char str char-list)
