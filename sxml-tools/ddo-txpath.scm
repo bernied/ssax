@@ -256,6 +256,20 @@
                 nset)
                (cdr preds))))))))))
 
+;  Filter expression, with a single predicate of the special structure, like
+;  [position()=1]
+; special-pred-impl ::= (lambda (nodeset) ...)  - filters the nodeset
+(define (ddo:filter-expr-special-predicate expr-impl special-pred-impl)
+  (lambda (nodeset position+size var-binding)
+    (let ((prim-res (expr-impl nodeset position+size var-binding)))
+      (if
+       (not (nodeset? prim-res))
+       (begin
+         (sxml:xpointer-runtime-error
+          "expected - nodeset instead of " prim-res)
+         '())
+       (special-pred-impl prim-res)))))
+
 
 ;=========================================================================
 ; Uniting context-sets, preserving distinct document order
@@ -330,6 +344,108 @@
             res
             (loop (ddo:unite-2-contextsets res (car more))
                   (cdr more))))))
+
+
+;=========================================================================
+; Optimizing special predicates like [position()=1] and the like
+
+; Similar to R5RS list-tail, but returns an empty list when k > (length lst)
+(define (ddo:list-tail lst k)
+  (if (or (null? lst) (<= k 0))
+      lst
+      (ddo:list-tail (cdr lst) (- k 1))))
+
+; Takes the first k members of the list
+; The whole list is taken when k > (length lst)
+(define (ddo:list-head lst k)
+  (if (or (null? lst) (<= k 0))
+      '()
+      (cons (car lst) (ddo:list-head (cdr lst) (- k 1)))))
+
+; Similar to R5RS list-tail, but returns an empty list when
+; (or (< k 0) (> k (length lst))
+(define (ddo:list-ref lst k)
+  (cond ((null? lst) lst)
+        ((zero? k) (car lst))
+        (else (ddo:list-ref (cdr lst) (- k 1)))))
+
+;-------------------------------------------------
+; Checks for a special structure of the predicate in its AST representation
+
+; Checks whether the given op is the AST representation to a function call
+; to position()
+(define ddo:check-ast-position?
+  (let ((ddo:ast-for-position-fun-call   ; evaluate just once
+         (txp:expr->ast "position()")))
+    (lambda (op)
+      (equal? op ddo:ast-for-position-fun-call))))
+
+; If the given op is the AST representation for a number and this number is
+; exact, returns this number. Otherwise returns #f
+(define (ddo:check4ast-number op)
+  (if
+   (eq? (car op) 'number)    
+   (let ((number (cadr op)))
+     (if (and (number? number) (exact? number))
+         number #f))
+   #f))
+
+;  In case when the predicate has one of the following forms:
+; SpecialPredicate ::= [ Number ]
+;                      | [ position() CmpOp Number ]
+;                      | [ Number CmpOp position() ]
+; CmpOp ::= > | < | >= | <= | =
+; Number - an integer
+;  than returns (lambda (nodeset) ...), where the lambda performs the required
+;  filtering as specified by the predicate.
+;  For a different sort of a predicate, returns #f
+;  The function doesn't signal of any semantic errors.
+(define (ddo:check-special-predicate op)
+  (if
+   (not (eq? (car op) 'predicate))
+   #f  ; an improper AST
+   (let ((expr (cadr op)))
+     (cond
+       ((ddo:check4ast-number expr)
+        => (lambda (num)
+             (lambda (nodeset) (ddo:list-ref nodeset (- num 1)))))
+       ((and (memq (car expr) '(= > < >= <=))
+             (= (length expr) 3))
+        (let-values*
+         (((cmp-op num)
+           (cond
+             ((and (ddo:check-ast-position? (cadr expr))
+                   (ddo:check4ast-number (caddr expr)))
+              => (lambda (num) (values (car expr) num)))
+             ((and (ddo:check-ast-position? (caddr expr))
+                   (ddo:check4ast-number (cadr expr)))
+              => (lambda (num)
+                   (values
+                    (cond   ; invert the cmp-op
+                      ((assq (car expr) '((< . >) (> . <) (>= . <=) (<= . >=)))
+                       => cdr)
+                      (else (car expr)))
+                    num)))
+             (else
+              (values #f #f)))))        
+         (if
+          (not num)
+          #f
+          (case cmp-op
+            ((=)
+             (lambda (nodeset) (ddo:list-ref nodeset (- num 1))))
+            ((>)
+             (lambda (nodeset) (ddo:list-tail nodeset num)))
+            ((>=)
+             (lambda (nodeset) (ddo:list-tail nodeset (- num 1))))
+            ((<)
+             (lambda (nodeset) (ddo:list-head nodeset (- num 1))))
+            ((<=)
+             (lambda (nodeset) (ddo:list-head nodeset num)))
+            (else   ; internal error
+             #f)))))
+       (else  ; not an equality or relational expr with 2 arguments
+        #f)))))
 
 
 ;=========================================================================
@@ -1052,7 +1168,22 @@
      (draft:signal-semantic-error "not an PrimaryExpr - " (cadr op)))
     ((null? (cddr op))  ; no Predicates
      (ddo:ast-expr (cadadr op) num-anc single-level?))
-    (else
+    ((and (null? (cdddr op))   ; a single predicate
+          (ddo:check-special-predicate (caddr op)))
+     => (lambda (special-pred-impl)          
+          (and-let*
+           ((expr-lst (ddo:ast-expr
+                       (cadadr op)
+                       num-anc   ; special predicate doesn't require ancestors
+                       single-level?)))
+           (list
+            (ddo:filter-expr-special-predicate
+             (car expr-lst) special-pred-impl)
+            (cadr expr-lst)  ; num-ancestors
+            (caddr expr-lst)  ; single-level? after this step
+            (cadddr expr-lst)  ; position-required?
+            ddo:type-nodeset))))
+    (else   ; the general case
      (and-let*
        ((preds-res (ddo:ast-predicate-list (cddr op) 0 #t))
         (expr-lst (ddo:ast-expr
@@ -1075,7 +1206,7 @@
            (cadr expr-lst)  ; num-ancestors
            (caddr expr-lst)  ; single-level? after this step
            (cadddr expr-lst)  ; position-required?
-           ddo:type-nodeset)))))))          
+           ddo:type-nodeset)))))))
 
 ; {19} <VariableReference> ::= (variable-reference  <String> )
 (define (ddo:ast-variable-reference op num-anc single-level?)
