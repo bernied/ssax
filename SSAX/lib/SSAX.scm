@@ -2881,10 +2881,6 @@
 		      result)))
 )))
 
-; For backwards compatibility
-(define SSAX:XML->SXML ssax:xml->sxml)
-
- 
 ; a few lines of validation code
 (run-test (letrec
     ((test (lambda (str namespace-assig expected-res)
