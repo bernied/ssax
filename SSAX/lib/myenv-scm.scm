@@ -187,6 +187,20 @@
 			; See Olin Shiver's Underground String functions
 (define-macro (string-null? str) `(zero? (string-length ,str)))
 
+
+; A rather useful utility from SRFI-1
+; cons* elt1 elt2 ... -> object
+;    Like LIST, but the last argument provides the tail of the constructed
+;    list -- i.e., (cons* a1 a2 ... an) = (cons a1 (cons a2 (cons ... an))).
+;
+;   (cons* 1 2 3 4) => (1 2 3 . 4)
+;   (cons* 1) => 1
+(define (cons* first . rest)
+  (let recur ((x first) (rest rest))
+    (if (pair? rest)
+	(cons x (recur (car rest) (cdr rest)))
+	x)))
+
 ; Support for let*-values form: SRFI-11
 
 (require 'values)
