@@ -4,18 +4,21 @@ String-value benchmark
 ----------------------
 
 This benchmark compares the performance of SSAX and Expat in
-"untagging" an XML document representing a full binary tree
+"untagging" of an XML document representing a full binary tree
 
 See ../docs/SSAX-benchmark-1.html for more details about the benchmark
 and for the discussion of its results.
 
-This benchmark requires Expat, which you can obtain from, for
-example, expat.sourceforge.net
+This benchmark requires Expat, which you can obtain from, for example,
+expat.sourceforge.net. Expat is often included as a standard component
+of an OS distribution (e.g., /usr/lib/libexpat* or
+/usr/local/lib/libexpat.{a,so}. Run "locate expat" to see if Expat
+libraries are already installed on your system).
 
 You may need to adjust the Makefile to account for location of
-the Expat library and and the Scheme compiler on your system.
-The Makefile as it is written assumes a Bigloo Scheme system and the Expat,
-in the "standard" locations (under /usr/local).
+the Expat library and of the Scheme compiler on your system.
+The Makefile as it is written assumes a Bigloo Scheme system and Expat,
+at the "standard" locations (under /usr/local).
 
 	$ make bench1
 

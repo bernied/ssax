@@ -22,7 +22,7 @@ CC = gcc
 CPPFLAGS = -I /usr/local/include
 LDFLAGS = 
 LIBS = -L /usr/local/lib -lexpat
-CFLAGS = -O -pipe
+CFLAGS = -O2 -pipe
 
 
 %: %.o rusage.o
@@ -70,9 +70,11 @@ string-value-ssax-ss: string-value-ssax-ss.scm read-NCName-ss.scm \
 
 clean:
 	rm -f *.o core \
-	bench1-file15.xml \
-	bench1-file16.xml \
+#	bench1-file15.xml \
+#	bench1-file16.xml \
 	string-value \
 	string-value-by-one \
 	string-value-ssax \
-	string-value-ssax-ss
+	string-value-ssax.c \
+	string-value-ssax-ss \
+	string-value-ssax-ss.c

@@ -19,43 +19,47 @@
 ; as a symbol
 (define (next-token-of-as-symb incl-list/pred port)
   (let* ((buffer (input-parse:init-buffer))
-	 (curr-buf-len (string-length buffer)) (quantum 16))
+	 (curr-buf-len (string-length buffer)))
   (if (procedure? incl-list/pred)
-    (let loop ((i 0) (c (peek-char port)))
-      (cond
-        ((incl-list/pred c) =>
-          (lambda (c)
-            (if (>= i curr-buf-len)	; make space for i-th char in buffer
-              (begin			; -> grow the buffer by the quantum
-                (set! buffer (string-append buffer (make-string quantum)))
-                (set! quantum curr-buf-len)
-                (set! curr-buf-len (string-length buffer))))
-            (string-set! buffer i c)
-            (read-char port)			; move to the next char
-            (loop (++ i) (peek-char port))))
-        (else (substring->symbol buffer 0 i))))
-			; incl-list/pred is a list of allowed characters
-    (let loop ((i 0) (c (peek-char port)))
-      (cond
-        ((not (memq c incl-list/pred)) (substring->symbol buffer 0 i))
-    	(else
-    	  (if (>= i curr-buf-len)	; make space for i-th char in buffer
-    	    (begin			; -> grow the buffer by the quantum
-    	      (set! buffer (string-append buffer (make-string quantum)))
-    	      (set! quantum curr-buf-len)
-    	      (set! curr-buf-len (string-length buffer))))
-    	  (string-set! buffer i c)
-    	  (read-char port)			; move to the next char
-    	  (loop (++ i) (peek-char port))
-    	  ))))))
+    (let outer ((buffer buffer) (filled-buffer-l '()))
+      (let loop ((i 0))
+	(if (>= i curr-buf-len)		; make sure we have space
+	  (outer (make-string curr-buf-len) (cons buffer filled-buffer-l))
+	  (let ((c (incl-list/pred (peek-char port))))
+	    (if c
+	      (begin
+		(string-set! buffer i c)
+		(read-char port)			; move to the next char
+		(loop (++ i)))
+	      ; incl-list/pred decided it had had enough
+	      (if (null? filled-buffer-l) (substring->symbol buffer 0 i)
+		(string->symbol
+		  (string-concatenate-reverse filled-buffer-l buffer i))))))))
+
+    ; incl-list/pred is a list of allowed characters
+    (let outer ((buffer buffer) (filled-buffer-l '()))
+      (let loop ((i 0))
+	(if (>= i curr-buf-len)		; make sure we have space
+	  (outer (make-string curr-buf-len) (cons buffer filled-buffer-l))
+	  (let ((c (peek-char port)))
+	    (cond
+	      ((not (memv c incl-list/pred))
+		(if (null? filled-buffer-l) (substring->symbol buffer 0 i)
+		  (string->symbol 
+		    (string-concatenate-reverse filled-buffer-l buffer i))))
+	      (else
+		(string-set! buffer i c)
+		(read-char port)			; move to the next char
+		(loop (++ i))))))))
+    )))
 
 ; A version of SSAX:read-NCName that uses next-token-of-as-symb
 
 ; Read a NCName starting from the current position in the PORT and
 ; return it as a symbol.
-(define (SSAX:read-NCName port)
+(define (ssax:read-NCName port)
   (let ((first-char (peek-char port)))
-    (or (SSAX:ncname-starting-char? first-char)
+    (or (ssax:ncname-starting-char? first-char)
       (parser-error port "XMLNS [4] for '" first-char "'")))
     (next-token-of-as-symb
       (lambda (c)

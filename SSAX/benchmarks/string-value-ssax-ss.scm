@@ -16,13 +16,16 @@
 ;
 ; $Id$
 
-(module string-value-ssax
+(module string-value-ssax-ss
 	(include "myenv-bigloo.scm")
+	(include "srfi-13-local.scm")
+	(include "char-encoding.scm")
 	(include "util.scm")
 	(include "look-for-str.scm")
 	(include "input-parse.scm")
-	(include "read-NCName-ss.scm")
-	(include "SSAX-code1.scm") ; the same as SSAX-code.scm save read-NCName
+	(include "SSAX-code1.scm") ; the same as SSAX-code.scm but with
+				   ; ssax:read-NCName commented out
+	(include "read-NCName-ss.scm") ; ssax:read-NCName is defined here
 	(extern
 	 (rusage-start::void () "rusage_start")
 	 (rusage-report::void (string) "rusage_report")
@@ -32,7 +35,7 @@
 
 
 (define parser-error error)
-(define SSAX:warn cerr)
+(define ssax:warn cerr)
 
 (cond-expand
  (bigloo
@@ -41,7 +44,6 @@
        (rusage-start)
        (begin0 ,x
 	       (rusage-report "Timing report"))))
-  (define OS:file-length file-size)
   )
  (else #f))
 
@@ -54,25 +56,6 @@
 	  (read-string size port)))))
 
 
-; SRFI-13
-(define (string-concatenate-reverse string-list)
-  (let* ((final-size
-	 ; total the length of strings in string-list
-	  (let loop ((size 0) (lst string-list))
-	    (if (pair? lst)
-		(loop (+ size (string-length (car lst))) (cdr lst))
-		size)))
-	 (final-str (make-string final-size))
-	 (dest-i (-- final-size)))
-    (let outer ((lst string-list))
-      (if (pair? lst)
-	  (let ((str (car lst)))
-	    (do ((i (-- (string-length str)) (-- i)))
-		((negative? i) (outer (cdr lst)))
-	      (string-set! final-str dest-i (string-ref str i))
-	      (--! dest-i)))
-	  final-str))))
-
 ; Parse the xml-doc and return the string-value of its root element
 ; (as a string)
 
@@ -81,7 +64,7 @@
     (lambda (xml-port)
     ; Accumulate the text values of leaves in a seed, in reverse order
     (let ((result
-	   ((SSAX:make-parser
+	   ((ssax:make-parser
 	     NEW-LEVEL-SEED 
 	     (lambda (elem-gi attributes namespaces
 			      expected-content seed)
@@ -98,7 +81,7 @@
 		     (cons string2 seed))))
 	     )
 	    xml-port '())))
-      (string-concatenate-reverse result)
+      (string-concatenate-reverse/shared result)
     ))))
 
 
