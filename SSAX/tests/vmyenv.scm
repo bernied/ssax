@@ -177,10 +177,7 @@
 	   '(1 2 3 4)))
   (assert (cond-expand (xxx (/ 1 0)) (else #t)))
   (assert (cond-expand ((not xxx) #t)))
-  (cond-expand
-   ((not bigloo)	; due to a cond-expand bug in Bigloo 2.2b
-    (assert (cond-expand ((not (and gambit scm mit-scheme)) #t))))
-   (else #t))
+  (assert (cond-expand ((not (and gambit scm mit-scheme)) #t)))
   (assert (cond-expand ((or xxx (not xxx)) #t)))
   (assert (cond-expand ((and (not xxx) xxx) (/ 1 0)) (else #t)))
   (assert
@@ -192,9 +189,9 @@
     (else #f)))
   (assert
    (cond-expand
-    ((or gambit scm mit-scheme) 
+    ((or gambit scm bigloo mit-scheme) 
      (char=? #\newline (string-ref "\n" 0)))
-    ((or scm bigloo mit-scheme) (eq? 'a 'A))
+    ((or scm mit-scheme) (eq? 'a 'A))
     (else #f)))
 )
 
