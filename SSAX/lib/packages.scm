@@ -223,7 +223,6 @@
 
 (define-structure sxml-to-html-ext sxml-to-html-ext-interface
   (open scheme
-	(subset srfi-13 (string-split))
 	srfi-23
 	oleg-utils
 	coutputs
@@ -270,6 +269,7 @@
 
 (define-structure sxpath sxpath-interface
   (open scheme
+	crementing
 	assertions
 	coutputs
 	pp
