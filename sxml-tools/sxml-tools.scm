@@ -782,10 +782,6 @@
       ((pair? (car fragments))
         (loop (cdr fragments) 
 	      (loop (car fragments) result)))
- ;      ((procedure? (car fragments))
- ;         (loop (cdr fragments) 
- ;              (cons ((car fragments))
- ;	       result)))
       (else
         (loop (cdr fragments) 
 	      (cons (car fragments) result)))))))
@@ -798,6 +794,14 @@
    (list " " (sxml:ncname attr)
 	 "='" (cadr attr) "'"))
 
+; Return a string or a list of strings where all the occurences of 
+; characters < > & " ' in a given string are replaced by corresponding 
+; character entity references. See also:  sxml:string->html
+(define sxml:string->xml
+  (make-char-quotator
+   '((#\< . "&lt;") (#\> . "&gt;") (#\& . "&amp;") 
+		    (#\" . "&quot;") (#\' . "&apos;"))))
+
 ; A version of dispatch-node specialized and optimized for SXML->XML
 ; transformation.
 (define (sxml:sxml->xml tree)
@@ -807,17 +811,15 @@
 	    (sxml:sxml->xml a-tree)) 
 	  tree))
     ((pair? tree)
-     (let ((nm (sxml:name tree))  ; NS (URI-prefixed) not supported
-	   (content (sxml:content-raw tree)))
-       (if (null? content)
-	 `("<" ,nm ,(map sxml:attr->xml 
-			 (sxml:attr-list tree)) "/>")
-	 `("<" ,nm ,(map sxml:attr->xml 
-			 (sxml:attr-list tree)) ">"
-	   ,@(sxml:sxml->xml content)
-	   "</" ,nm ">" ))))
+     (let* ((name (sxml:name tree))   ; NS (URI-prefixed) not supported
+	    (nm (symbol->string name))
+	    (content (sxml:content-raw tree)))
+	 `("<" ,nm ,@(map sxml:attr->xml (sxml:attr-list tree))
+	   ,@(if (null? content) '("/>")
+	       `(">" ,@(sxml:sxml->xml content) "</" ,nm ">")))))
     ((string? tree) (sxml:string->xml tree)) ; *text*
-    (else (sxml:error "sxml->xml - unexpected type of node: " tree))))
+    (else (sxml:error "sxml->html - unexpected type of node: " tree))))
+
 
 ;------------------------------------------------------------------------------
 ; HTML
@@ -827,28 +829,6 @@
 	 (if (equal? "" (cadr attr))
              (list " " (sxml:ncname attr))
              (list " " (sxml:ncname attr) "='" (cadr attr) "'")))
-	   
-; A version of dispatch-node specialized and optimized for SXML->HTML
-; transformation.
-(define (sxml:sxml->html tree)
-  (cond
-    ((nodeset? tree)
-     (map (lambda (a-tree) 
-	    (sxml:sxml->html a-tree)) 
-	  tree))
-    ((pair? tree)
-     (let ((nm (sxml:ncname tree))
-	   (content (sxml:content-raw tree)))
-       (if (null? content)
-	 `("<" ,nm ,(map sxml:attr->html 
-			 (sxml:attr-list tree)) ">")
-	 `("<" ,nm ,(map sxml:attr->html 
-			 (sxml:attr-list tree)) ">"
-	   ,@(sxml:sxml->html content)
-	   "</" ,nm ">" ))))
-    ((string? tree) (sxml:string->html tree)) ; *text*
-    (else (sxml:error "sxml->html - unexpected type of node: " tree))))
-
 
 ; Given a string, check to make sure it does not contain characters
 ; < > & " that require encoding. Return either the original
@@ -860,10 +840,29 @@
   (make-char-quotator
    '((#\< . "&lt;") (#\> . "&gt;") (#\& . "&amp;") (#\" . "&quot;"))))
 
-; Return a string or a list of strings where all the occurences of 
-; characters < > & " ' in a given string are replaced by corresponding 
-; character entity references. 
-(define sxml:string->xml
-  (make-char-quotator
-   '((#\< . "&lt;") (#\> . "&gt;") (#\& . "&amp;") 
-		    (#\" . "&quot;") (#\' . "&apos;"))))
+
+; This predicate yields #t for "non-terminated" HTML 4.0 tags
+(define (sxml:non-terminated-html-tag? tag) 
+  (memq tag 
+     '(area base basefont br col frame hr img input isindex link meta param)))
+
+
+; A version of dispatch-node specialized and optimized for SXML->HTML
+; transformation.
+(define (sxml:sxml->html tree)
+  (cond
+    ((nodeset? tree)
+     (map (lambda (a-tree) 
+	    (sxml:sxml->html a-tree)) 
+	  tree))
+    ((pair? tree)
+     (let* ((name (sxml:name tree))
+	    (nm (symbol->string name))
+	    (content (sxml:content-raw tree)))
+	 `("<" ,nm ,@(map sxml:attr->html (sxml:attr-list tree))
+	   ,@(if (null? content)
+	       (if (sxml:non-terminated-html-tag? name) '(">") '("/>"))
+	       `(">" ,@(sxml:sxml->html content) "</" ,nm ">")))))
+    ((string? tree) (sxml:string->html tree)) ; *text*
+    (else (sxml:error "sxml->html - unexpected type of node: " tree))))
+
