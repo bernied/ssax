@@ -1,22 +1,25 @@
        Examples and the sample code of SSAX parsing and SXML transformations
 
-Remove-tags example 
+You need GNU Make to build the targets. To run any of the examples, you need
+to do
+	make PLATFORM=<platform> <target-name>
+where <platform> is scmi, petite, biglooi. See the Makefile in this
+directory for more details.
+
+
+Remove-tags example
 -------------------
+
+Target name: remove-markup
 
 Given an XML document, remove all the markup and print the resulting document.
 This is a simple in-out application.
 
-    $ make run-remove-markup-bigloo
-    $ ./run-remove-markup-bigloo xml/ddn.rdf
-
-See the files remove-markup.scm and remove-markup.scm.
-
-The Makefile includes targets that run the above example under a few other
-Scheme compilers/interpreters.
-
 
 Outline example
 --------------- 
+
+Target name: outline
 
 Pretty-print the structure of an XML document (disregarding the
 character data)
@@ -24,36 +27,24 @@ This example corresponds to outline.c of the Expat distribution.
 The example demonstrates how to transform an XML document on the
 fly, as we parse it.
 
-    $ make run-outline-bigloo
-    $ ./run-outline-bigloo xml/total_weather.xsl
-
 Note that the tags of elements with no XML namespace are printed as
 they are. Tags of elements within an XML namespace are printed as a
 pair (Namespace-URI . Local-name)
 
-See the files outline.scm and run-outline.scm.
-
-The Makefile includes targets that run the above example under a few other
-Scheme compilers/interpreters.
-
 
 SXML example
 ------------
+
+Target name: run-sxml
+
 Transform an XML document into SXML. See ../docs/SXML.html for
 the description.
-
-    $ make run-sxml-bigloo
-    $ ./run-sxml-bigloo xml/OMF-sample.xml
-
-See the file run-sxml.scm.
-
-The Makefile includes targets that run the above example under a few other
-Scheme compilers/interpreters.
-
 
 
 Permissive HTML parsing
 -----------------------
+
+Target name: html-parser
 
 This example gets SSAX to _permissively_ parse HTML documents or HTML
 fragments. Because HTML browsers are so lax, many web pages on the
@@ -98,9 +89,7 @@ newlines). Also note that the three possible styles of HTML attributes
 are handled properly. In addition, single quotes are also
 allowed. Comments are silently skipped.
 
-    $ make run-html-parse-sample-bigloo-i
-
-This command runs the example that parses the sample HTML document and
+This example, after it is built, parses the sample HTML document and
 prints out the above result.
 
 
@@ -138,18 +127,15 @@ examples in this directory:
 		transformation can be queried with SXPath or transformed
 		again with SXSLT.
 
-	$ make run-apply-templates-bigloo-i
-	$ make run-pull-punct-bigloo-i
-	$ make run-sxml-db-conv-i
-	$ make sxml-nesting-depth-label-bi
-	$ make sxml-nesting-depth-label-scm
-	$ make sxml-nesting-depth-label-petite
-	$ make sxml-to-sxml-bi
-	$ make sxml-to-sxml-scm
-	$ make sxml-to-sxml-petite
+
+The names of the targets are the names of the above files without the .scm
+extension.
+
 
 Parsing and Unparsing of a Namespace-rich XML document
 ------------------------------------------------------
+
+Target name: daml-parse-unparse
 
 The file daml-parse-unparse.scm parses a DAML (DARPA Agent Markup
 Language -- XML ontology) document and unparses it. A DAML document
@@ -157,16 +143,15 @@ has a _great_ deal of namespaces. Some of them are represented by
 namespace shortcuts, some are not. The test prints out the SXML after
 the parsing, with all the XML namespaces ids and URIs. The file
 daml-parse-unparse.scm file unparses the SXML tree back into XML. The
-code then verifies that we can parse that unprased document
+code then verifies that we can parse that unparsed document
 again. Furthermore, the code tests that the following invariant holds:
         PARSE . UNPARSE . PARSE === PARSE
-
-	$ make run-daml-parse-unparse-i
-
 
 
 An advanced example of SXSLT transformations
 --------------------------------------------
+
+Target name: sxslt-advanced
 
 The example transforms an SHTML-like SXML document with nested
 sections into a web page with hierarchically numbered and marked up
@@ -186,12 +171,11 @@ with "modifications".
 The file sxslt-advanced.scm should be more properly called a tutorial,
 with a few occasional lines of code.
 
-	$ make run-sxslt-advanced-bigloo-i
-	$ make run-sxslt-advanced-scm
-
 
 Parent pointers in SXML trees
 -----------------------------
+
+Target name: parent-pointers
 
 This is the source code for an article 'On parent pointers in SXML
 trees' posted on the SSAX-SXML mailing list. The code implements and
@@ -201,12 +185,11 @@ framework, to add various kinds of parent "pointer" annotations to
 SXML nodes as we parse an XML document.
 
 
-	$ make run-parent-pointers-bigloo-i
-	$ make run-parent-pointers-scm
-
 
 SSAX parsing with limited XML doctype validation and datatype conversion
 ------------------------------------------------------------------------
+
+Target name: validate-doctype-simple
 
 The present test instantiates the SSAX parser framework to support a
 limited document type validation and datatype conversion. We
@@ -218,7 +201,4 @@ validates, we convert it to a boolean or an integer value for the
 resulting SXML.  We also show validation of a simple structural
 constraint, the sequence of child elements matching a user-specified
 template.
-
-	$ make run-validate-doctype-simple-bi
-
 
