@@ -121,8 +121,23 @@
 ;=========================================================================
 ; Comparators for XPath objects 
 
+; Implements XPath equality comparison in a straightforward nested loop manner
+(define (sxml:nested-loop-join string-set1 string-set2 string-op)
+  (let first ((str-set1 string-set1)
+              (str-set2 string-set2))
+    (cond
+      ((null? str-set1) #f)
+      ((let second ((elem (car str-set1))
+                    (set2 str-set2))
+         (cond
+           ((null? set2) #f)
+           ((string-op elem (car set2)) #t)
+           (else (second elem (cdr set2))))) #t)
+      (else
+       (first (cdr str-set1) str-set2)))))
+
 ;-------------------------------------------------
-; Helper merge-sort for speeding up equality comparison of two nodesets
+; Merge-sort for speeding up equality comparison of two nodesets
 
 ; Similar to R5RS 'list-tail' but returns the new list consisting of the first
 ; 'k' members of 'lst'
@@ -158,6 +173,139 @@
         (sxml:merge-sort less-than?-pred (sxml:list-head lst middle))
         (sxml:merge-sort less-than?-pred (list-tail lst middle)))))))
 
+; Implementation of XPath equality comparison for 2 string-sets with
+; merge-sort join algorithm
+(define (sxml:merge-sort-join string-set1 string-set2 string-op)
+  (let loop ((str-set1 (sxml:merge-sort string<? string-set1))
+             (str-set2 (sxml:merge-sort string<? string-set2)))
+    (cond
+      ((or (null? str-set1) (null? str-set2))
+       #f)
+      ((string-op (car str-set1) (car str-set2))
+       ; comparison condition fulfilled for a pair of nodes
+       #t)
+      ((string<? (car str-set1) (car str-set2))
+       ; we can remove (car str-set1) from our further consideration
+       (loop (cdr str-set1) str-set2))
+      (else  ; vice versa
+       (loop str-set1 (cdr str-set2))))))
+
+;-------------------------------------------------
+; Radix-sort join for equality comparison of 2 nodesets
+; The running time of the algorithm is proportional to the nodeset size and
+; to node string-value length
+; 
+; Since each nodeset contains O(n) nodes and string-value for each node is
+; O(n) in length, radix-sort join algorithm evaluates in O(n^2) time. By
+; comparison, nested loop join requires O(n^3) time, merge-sort join
+; implemented above requires O(n^2*log(n)).
+;
+; On the other hand, radix-sort join is time-ineffective for relatively small
+; nodesets being joined. For small nodesets, the above implemented sort-merge
+; join runs more effectively. Radix-sort join is promising for large nodesets.
+
+; Represents a list of chars as a branch in the string-tree
+; The list of chars must be non-empty
+(define (sxml:charlst->branch lst)
+  (if (null? (cdr lst))  ; this is the last character in the lst
+      `(,(car lst) #t)
+      `(,(car lst) #f ,(sxml:charlst->branch (cdr lst)))))
+
+; Converts a string to a string-tree
+(define (sxml:string->tree str)
+  (let ((lst (string->list str)))
+    (if (null? lst)   ; an empty string is given
+        '(*top* #t)
+        `(*top* #f ,(sxml:charlst->branch lst)))))
+
+; Adds a new string to string-tree
+; In a special case, tree257 may be #f. The function than creates a new tree,
+; which contains just the representation for str
+(define (sxml:add-string-to-tree str tree)
+  (letrec
+      ((add-lst-to-tree   ; adds the list of chars to tree
+        (lambda (lst tree)
+          (if
+           (null? lst)  ; the lst is over
+           (if
+            (cadr tree)  ; whether it is already in the tree
+            tree
+            (cons (car tree)
+                  (cons #t (cddr tree))))
+           (let ((curr-char (car lst)))
+             (let iter-alist ((alist (cddr tree))
+                              (res (list (cadr tree) (car tree))))
+               (cond
+                 ((null? alist)  ; branch not in a tree
+                  (reverse
+                   (cons
+                    (sxml:charlst->branch lst)
+                    res)))
+                 ((char=? (caar alist) curr-char)  ; entry found
+                  (if
+                   (null? (cdr alist))  ; nothing more in the alist
+                   (reverse
+                    (cons
+                     (add-lst-to-tree (cdr lst) (car alist))
+                     res))
+                   (append
+                    (reverse
+                     (cons
+                      (add-lst-to-tree (cdr lst) (car alist))
+                      res))
+                    (cdr alist))))
+                 ((char>? (caar alist) curr-char)
+                  (if
+                   (null? (cdr alist))  ; nothing more in the alist
+                   (reverse
+                    (cons
+                     (sxml:charlst->branch lst)
+                     (cons (car alist) res)))
+                   (append
+                    (reverse
+                     (cons
+                      (sxml:charlst->branch lst)
+                      res))
+                    alist)))
+                 (else
+                  (iter-alist (cdr alist)
+                              (cons (car alist) res))))))))))
+    (add-lst-to-tree (string->list str) tree)))
+
+; Whether a given string is presented in the string-tree
+(define (sxml:string-in-tree? str tree)  
+  (let loop ((lst (string->list str))
+             (tree tree))
+    (cond
+      ((null? lst)  ; the string is over
+       (cadr tree))
+      ((assv (car lst) (cddr tree))             
+       => (lambda (new-tree)
+            (loop (cdr lst) new-tree)))
+      (else #f))))
+        
+; XPath equality comparison for 2 string-sets
+;  bool-op - comparison function for 2 boolean values
+(define (sxml:radix-sort-join string-set1 string-set2 bool-op)
+  (if
+   (null? string-set1)  ; always #f
+   #f
+   (let ((tree
+          (let iter-1 ((set1 (cdr string-set1))
+                       (tree (sxml:string->tree (car string-set1))))
+            (if (null? set1)
+                tree
+                (iter-1 (cdr set1)
+                        (sxml:add-string-to-tree (car set1) tree))))))
+     (let iter-2 ((set2 string-set2))
+       (cond
+         ((null? set2)  ; equality not found
+          #f)
+         ((bool-op (sxml:string-in-tree? (car set2) tree) #t)
+          #t)
+         (else
+          (iter-2 (cdr set2))))))))
+
 ;-------------------------------------------------
 ; Equality comparison
 
@@ -177,21 +325,21 @@
          (else  ; both objects are strings
           (string-op obj1 obj2))))
       ((and (nodeset? obj1) (nodeset? obj2))  ; both objects are nodesets
-       (let loop ((str-set1
-                   (sxml:merge-sort string<? (map sxml:string-value obj1)))
-                  (str-set2
-                   (sxml:merge-sort string<? (map sxml:string-value obj2))))
+       (let ((lng1 (length obj1))
+             (lng2 (length obj2)))
          (cond
-           ((or (null? str-set1) (null? str-set2))
-            #f)
-           ((string-op (car str-set1) (car str-set2))
-            ; comparison condition fulfilled for a pair of nodes
-            #t)
-           ((string<? (car str-set1) (car str-set2))
-            ; we can remove (car str-set1) from our further consideration
-            (loop (cdr str-set1) str-set2))
-           (else  ; vice versa
-            (loop str-set1 (cdr str-set2))))))
+           ((and (< lng1 100000) (< lng2 100000))
+            (sxml:merge-sort-join (map sxml:string-value obj1)
+                                  (map sxml:string-value obj2)
+                                  string-op))
+           ((< lng1 lng2)            
+            (sxml:radix-sort-join (map sxml:string-value obj1)
+                                  (map sxml:string-value obj2)
+                                  bool-op))
+           (else  ; lng2 < lng1
+            (sxml:radix-sort-join (map sxml:string-value obj2)
+                                  (map sxml:string-value obj1)
+                                  bool-op)))))
       (else  ; one of the objects is a nodeset, another is not
        (let-values*
         (((nset elem)
