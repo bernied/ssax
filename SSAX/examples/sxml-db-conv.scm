@@ -47,26 +47,6 @@
 ;
 ; $Id$
 
-; If the pretty-printer is available, use it. Otherwise, use 'display'
-(cond-expand
-  ((or scm bigloo gambit)
-    #f)					; pp is natively available
-  ((or petite-chez)
-    (define pp pretty-print))
-  (else
-    (define pp display)		         ; Fall-back to display
-    ))
-
-; The following two definitions satisfy the import requirement of SSAX
-(define (parser-error port message . specialising-msgs)
-  (apply cerr (cons message specialising-msgs))
-  (cerr nl)
-  (exit 4))
-(define (ssax:warn port message . specialising-msgs)
-  (apply cerr (cons message specialising-msgs))
-  (cerr nl))
-
-
 ; Sample documents:
 (define doc1
         "<db:purchase xmlns:db='http://internal.com/db'>
@@ -205,7 +185,7 @@
 
 (define (enattr attr-key value)
   (if (null? value) (list #\space attr-key "='" attr-key "'")
-    (list #\space attr-key "=\'" value #\')))
+    (list #\space attr-key "='" value #\')))
 
 
 ; Given a string, check to make sure it does not contain characters

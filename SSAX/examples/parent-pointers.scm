@@ -41,31 +41,22 @@
 ; If display-circle is available or a regular pretty-printer can handle
 ; circular lists, use them. Otherwise, refuse to display circular data
 ; structures
-(cond-expand
-  (bigloo
-    #f)					; pp and display-circle are natively
-					; available
-  ((or scm gambit)
-    					; pp is natively available
-    (define (display-circle x)          ; display-circle is not
-      (display "Cannot safely display circular datastructures. Use SRFI-38")
-      (newline)))
-  ((or petite-chez)
-    (define pp pretty-print))
-  (else
-    (define pp display)		         ; Fall-back to display
-    (define (display-circle x)
-      (display "Cannot safely display circular datastructures. Use SRFI-38")
-      (newline))))
-
-; The following two definitions satisfy the import requirement of SSAX
-(define (parser-error port message . specialising-msgs)
-  (apply cerr (cons message specialising-msgs))
-  (cerr nl)
-  (exit 4))
-(define (ssax:warn port message . specialising-msgs)
-  (apply cerr (cons message specialising-msgs))
-  (cerr nl))
+;; (cond-expand
+;;   (bigloo
+;;     #f)					; pp and display-circle are natively
+;; 					; available
+;;   ((or scm gambit)
+;;     					; pp is natively available
+;;     (define (display-circle x)          ; display-circle is not
+;;       (display "Cannot safely display circular datastructures. Use SRFI-38")
+;;       (newline)))
+;;   ((or petite-chez)
+;;     (define pp pretty-print))
+;;   (else
+;;     (define pp display)		         ; Fall-back to display
+;;     (define (display-circle x)
+;;       (display "Cannot safely display circular datastructures. Use SRFI-38")
+;;       (newline))))
 
 ; A sample document used throughout the example
 ; It is an RSS description of the latest news from a fictious
@@ -90,6 +81,19 @@
 
 ;-------------------------
 ; Auxiliary functions 
+
+(define (string-whitespace? str)
+  (let ((len (string-length str)))
+    (cond
+     ((zero? len) #t)
+     ((= 1 len) (char-whitespace? (string-ref str 0)))
+     ((= 2 len) (and (char-whitespace? (string-ref str 0))
+		     (char-whitespace? (string-ref str 1))))
+     (else
+      (let loop ((i 0))
+	(or (>= i len)
+	    (and (char-whitespace? (string-ref str i))
+		 (loop (+ 1 i)))))))))
 
 ; Given the list of fragments (some of which are text strings) reverse
 ; the list and concatenate adjacent text strings. We also drop

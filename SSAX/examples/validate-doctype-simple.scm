@@ -45,24 +45,6 @@
 ; 	(include "SSAX-code.scm")
 ; 	)
 
-; If the pretty-printer is available, use it. Otherwise, use 'display'
-(cond-expand
-  ((or bigloo scm gambit)
-    #f)					; pp is natively available
-  ((or petite-chez)
-    (define pp pretty-print))
-  (else
-    (define pp display))	        ; Fall-back to display
-)
-
-; The following two definitions satisfy the import requirement of SSAX
-(define (parser-error port message . specialising-msgs)
-  (apply error (cons message specialising-msgs)))
-(define (ssax:warn port message . specialising-msgs)
-  (apply cerr (cons message specialising-msgs))
-  (cerr nl))
-
-
 ; procedure: validate-content EXPECTED-CONTENT SEED -> CONVERTED-SEED
 
 ; Verify the content represented by the SEED against the EXPECTED-CONTENT.

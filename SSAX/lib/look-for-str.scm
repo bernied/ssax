@@ -45,7 +45,7 @@
 			(let ((c (peek-char <input-port>)))
 			  (if (eof-object? c) #f c)))))
        (next-char (lambda () (read-char <input-port>)
-			  (set! no-chars-read  (+ 1 no-chars-read))))
+			  (set! no-chars-read  (inc no-chars-read))))
        (match-1st-char			; of the string str
 	(lambda ()
 	  (let ((c (my-peek-char)))
@@ -66,7 +66,7 @@
 		     (if (not (char=? c (string-ref str pos-to-match)))
 			 (backtrack 1 pos-to-match)
 			 (begin (next-char)
-				(match-other-chars (+ 1 pos-to-match)))))))))
+				(match-other-chars (inc pos-to-match)))))))))
 
        ;; There had been a partial match, but then a wrong char showed up.
        ;; Before discarding previously read (and matched) characters, we check
@@ -85,8 +85,8 @@
 	           (match-other-chars j) ; there was indeed a shorter match
 	           (if (char=? (string-ref str k)
 	           	       (string-ref str (+ i k)))
-	             (loop (+ 1 k))
-	             (backtrack (+ 1 i) matched-substr-len))))))))
+	             (loop (inc k))
+	             (backtrack (inc i) matched-substr-len))))))))
        )
     (match-1st-char)))
 

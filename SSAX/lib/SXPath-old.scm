@@ -82,7 +82,7 @@
 ;(module SXPath
 ;  (include "myenv-bigloo.scm"))		; For use with Bigloo 2.2b
 ;(load "myenv-scm.scm")		; For use with SCM v5d2
-(include "myenv.scm")		; For use with Gambit-C 3.0
+;(include "myenv.scm")		; For use with Gambit-C 3.0
 
 
 
@@ -156,7 +156,7 @@
      ((negative? n) ((node-pos (+ n 1 (length nodeset))) nodeset))
      (else
       (assert (positive? n))
-      ((node-pos (-- n)) (cdr nodeset))))))
+      ((node-pos (dec n)) (cdr nodeset))))))
 
 ; filter:: Converter -> Converter
 ; A filter applicator, which introduces a filtering context. The argument
@@ -247,7 +247,7 @@
 
 (define (node-trace title)
   (lambda (node-or-nodeset)
-    (display "\n-->")
+    (cout nl "-->")
     (display title)
     (display " :")
     (pretty-print node-or-nodeset)
@@ -511,19 +511,73 @@
 
 ; Validation Test harness
 
-(define-macro (run-test selector node expected-result)
-  (let ((res (gensym)))
-    `(begin
-       (cerr "\nApplying " ',selector "\nto " ,node nl)
-       (let ((,res (,selector ,node)))
-	 (if (equal? ,res ,expected-result)
-	     (cerr "gave the expected result: "
-		   (lambda (port) (write ,res port)) nl)
-	     (error "Unexpected result: " ,res "\nexpected"
-		    ,expected-result))))))
+(define-syntax run-test
+ (syntax-rules (define)
+   ((run-test "scan-exp" (define vars body))
+    (define vars (run-test "scan-exp" body)))
+   ((run-test "scan-exp" ?body)
+    (letrec-syntax
+      ((scan-exp			; (scan-exp body k)
+	 (syntax-rules (quote quasiquote !)
+	   ((scan-exp '() (k-head ! . args))
+	     (k-head '() . args))
+	   ((scan-exp (quote (hd . tl)) k)
+	     (scan-lit-lst (hd . tl) (do-wrap ! quasiquote k)))
+	   ((scan-exp (quasiquote (hd . tl)) k)
+	     (scan-lit-lst (hd . tl) (do-wrap ! quasiquote k)))
+	   ((scan-exp (quote x) (k-head ! . args))
+	     (k-head 
+	       (if (string? (quote x)) (string->symbol (quote x)) (quote x))
+	       . args))
+	   ((scan-exp (hd . tl) k)
+	     (scan-exp hd (do-tl ! scan-exp tl k)))
+	   ((scan-exp x (k-head ! . args))
+	     (k-head x . args))))
+	(do-tl
+	  (syntax-rules (!)
+	    ((do-tl processed-hd fn () (k-head ! . args))
+	      (k-head (processed-hd) . args))
+	    ((do-tl processed-hd fn old-tl k)
+	      (fn old-tl (do-cons ! processed-hd k)))))
+	(do-cons
+	  (syntax-rules (!)
+	    ((do-cons processed-tl processed-hd (k-head ! . args))
+	      (k-head (processed-hd . processed-tl) . args))))
+	(do-wrap
+	  (syntax-rules (!)
+	    ((do-wrap val fn (k-head ! . args))
+	      (k-head (fn val) . args))))
+	(do-finish
+	  (syntax-rules ()
+	    ((do-finish new-body) new-body)))
+
+	(scan-lit-lst			; scan literal list
+	  (syntax-rules (quote unquote unquote-splicing !)
+	   ((scan-lit-lst '() (k-head ! . args))
+	     (k-head '() . args))
+	   ((scan-lit-lst (quote (hd . tl)) k)
+	     (do-tl quote scan-lit-lst ((hd . tl)) k))
+	   ((scan-lit-lst (unquote x) k)
+	     (scan-exp x (do-wrap ! unquote k)))
+	   ((scan-lit-lst (unquote-splicing x) k)
+	     (scan-exp x (do-wrap ! unquote-splicing k)))
+	   ((scan-lit-lst (quote x) (k-head ! . args))
+	     (k-head 
+	       ,(if (string? (quote x)) (string->symbol (quote x)) (quote x))
+	       . args))
+	    ((scan-lit-lst (hd . tl) k)
+	      (scan-lit-lst hd (do-tl ! scan-lit-lst tl k)))
+	    ((scan-lit-lst x (k-head ! . args))
+	      (k-head x . args))))
+	)
+      (scan-exp ?body (do-finish !))))
+  ((run-test body ...)
+   (begin
+     (run-test "scan-exp" body) ...))
+))
 
 ; Overwrite the above macro to switch the tests off
-(define-macro (run-test selector node expected-result) #f)
+; (define-macro (run-test selector node expected-result) #f)
 
 ; Location path, full form: child::para 
 ; Location path, abbreviated form: para
@@ -1145,7 +1199,7 @@
 ; more title children
 ; See a similar example //td[@align] above.
 
-(cerr "\nExample with tree3: extracting the first lines of every stanza\n")
+(cerr nl "Example with tree3: extracting the first lines of every stanza" nl)
 (let ((tree tree3)
       (expected
        '("Let us go then, you and I," "In the room the women come and go")

@@ -2,6 +2,7 @@
 ;
 ; IMPORT
 ; SXML-to-HTML.scm and all of its imports
+; ,open sxml-to-html sxml-tree-trans coutputs assertions with-output-to-string srfi-23
 ;
 ; $Id$
 

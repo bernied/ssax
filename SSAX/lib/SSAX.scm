@@ -629,7 +629,7 @@
       (let loop ((i 0))
 	(or (>= i len)
 	    (and (char-whitespace? (string-ref str i))
-		 (loop (++ i)))))))))
+		 (loop (inc i)))))))))
 
 ; Find val in alist
 ; Return (values found-el remaining-alist) or
@@ -1622,12 +1622,12 @@
    (assert (failed? (test "TAG1" '((TAG2 ANY ()))
 			  "B:HREF='b' xmlns:B='urn:b'>")))
    ; No decl for HREF elem
-   (cond-expand
-    ((not (or scm mit-scheme))	; Regretfully, SCM treats '() as #f
-     (assert (failed?
-	      (test "TAG1" '(('"TAG1" ANY ()))
-		    "B:HREF='b' xmlns:B='urn:b'>"))))
-    (else #t))
+;;   (cond-expand
+;;    ((not (or scm mit-scheme))	; Regretfully, SCM treats '() as #f
+;;     (assert (failed?
+;;	      (test "TAG1" '(('"TAG1" ANY ()))
+;;		    "B:HREF='b' xmlns:B='urn:b'>"))))
+;;    (else #t))
    ; No decl for HREF elem
    (assert (failed?
 	    (test "TAG1" '(('"TAG1" ANY (('"HREF1" CDATA IMPLIED #f))))

@@ -3,7 +3,7 @@
 (define xml-token? pair?)
 (define-syntax xml-token-kind (syntax-rules () ((xml-token-kind token) (car token))))
 (define-syntax xml-token-head (syntax-rules () ((xml-token-head token) (cdr token))))
-(define (string-whitespace? str) (let ((len (string-length str))) (cond ((zero? len) #t) ((= 1 len) (char-whitespace? (string-ref str 0))) ((= 2 len) (and (char-whitespace? (string-ref str 0)) (char-whitespace? (string-ref str 1)))) (else (let loop ((i 0)) (or (>= i len) (and (char-whitespace? (string-ref str i)) (loop (++ i)))))))))
+(define (string-whitespace? str) (let ((len (string-length str))) (cond ((zero? len) #t) ((= 1 len) (char-whitespace? (string-ref str 0))) ((= 2 len) (and (char-whitespace? (string-ref str 0)) (char-whitespace? (string-ref str 1)))) (else (let loop ((i 0)) (or (>= i len) (and (char-whitespace? (string-ref str i)) (loop (inc i)))))))))
 (define (assq-values val alist) (let loop ((alist alist) (scanned '())) (cond ((null? alist) (values #f scanned)) ((equal? val (caar alist)) (values (car alist) (append scanned (cdr alist)))) (else (loop (cdr alist) (cons (car alist) scanned))))))
 (define (fold-right kons knil lis1) (let recur ((lis lis1)) (if (null? lis) knil (let ((head (car lis))) (kons head (recur (cdr lis)))))))
 (define (fold kons knil lis1) (let lp ((lis lis1) (ans knil)) (if (null? lis) ans (lp (cdr lis) (kons (car lis) ans)))))

@@ -81,16 +81,6 @@
 ;
 ; $Id$
 
-; If the pretty-printer is available, use it. Otherwise, use 'display'
-(cond-expand
-  ((or scm gambit bigloo)
-    #f)					; pp is natively available
-  ((or petite-chez)
-    (define pp pretty-print))
-  (else
-    (define pp display)		         ; Fall-back to display
-    ))
-
 ; map-node-concat FN NODELIST -> NODELIST
 ; Map FN to each element of NODELIST where FN is a function
 ;	NODE -> NODE or NODELIST
@@ -166,7 +156,7 @@
 ; It is implemented here for easy reference
 (define (make-list count elem)
   (if (not (positive? count)) '()
-    (cons elem (make-list (-- count) elem))))
+    (cons elem (make-list (dec count) elem))))
 
 (define (transform1 sxml)
   (pre-post-order sxml

@@ -72,16 +72,6 @@
 ;
 ; $Id$
 
-; If the pretty-printer is available, use it. Otherwise, use 'display'
-(cond-expand
-  ((or scm gambit bigloo)
-    #f)					; pp is natively available
-  ((or petite-chez)
-    (define pp pretty-print))
-  (else
-    (define pp display)		         ; Fall-back to display
-    ))
-
 ; T. Kurt Bond's sample document
 (define doc2
   '(article

@@ -9,13 +9,6 @@
 ;
 ; $Id$
 
-(declare 			; Gambit-compiler optimization options
- (block)
- (standard-bindings)
- (fixnum)
-)
-
-
 ;------------------------------------------------------------------------
 ;                               Iterator ANY?
 ;
@@ -42,13 +35,13 @@
       (let ((len (vector-length coll)))
        (let loop ((i 0))
         (if (>= i len) #f
-          (or (<pred?> (vector-ref coll i)) (loop (+ 1 i)))))))
+          (or (<pred?> (vector-ref coll i)) (loop (inc i)))))))
 
     ((string? coll)
       (let ((len (string-length coll)))
        (let loop ((i 0))
         (if (>= i len) #f
-          (or (<pred?> (string-ref coll i)) (loop (+ 1 i)))))))
+          (or (<pred?> (string-ref coll i)) (loop (inc i)))))))
 
     ((input-port? coll)
       (let loop ((c (read-char coll)))
@@ -135,12 +128,12 @@
 ; number; we want merely to read an integral label.
 
 (define (string->integer str start end)
-  (and (< -1 start end (++ (string-length str)))
+  (and (< -1 start end (inc (string-length str)))
     (let loop ((pos start) (accum 0))
       (cond
         ((>= pos end) accum)
         ((char-numeric? (string-ref str pos))
-          (loop (++ pos) (+ (char->integer (string-ref str pos)) 
+          (loop (inc pos) (+ (char->integer (string-ref str pos)) 
               (- (char->integer #\0)) (* 10 accum))))
         (else #f)))))
 
@@ -195,8 +188,8 @@
       (cond
         ((>= i (string-length str)) '())
         ((char-whitespace? (string-ref str i))
-          (skip-ws (++ i) yet-to-split-count))
-        (else (scan-beg-word (++ i) i yet-to-split-count))))
+          (skip-ws (inc i) yet-to-split-count))
+        (else (scan-beg-word (inc i) i yet-to-split-count))))
     (define (scan-beg-word i from yet-to-split-count)
       (cond
         ((zero? yet-to-split-count)
@@ -208,9 +201,9 @@
           (cons (substring str from i) '()))
         ((char-whitespace? (string-ref str i))
           (cons (substring str from i) 
-            (skip-ws (++ i) (-- yet-to-split-count))))
-        (else (scan-word (++ i) from yet-to-split-count))))
-    (skip-ws 0 (-- maxsplit)))
+            (skip-ws (inc i) (- yet-to-split-count 1))))
+        (else (scan-word (inc i) from yet-to-split-count))))
+    (skip-ws 0 (- maxsplit 1)))
 
 		; maxsplit is a positive number
 		; str is not empty
@@ -227,19 +220,19 @@
           (cons (substring str from i) '()))
         ((memq (string-ref str i) delimeters)
           (cons (substring str from i) 
-            (scan-beg-word (++ i) (-- yet-to-split-count))))
-        (else (scan-word (++ i) from yet-to-split-count))))
-    (scan-beg-word 0 (-- maxsplit)))
+            (scan-beg-word (inc i) (- yet-to-split-count 1))))
+        (else (scan-word (inc i) from yet-to-split-count))))
+    (scan-beg-word 0 (- maxsplit 1)))
 
 			; resolver of overloading...
 			; if omitted, maxsplit defaults to
-			; (++ (string-length str))
+			; (inc (string-length str))
   (if (string-null? str) '()
     (if (null? rest) 
-      (split-by-whitespace str (++ (string-length str)))
+      (split-by-whitespace str (inc (string-length str)))
       (let ((charset (car rest))
           (maxsplit
-            (if (pair? (cdr rest)) (cadr rest) (++ (string-length str)))))
+            (if (pair? (cdr rest)) (cadr rest) (inc (string-length str)))))
         (cond 
           ((not (positive? maxsplit)) '())
           ((null? charset) (split-by-whitespace str maxsplit))
@@ -274,7 +267,7 @@
       (let loop ((i i))
 	(and (< i (string-length str))
 	     (if (memv (string-ref str i) charset) i
-		 (loop (++ i))))))
+		 (loop (inc i))))))
 
     ; The body of the function
     (lambda (str)
@@ -289,11 +282,11 @@
 		(let ((quoted-char
 		       (cdr (assv (string-ref str to) char-encoding)))
 		      (new-to 
-		       (index-cset str (++ to) bad-chars)))
+		       (index-cset str (inc to) bad-chars)))
 		  (if (< from to)
 		      (cons
 		       (substring str from to)
-		       (cons quoted-char (loop (++ to) new-to)))
-		      (cons quoted-char (loop (++ to) new-to))))))))))
+		       (cons quoted-char (loop (inc to) new-to)))
+		      (cons quoted-char (loop (inc to) new-to))))))))))
 ))
 

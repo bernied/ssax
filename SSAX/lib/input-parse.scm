@@ -34,40 +34,6 @@
 ;
 ; $Id$
 
-(declare 			; Gambit-compiler optimization options
- (block)
- (standard-bindings)
- (extended-bindings)		; Needed for #!optional arguments, DSSSL-style
- (fixnum)			; optional, keyword and rest arguments
-)
-
-;------------------------------------------------------------------------
-;		     Preparation and tuning section
-
-; This package is heavily used. Therefore, we take time to tune it in,
-; in particular for Gambit.
-
-(cond-expand
- (gambit
-      ; The following macro makes a macro that turns (read-char port)
-      ; into (##read-char port). We can't enter such a macro-converter
-      ; directly as readers of SCM and Bigloo, for ones, don't like
-      ; identifiers with two leading # characters
-   (define-macro (gambitize clause)
-     `(define-macro ,clause
-	,(list 'quasiquote
-	    (cons
-	     (string->symbol (string-append "##"
-					    (symbol->string (car clause))))
-	     (map (lambda (id) (list 'unquote id)) (cdr clause))))))
-   (gambitize (read-char port))
-   (gambitize (peek-char port))
-   (gambitize (eof-object? port))
-   )
- (else #t))
-
-
-
 ;------------------------------------------------------------------------
 
 ; -- procedure+: peek-next-char [PORT]
@@ -116,7 +82,7 @@
 (define-opt (skip-until arg (optional (port (current-input-port))) )
   (cond
    ((number? arg)		; skip 'arg' characters
-      (do ((i arg (-- i)))
+      (do ((i arg (dec i)))
       	  ((not (positive? i)) #f)
       	  (if (eof-object? (read-char port))
       	    (parser-error port "Unexpected EOF while skipping "
@@ -213,7 +179,7 @@
     	      (set! curr-buf-len (string-length buffer))))
     	  (string-set! buffer i c)
     	  (read-char port)			; move to the next char
-    	  (loop (++ i) (peek-char port))
+    	  (loop (inc i) (peek-char port))
     	  )))))
 
 
@@ -249,7 +215,7 @@
 	  (else
 	    (string-set! buffer i c)
 	    (read-char port)			; move to the next char
-	    (loop (++ i) (peek-char port))))))))
+	    (loop (inc i) (peek-char port))))))))
 
 ; -- procedure+: next-token-of INC-CHARSET [PORT]
 ;	Reads characters from the PORT that belong to the list of characters
@@ -294,7 +260,7 @@
 	      (begin
 		(string-set! buffer i c)
 		(read-char port)			; move to the next char
-		(loop (++ i)))
+		(loop (inc i)))
 	      ; incl-list/pred decided it had had enough
 	      (if (null? filled-buffer-l) (substring buffer 0 i)
 		(string-concatenate-reverse filled-buffer-l buffer i)))))))
@@ -312,11 +278,11 @@
 	      (else
 		(string-set! buffer i c)
 		(read-char port)			; move to the next char
-		(loop (++ i))))))))
+		(loop (inc i))))))))
     )))
 
 
-; -- procedure+: read-line [PORT]
+; -- procedure+: read-text-line [PORT]
 ;	Reads one line of text from the PORT, and returns it as a string.
 ;	A line is a (possibly empty) sequence of characters terminated
 ;	by CR, CRLF or LF (or even the end of file).
@@ -328,13 +294,15 @@
 ; 
 ;	The optional argument PORT defaults to the current input port.
 
-(define-opt (read-line (optional (port (current-input-port))) )
+(define *read-line-breaks* (list char-newline char-return '*eof*))
+
+(define-opt (read-text-line (optional (port (current-input-port))) )
   (if (eof-object? (peek-char port)) (peek-char port)
     (let* ((line
-             (next-token '() '(#\newline #\return *eof*)
+             (next-token '() *read-line-breaks*
 			 "reading a line" port))
            (c (read-char port)))	; must be either \n or \r or EOF
-       (and (eqv? c #\return) (eqv? (peek-char port) #\newline)
+       (and (eqv? c char-return) (eqv? (peek-char port) #\newline)
          (read-char port))			; skip \n that follows \r
        line)))
 
@@ -351,9 +319,8 @@
     (let ((buffer (make-string n)))
       (let loop ((i 0) (c (read-char port)))
         (if (eof-object? c) (substring buffer 0 i)
-          (let ((i1 (++ i)))
+          (let ((i1 (inc i)))
             (string-set! buffer i c)
             (if (= i1 n) buffer
               (loop i1 (read-char port)))))))))
-
 

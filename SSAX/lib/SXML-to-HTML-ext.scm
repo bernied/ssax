@@ -126,7 +126,7 @@
 		  '#("January" "February" "March" "April" "May" "June"
 		    "July"   "August" "September" "October" "November"
 		    "December")
-		  (-- month))))
+		  (dec month))))
 	   (list month-name " " day ", " year)))
     ,(let ((links (lookup-def 'Links head-parms '())))
        (and (pair? links)
@@ -280,7 +280,7 @@
 		((null? sections)
 		 (let fill ((curr-level curr-level))
 		   (if (> curr-level 1)
-		       (cons "</ol>" (fill (-- curr-level)))
+		       (cons "</ol>" (fill (dec curr-level)))
 		       '())))
 		((null? (car sections)) (loop curr-level (cdr sections)))
 		((pair? (car sections)) (loop curr-level
@@ -292,11 +292,11 @@
 		    ((= new-level curr-level)
 		     (cons (vector-ref (car sections) 1)
 			   (loop curr-level (cdr sections))))
-		    ((= (++ new-level) curr-level)
+		    ((= (inc new-level) curr-level)
 		     (cons "</ol>"
 			   (cons (vector-ref (car sections) 1)
 				 (loop new-level (cdr sections)))))
-		    ((= new-level (++ curr-level))
+		    ((= new-level (inc curr-level))
 		     (cons nl (cons "<ol>"
 			   (cons (vector-ref (car sections) 1)
 				 (loop new-level (cdr sections))))))

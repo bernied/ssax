@@ -3,6 +3,7 @@
 ; IMPORT
 ; SXML-tree-trans.scm and all of its imports
 ; Pretty-printer of trees (named pp)
+; ,open sxml-tree-trans ppretty-prints coutputs assertions
 ;
 ; $Id$
 
