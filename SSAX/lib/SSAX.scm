@@ -358,19 +358,6 @@
 ;-------------------------
 ; Utilities
 
-; A rather useful utility from SRFI-1
-; cons* elt1 elt2 ... -> object
-;    Like LIST, but the last argument provides the tail of the constructed
-;    list -- i.e., (cons* a1 a2 ... an) = (cons a1 (cons a2 (cons ... an))).
-;
-;   (cons* 1 2 3 4) => (1 2 3 . 4)
-;   (cons* 1) => 1
-(define (cons* first . rest)
-  (let recur ((x first) (rest rest))
-    (if (pair? rest)
-	(cons x (recur (car rest) (cdr rest)))
-	x)))
-
 ;   SSAX:warn PORT MESSAGE SPECIALISING-MSG*
 ; to notify the user about warnings that are NOT errors but still
 ; may alert the user.
@@ -2594,9 +2581,10 @@
 	    port '()))))
       (cons '*TOP*
 	    (if (null? namespace-prefix-assig) result
-		(cons (cons '*NAMESPACES* 
-			    (map (lambda (ns) (list (car ns) (cdr ns)))
-				 namespace-prefix-assig))
+		(cons
+		 (list '@@ (cons '*NAMESPACES* 
+				 (map (lambda (ns) (list (car ns) (cdr ns)))
+				      namespace-prefix-assig)))
 		      result)))
 )))
 
@@ -2652,7 +2640,7 @@
     (test "<DIV A:B='A' B='B' xmlns:A='URI1' xmlns='URI1'><A:P xmlns=''><BR/></A:P></DIV>" '()
 	  '(*TOP* (URI1:DIV (@ (URI1:B "A") (B "B")) (URI1:P (BR)))))
     (test "<DIV A:B='A' B='B' xmlns:A='URI1' xmlns='URI1'><A:P xmlns=''><BR/></A:P></DIV>" '((UA . "URI1"))
-	  '(*TOP* (*NAMESPACES* (UA "URI1"))
+	  '(*TOP* (@@ (*NAMESPACES* (UA "URI1")))
 		  (UA:DIV (@ (UA:B "A") (B "B")) (UA:P (BR)))))
 
     ; A few tests from XML Namespaces Recommendation
@@ -2671,7 +2659,7 @@
            "<lineItem edi:taxClass='exempt'>Baby food</lineItem>"
            "</x>") '((EDI . "http://ecommerce.org/schema"))
 	   '(*TOP*
-	     (*NAMESPACES* (EDI "http://ecommerce.org/schema"))
+	     (@@ (*NAMESPACES* (EDI "http://ecommerce.org/schema")))
 	     (x (lineItem
 		 (@ (EDI:taxClass "exempt"))
             "Baby food"))))
@@ -2727,7 +2715,7 @@
            "</Beers>")
 	      '((html . "http://www.w3.org/TR/REC-html40"))
 	      '(*TOP*
-		(*NAMESPACES* (html "http://www.w3.org/TR/REC-html40"))
+		(@@ (*NAMESPACES* (html "http://www.w3.org/TR/REC-html40")))
 		(Beers (html:table
                 (html:th (html:td "Name")
                          (html:td "Origin")
@@ -2748,7 +2736,8 @@
        "<!-- 4 --><HTML:A HREF='/cgi-bin/ResStatus'>Check Status</HTML:A>"
        "<!-- 5 --><DEPARTURE>1997-05-24T07:55:00+1</DEPARTURE></RESERVATION>")
 	  '((HTML . "http://www.w3.org/TR/REC-html40"))
-	  '(*TOP* (*NAMESPACES* (HTML "http://www.w3.org/TR/REC-html40"))
+	  '(*TOP*
+	    (@@ (*NAMESPACES* (HTML "http://www.w3.org/TR/REC-html40")))
 	     (RESERVATION
 	      (NAME (@ (HTML:CLASS "largeSansSerif")) "Layman, A")
 	      (SEAT (@ (HTML:CLASS "largeMonotype") (CLASS "Y")) "33B")
@@ -2787,10 +2776,10 @@
    '((RDF . "http://www.w3.org/1999/02/22-rdf-syntax-ns#")
      (RDFS . "http://www.w3.org/2000/01/rdf-schema#")
      (ISET . "http://www.w3.org/2001/02/infoset#"))
-   '(*TOP* (*NAMESPACES*
+   '(*TOP* (@@ (*NAMESPACES*
          (RDF "http://www.w3.org/1999/02/22-rdf-syntax-ns#")
          (RDFS "http://www.w3.org/2000/01/rdf-schema#")
-         (ISET "http://www.w3.org/2001/02/infoset#"))
+         (ISET "http://www.w3.org/2001/02/infoset#")))
        (*PI* xml "version='1.0' encoding='utf-8' standalone='yes'")
        (RDF:RDF
 	(RDFS:Class (@ (ID "Boolean")))
@@ -2839,10 +2828,10 @@
    '((RDF . "http://www.w3.org/1999/02/22-rdf-syntax-ns#")
      (RSS . "http://my.netscape.com/rdf/simple/0.9/")
      (ISET . "http://www.w3.org/2001/02/infoset#"))
-   '(*TOP* (*NAMESPACES*
+   '(*TOP* (@@ (*NAMESPACES*
          (RDF "http://www.w3.org/1999/02/22-rdf-syntax-ns#")
          (RSS "http://my.netscape.com/rdf/simple/0.9/")
-         (ISET "http://www.w3.org/2001/02/infoset#"))
+         (ISET "http://www.w3.org/2001/02/infoset#")))
        (*PI* xml "version='1.0'")
        (RDF:RDF (RSS:channel
                   (RSS:title "Daemon News Mall")
