@@ -18,11 +18,11 @@
 ;		     (node-closure (ntype?? '*any*)))
 ; (sxpath1 '(equal? x)) -> (select-kids (node-equal? x))
 ; (sxpath1 '(eq? x))    -> (select-kids (node-eq? x))
-; (sxpath1 '(or@ ...))  -> (select-kids (ntype-names??
-;                                          (cdr '(or@ ...))))
-; (sxpath1 '(not@ ...)) -> (select-kids (sxml:invert 
+; (sxpath1 '(*or* ...))  -> (select-kids (ntype-names??
+;                                          (cdr '(*or* ...))))
+; (sxpath1 '(*not* ...)) -> (select-kids (sxml:invert 
 ;                                         (ntype-names??
-;                                          (cdr '(not@ ...)))))
+;                                          (cdr '(*not* ...)))))
 ; (sxpath1 '(ns-id:* x)) -> (select-kids 
 ;                                      (ntype-namespace-id?? x))
 ; (sxpath1 ?symbol)     -> (select-kids (ntype?? ?symbol))
@@ -34,41 +34,40 @@
 ; (sxpathr number)      -> (node-pos number)
 ; (sxpathr path-filter) -> (filter (sxpath path-filter))
 (define (sxpath path . ns-binding)
+  (let ((ns-binding (if (null? ns-binding) ns-binding (car ns-binding))))
   (let loop ((converters '())
-             (root-vars '())
+             (root-vars '())  ; a list of booleans, one per location step:
+	                      ;  #t - location step function is binary
+                              ;  #f - location step function is unary
              (path (if (string? path) (list path) path)))
     (cond
       ((null? path)  ; parsing is finished
-       (lambda (node . root-var-binding)
-         (let ((root-node
-                (if (null? root-var-binding) node (car root-var-binding)))
-               (var-binding
-                (if
-                 (or (null? root-var-binding) (null? (cdr root-var-binding)))
-                 '() (cadr root-var-binding))))
-           (let rpt ((nodeset (if (nodeset? node) node (list node)))
+       (lambda (node . var-binding)
+         (let ((var-binding
+                (if (null? var-binding) var-binding (car var-binding))))
+           (let rpt ((nodeset (as-nodeset node))
                      (conv (reverse converters))
                      (r-v (reverse root-vars)))
              (if
               (null? conv)  ; the path is over
               nodeset
               (rpt
-               (if (car r-v)  ; the current converter consumes 3 arguments
-                   ((car conv) nodeset root-node var-binding)
+               (if (car r-v)  ; the current converter consumes 2 arguments
+                   ((car conv) nodeset var-binding)
                    ((car conv) nodeset))
                (cdr conv)
                (cdr r-v)))))))
-      ; or@ handler
+      ; *or* handler
       ((and (pair? (car path)) 
             (not (null? (car path)))
-            (eq? 'or@ (caar path)))
+            (eq? '*or* (caar path)))
        (loop (cons (select-kids (ntype-names?? (cdar path))) converters)
              (cons #f root-vars)
              (cdr path)))
-      ; not@ handler 
+      ; *not* handler 
       ((and (pair? (car path)) 
             (not (null? (car path)))
-            (eq? 'not@ (caar path)))
+            (eq? '*not* (caar path)))
        (loop (cons
               (select-kids (sxml:invert (ntype-names?? (cdar path))))
               converters)
@@ -114,25 +113,25 @@
         ((select
           (if
            (symbol? (caar path))
-           (lambda (node root-node . var-binding)
+           (lambda (node . var-binding)
              ((select-kids (ntype?? (caar path))) node))
-           (sxpath (caar path)))))       
+           (sxpath (caar path) ns-binding))))
         (let reducer ((reducing-path (cdar path))
                       (filters '()))
           (cond
             ((null? reducing-path)
              (loop
               (cons
-               (lambda (node root-node var-binding)                 
+               (lambda (node var-binding)
                  (map-union
                   (lambda (node)
-                    (let label ((nodeset (select node root-node var-binding))
+                    (let label ((nodeset (select node var-binding))
                                 (fs (reverse filters)))
                       (if
                        (null? fs)
                        nodeset
                        (label
-                        ((car fs) nodeset root-node var-binding)
+                        ((car fs) nodeset var-binding)
                         (cdr fs)))))
                   (if (nodeset? node) node (list node))))
                converters)
@@ -142,23 +141,23 @@
              (reducer
               (cdr reducing-path)
               (cons
-               (lambda (node root-node var-binding)
+               (lambda (node var-binding)
                  ((node-pos (car reducing-path)) node))
                filters)))
             (else
              (and-let*
-              ((func (sxpath (car reducing-path))))
+              ((func (sxpath (car reducing-path) ns-binding)))
               (reducer
                (cdr reducing-path)
                (cons
-                (lambda (node root-node var-binding)
+                (lambda (node var-binding)
                   ((sxml:filter
-                    (lambda (n) (func n root-node var-binding)))
+                    (lambda (n) (func n var-binding)))
                     node))
                 filters))))))))
       (else
        (cerr "Invalid path step: " (car path))
-       #f))))
+       #f)))))
 
 
 ;==============================================================================
@@ -187,6 +186,7 @@
 
 ;==============================================================================
 ; lookup by a value of ID type attribute
+; See also sxml:lookup in sxml-tools
 
 ; Built an index as a list of (ID_value . element) pairs for given
 ; node. lpaths are location paths for attributes of type ID.
@@ -203,7 +203,8 @@
 	    ; Selects elements with ID attributes
 	    ;  using (lpath ,(node-self (sxpath '(@ attrname))))
 	    ((sxpath (reverse (cons 
-				(node-self (sxpath `(@ ,(car lpr))))
+			  (lambda(n r+v)
+			   ((node-self (sxpath `(@ ,(car lpr)))) n))
 				(cddr lpr)))) node))   
 	  ))
       lpaths)))
