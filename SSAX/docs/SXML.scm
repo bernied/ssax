@@ -236,12 +236,12 @@ document.")
 
     )
 
-   (p "An SXML " (code (nonterm "name")) " is a single symbol. It is generally an expanded name " (cite "XML Namespaces") ", which conceptually consists of a
+   (p "An SXML " (code (nonterm "name")) " is a single symbol. It is generally an expanded name " (cite "XML-Namespaces") ", which conceptually consists of a
 local name and a namespace URI. The latter part may be empty, in which
 case
 " (code (nonterm "name")) " is a " (code (term-id "NCName")) ": a Scheme
 symbol whose spelling conforms to production [4] of the XML Namespaces
-Recommendation " (cite "XML Namespaces") ". " (code (nonterm
+Recommendation " (cite "XML-Namespaces") ". " (code (nonterm
 "ExpName")) " is also a Scheme symbol, whose string representation
 contains an embedded colon that joins the local and the namespace
 parts of the name. A " (code (sexp-symb (term-str "URI"))) " is a Namespace URI
@@ -249,8 +249,8 @@ string converted to a Scheme symbol. Universal Resource Identifiers (URI)
 may contain characters (e.g., parentheses) that are prohibited
 in Scheme identifiers. Such characters must be %-quoted during the
 conversion from a URI string to " (code (nonterm "namespace-id"))
-". The original XML Namespace prefix of a QName " (cite "XML
-Namespaces") " may be retained as an optional member " (code (term-lit
+". The original XML Namespace prefix of a QName " (cite "XML-Namespaces") " 
+may be retained as an optional member " (code (term-lit
 "original-prefix")) " of a " (code (nonterm "namespace-assoc")) "
 association. A " (code (term-id "user-ns-shortcut")) " is a Scheme
 symbol chosen by an application programmer to represent a namespace
@@ -447,7 +447,7 @@ SXML, James Clark's example will appear as follows:"
 
    (p
     "Such a representation also agrees with the Namespaces Recommendation "
-    (cite "XML Namespaces") ", which says: \"Note that the prefix
+    (cite "XML-Namespaces") ", which says: \"Note that the prefix
 functions only as a placeholder for a namespace name. Applications
 should use the namespace name, not the prefix, in constructing names
 whose scope extends beyond the containing document.\"")
@@ -793,7 +793,7 @@ Specification. W3C Recommendation."
        "World Wide Web Consortium. XML Information Set.  W3C Recommendation. 24 October 2001."
        (URL "http://www.w3.org/TR/xml-infoset"))
 
-    (bibitem "XML Namespaces" "XML Namespaces"
+    (bibitem "XML-Namespaces" "XML-Namespaces"
        "World Wide Web Consortium. Namespaces in XML. W3C Recommendation. January 14, 1999."
        (URL "http://www.w3.org/TR/REC-xml-names/"))
 
@@ -813,8 +813,8 @@ Version 1.0. W3C Recommendation. November 16, 1999."
 ;========================================================================
 ;			HTML generation
 
-(include "SXML-to-HTML-ext.scm")
-
+; IMPORT
+; SXML-to-HTML-ext.scm and all of its imports
 
 ; Generating HTML
 

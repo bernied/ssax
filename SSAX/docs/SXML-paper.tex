@@ -133,19 +133,19 @@ document.
 {[}14{]} & \texttt{<namespace-assoc>} &  $::=$ & \texttt{\textbf{(} <namespace-id> "URI" {\itshape original-prefix}? \textbf{)} } \\
 \end{tabular}
 \\
-An SXML \texttt{<name>} is a single symbol. It is generally an expanded name \cite{XML Namespaces}, which conceptually consists of a
+An SXML \texttt{<name>} is a single symbol. It is generally an expanded name \cite{XML-Namespaces}, which conceptually consists of a
 local name and a namespace URI. The latter part may be empty, in which
 case
 \texttt{<name>} is a \texttt{NCName}: a Scheme
 symbol whose spelling conforms to production [4] of the XML Namespaces
-Recommendation \cite{XML Namespaces}. \texttt{<ExpName>} is also a Scheme symbol, whose string representation
+Recommendation \cite{XML-Namespaces}. \texttt{<ExpName>} is also a Scheme symbol, whose string representation
 contains an embedded colon that joins the local and the namespace
 parts of the name. A \texttt{\textbf{$MAKE-SYMBOL$(}"URI"\textbf{)}} is a Namespace URI
 string converted to a Scheme symbol. Universal Resource Identifiers (URI)
 may contain characters (e.g., parentheses) that are prohibited
 in Scheme identifiers. Such characters must be \%-quoted during the
-conversion from a URI string to \texttt{<namespace-id>}. The original XML Namespace prefix of a QName \cite{XML
-Namespaces} may be retained as an optional member \texttt{{\itshape original-prefix}} of a \texttt{<namespace-assoc>}
+conversion from a URI string to \texttt{<namespace-id>}. The original XML Namespace prefix of a QName \cite{XML-Namespaces} 
+may be retained as an optional member \texttt{{\itshape original-prefix}} of a \texttt{<namespace-assoc>}
 association. A \texttt{user-ns-shortcut} is a Scheme
 symbol chosen by an application programmer to represent a namespace
 URI in the application program. The SSAX parser lets the programmer
@@ -287,7 +287,7 @@ or, somewhat redundantly, \begin{verbatim}
 \end{verbatim}
 
 
-Such a representation also agrees with the Namespaces Recommendation \cite{XML Namespaces}, which says: "Note that the prefix
+Such a representation also agrees with the Namespaces Recommendation \cite{XML-Namespaces}, which says: "Note that the prefix
 functions only as a placeholder for a namespace name. Applications
 should use the namespace name, not the prefix, in constructing names
 whose scope extends beyond the containing document."
@@ -462,7 +462,7 @@ Specification. W3C Recommendation. \texttt{http://www.w3.org/TR/REC-DOM-Level-1}
 \bibitem{XML} World Wide Web Consortium. Extensible Markup Language (XML)
 1.0 (Second Edition). W3C Recommendation. October 6, 2000. \texttt{http://www.w3.org/TR/REC-xml} 
 \bibitem{XML Infoset} World Wide Web Consortium. XML Information Set.  W3C Recommendation. 24 October 2001. \texttt{http://www.w3.org/TR/xml-infoset} 
-\bibitem{XML Namespaces} World Wide Web Consortium. Namespaces in XML. W3C Recommendation. January 14, 1999. \texttt{http://www.w3.org/TR/REC-xml-names/} 
+\bibitem{XML-Namespaces} World Wide Web Consortium. Namespaces in XML. W3C Recommendation. January 14, 1999. \texttt{http://www.w3.org/TR/REC-xml-names/} 
 \bibitem{XPath} World Wide Web Consortium. XML Path Language (XPath).
 Version 1.0. W3C Recommendation. November 16, 1999. \texttt{http://www.w3.org/TR/xpath} 
 \end{thebibliography}

@@ -1,7 +1,10 @@
 ; Converting SXML.scm into a SIGPLAN paper submission
 ; Evaluation of this file yields TeX data for an article
 
-(include "SXML-to-HTML-ext.scm")
+; IMPORT
+; SXML-to-HTML-ext.scm and all of its imports
+;
+; $Id$
 
 ; Extract 'Content' from SXML.scm
 ; It is idefined in SXML.scm as
@@ -233,11 +236,7 @@ Army Research Office under contracts 38690-MA and 40473-MA-SP.")))
       ((Revision
 	. ,(lambda (tag)	; Find the Header in the Content
 				; and create the revision record
-	     (let ((header-parms
-		    (lookup-def 'Header
-				(list (post-order Content
-						  search-Header-rules))
-				#f)))
+	     (let ((header-parms (find-Header Content)))
 	       (list "The present article specifies revision "
 		     (lookup-def 'Revision header-parms #f) " of SXML. "))))
        (prod-note
@@ -246,11 +245,7 @@ Army Research Office under contracts 38690-MA and 40473-MA-SP.")))
 	      "\\\\The master SXML specification file is written in SXML itself. The present paper is the result of translating that SXML code into \\LaTeX, using an appropriate \"stylesheet\". A different stylesheet converted the specification to HTML. The master file, the stylesheets and the corresponding HTML and \\LaTeX documents are available at "  master-url ".")))
        (keywords
 	. ,(lambda (tag)
-	     (let ((header-parms
-		    (lookup-def 'Header
-				(list (post-order Content
-						  search-Header-rules))
-				#f)))
+	     (let ((header-parms (find-Header Content)))
 	       (list "\\\\Keywords: " 
 		     (lookup-def 'keywords header-parms #f) "."))))
 
