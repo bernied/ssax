@@ -411,13 +411,14 @@
 ; this point further iterations will no longer affect the result and
 ; can be stopped.
 (define (node-closure test-pred?)	    
-  (lambda (node)		; Nodeset or node
+(let ((kid-selector (select-kids test-pred?)))
+  (lambda (node) ; Nodelist or node
     (let loop ((parent node) (result '()))
       (if (null? parent) result
-	  (loop (sxml:child-elements parent)
-		(append result
-			((select-kids test-pred?) parent)))
-	  ))))
+	(loop (sxml:child-elements parent)
+	  (append result
+	    (kid-selector parent)))
+	)))))
 
 ;=============================================================================
 ; Unified with sxpath-ext and sxml-tools
