@@ -19,8 +19,6 @@
 
 ; Given param-name, returns the corresponding lambda
 (define (txp:param-value param-name txp-params)
-;  (display "txp:param-value called")
-;  (newline)
   (cond
     ((assq param-name txp-params)
      => cadr)

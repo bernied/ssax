@@ -55,7 +55,14 @@
       (preceding-sibling
        ,(lambda (add-on) 'preceding-sibling))
       (self
-       ,(lambda (add-on) 'self))))
+       ,(lambda (add-on) 'self))
+      ; Addition by XLink
+      (arc
+       ,(lambda (add-on) 'arc))
+      (traverse
+       ,(lambda (add-on) 'traverse))
+      (traverse-arc
+       ,(lambda (add-on) 'traverse-arc))))
         
     ; Node test
     (node-test

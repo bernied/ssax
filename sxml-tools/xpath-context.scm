@@ -740,7 +740,7 @@
           (str2 (sxml:string
                  (draft:contextset->nodeset
                   (arg-func2 nodeset position+size var-binding)))))
-      (if (substring? str1 str2) #t #f)  ; must return a boolean
+      (if (substring? str2 str1) #t #f)  ; must return a boolean
       )))
   
 ; substring-before(string, string)
@@ -1012,37 +1012,48 @@
 ;                    | (preceding)
 ;                    | (preceding-sibling)
 ;                    | (self)
+;                    | (arc)  ; the following 3 are added by SXLink
+;                    | (traverse)
+;                    | (traverse-arc)
+; Returns:  (list lambda num-ancestors pass-vars?)
+;  pass-vars? - a boolean: whether var-bindings must be passed to the axis
 (define (draft:ast-axis-specifier op num-anc)
   (if
    (not (eq? (car op) 'axis-specifier))
    (draft:signal-semantic-error "not an AxisSpecifier - " op)
    (case (caadr op)  ; AxisName
      ((ancestor)
-      (cons draft:ancestor #f))
+      (list draft:ancestor #f #f))
      ((ancestor-or-self)
-      (cons draft:ancestor-or-self #f))
+      (list draft:ancestor-or-self #f #f))
      ((attribute)
-      (cons draft:attribute (draft:na-minus-nneg num-anc 1)))
+      (list draft:attribute (draft:na-minus-nneg num-anc 1) #f))
      ((child)
-      (cons draft:child (draft:na-minus-nneg num-anc 1)))
+      (list draft:child (draft:na-minus-nneg num-anc 1) #f))
      ((descendant)
-      (cons draft:descendant (draft:na-minus-nneg num-anc 1)))
+      (list draft:descendant (draft:na-minus-nneg num-anc 1) #f))
      ((descendant-or-self)
-      (cons draft:descendant-or-self num-anc))
+      (list draft:descendant-or-self num-anc #f))
      ((following)
-      (cons draft:following #f))
+      (list draft:following #f #f))
      ((following-sibling)
-      (cons draft:following-sibling (draft:na-max num-anc 1)))
+      (list draft:following-sibling (draft:na-max num-anc 1) #f))
      ((namespace)
-      (cons draft:namespace (draft:na-minus-nneg num-anc 1)))
+      (list draft:namespace (draft:na-minus-nneg num-anc 1) #f))
      ((parent)
-      (cons draft:parent (draft:na+ num-anc 1)))
+      (list draft:parent (draft:na+ num-anc 1) #f))
      ((preceding)
-      (cons draft:preceding #f))
+      (list draft:preceding #f #f))
      ((preceding-sibling)
-      (cons draft:preceding-sibling (draft:na-max num-anc 1)))
+      (list draft:preceding-sibling (draft:na-max num-anc 1) #f))
      ((self)
-      (cons draft:self num-anc))
+      (list draft:self num-anc #f))
+     ((arc)
+      (list xlink:axis-arc #f #f))
+     ((traverse)
+      (list xlink:axis-traverse #f #t))
+     ((traverse-arc)
+      (list xlink:axis-traverse-arc #f #t))
      (else
       (draft:signal-semantic-error "unknown AxisName - " op)))))
 
@@ -1181,11 +1192,14 @@
       (and-let*
        ((axis-lst (draft:ast-axis-specifier (cadr op) num-anc))
         (ntest (draft:ast-node-test (caddr op))))
-       (let ((axis ((car axis-lst) ntest num-anc)))                
+       (let ((axis ((car axis-lst) ntest num-anc)))
          (cons
-          (lambda (nodeset position+size var-binding)
-            (axis nodeset))
-          (cdr axis-lst))))
+          (if (caddr axis-lst)  ; var-binding is to be passed
+              (lambda (nodeset position+size var-binding)
+                (axis nodeset var-binding))
+              (lambda (nodeset position+size var-binding)
+                (axis nodeset)))
+          (cadr axis-lst))))
       (and-let*
        ((preds-res (draft:ast-predicate-list (cdddr op) 0))
         (axis-lst (draft:ast-axis-specifier
@@ -1195,18 +1209,31 @@
                     ntest (draft:na-max num-anc (cdr preds-res))))
              (pred-impl-lst (car preds-res)))
          (cons
-          (lambda (nodeset position+size var-binding)
-            (map-union
-             (lambda (node)
-               (let loop ((nset (axis node))
-                          (preds pred-impl-lst))
-                 (if
-                  (null? preds)
-                  nset
-                  (loop ((car preds) nset position+size var-binding)
-                        (cdr preds)))))
-             nodeset))
-          (cdr axis-lst))))))
+          (if
+           (caddr axis-lst)  ; variables are to be passed to the axis
+           (lambda (nodeset position+size var-binding)
+             (map-union
+              (lambda (node)
+                (let loop ((nset (axis node var-binding))
+                           (preds pred-impl-lst))
+                  (if
+                   (null? preds)
+                   nset
+                   (loop ((car preds) nset position+size var-binding)
+                         (cdr preds)))))
+              nodeset))
+           (lambda (nodeset position+size var-binding)
+             (map-union
+              (lambda (node)
+                (let loop ((nset (axis node))
+                           (preds pred-impl-lst))
+                  (if
+                   (null? preds)
+                   nset
+                   (loop ((car preds) nset position+size var-binding)
+                         (cdr preds)))))
+              nodeset)))
+          (cadr axis-lst))))))
     (else
      (draft:signal-semantic-error "not a Step - " op))))
 
@@ -1676,7 +1703,7 @@
           (converters (car numbers-res))
           (num-ancestors (cdr numbers-res)))
       (cons
-       (lambda (nodeset position+size var-binding)    
+       (lambda (nodeset position+size var-binding)
          (let* ((root-node (draft:reach-root nodeset))
                 (id-nset ((sxml:child (ntype?? 'id-index))
                           ((sxml:child (ntype?? '@@)) root-node))))
@@ -1793,7 +1820,7 @@
 ; Helper for constructing several highest-level API functions
 (define (draft:api-helper grammar-parser ast-parser)
   (lambda (xpath-string . ns+na)
-    (let-values
+    (let-values*
         (((ns-binding num-anc) (draft:arglist->ns+na ns+na)))
       (and-let*
        ((ast (grammar-parser xpath-string ns-binding))
@@ -1804,7 +1831,10 @@
                 draft:contextset->nodeset
                 (lambda (x) x))             
             (res (as-nodeset node) (cons 1 1)
-                 (if (null? var-binding) var-binding (car var-binding))))))))))
+                 (xlink:add-docs-to-vars
+                  node
+                  (if (null? var-binding)
+                      var-binding (car var-binding)))))))))))
 
 (define draft:xpath (draft:api-helper txp:xpath->ast draft:ast-location-path))
 (define draft:xpointer (draft:api-helper txp:xpointer->ast draft:ast-xpointer))
@@ -2101,7 +2131,7 @@
                 (else
                  (cerr "Invalid path step: " (car path))
                  #f))))))
-      (let-values
+      (let-values*
           (((ns-binding num-anc) (draft:arglist->ns+na ns+na)))
         (and-let*
          ((res (local-sxpath path
@@ -2113,12 +2143,17 @@
             (lambda (node . var-binding)
               (draft:contextset->nodeset
                (func node
-                     (if (null? var-binding) var-binding (car var-binding)))))
-            (lambda (node . var-binding)              
-              (func node                    
-                    (if (null? var-binding)
-                        var-binding
-                        (car var-binding)))))))))))
+                     (xlink:add-docs-to-vars
+                      node
+                      (if (null? var-binding)
+                          var-binding (car var-binding))))))
+            (lambda (node . var-binding)
+              (func node
+                    (xlink:add-docs-to-vars
+                     node
+                     (if (null? var-binding)
+                         var-binding (car var-binding))))))))))))
 
 ; Alias
 (define sxpath-with-context draft:sxpath)
+(define sxpath/c draft:sxpath)
