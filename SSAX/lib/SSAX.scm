@@ -142,6 +142,36 @@
 ; It seems it is highly desirable to separate tests out in a dedicated
 ; file.
 ;
+; Jim Bender wrote on Mon, 9 Sep 2002 20:03:42 EDT on the SSAX-SXML
+; mailing list (message A fine-grained "lego")
+; The task was to record precise source location information, as PLT
+; does with its current XML parser. That parser records the start and
+; end location (filepos, line#, column#) for pi, elements, attributes,
+; chuncks of "pcdata".
+; As suggested above, though, in some cases I needed to be able force
+; open an interface that did not yet exist. For instance, I added an
+; "end-char-data-hook", which would be called at the end of char-data
+; fragment. This returns a function of type (seed -> seed) which is
+; invoked on the current seed only if read-char-data has indeed reached
+; the end of a block of char data (after reading a new token.
+; But the deepest interface that I needed to expose was that of reading
+; attributes. In the official distribution, this is not even a separate
+; function. Instead, it is embedded within SSAX:read-attributes.  This
+; required some small re-structuring as well.
+; This definitely will not be to everyone's taste (nor needed by most).
+; Certainly, the existing make-parser interface addresses most custom
+; needs. And likely 80-90 lines of a "link specification" to create a
+; parser from many tiny little lego blocks may please only a few, while
+; appalling others.
+; The code is available at http://celtic.benderweb.net/ssax-lego.plt or 
+; http://celtic.benderweb.net/ssax-lego.tar.gz
+; In the examples directory, I provide:
+; - a unit version of the make-parser interface,
+; - a simple SXML parser using that interface, 
+; - an SXML parser which directly uses the "new lego",
+; - a pseudo-SXML parser, which records source location information
+; - and lastly a parser which returns the structures used in PLT's xml 
+; collection, with source location information
 
 ; $Id$
 
@@ -1731,7 +1761,7 @@
 (run-test (letrec
   ((a-tag (make-xml-token 'START (string->symbol "BR")))
    (a-ref (make-xml-token 'ENTITY-REF (string->symbol "lt")))
-   (eof-object (with-input-from-string "" read))
+   (eof-object (lambda () eof-object)) ; a unique value
    (str-handler (lambda (fragment foll-fragment seed)
      (if (string-null? foll-fragment) (cons fragment seed)
 	 (cons* foll-fragment fragment seed))))
@@ -1748,7 +1778,9 @@
 	   (display " ")
 	   (display token)
 	   (assert (equal? result (map unesc-string expected-data))
-		   (equal? token expected-token)))))
+	           (if (eq? expected-token eof-object)
+		     (eof-object? token)
+		     (equal? token expected-token))))))
    )
   (test "" #t '() eof-object)
   (assert (failed? (test "" #f '() eof-object)))
@@ -2370,9 +2402,7 @@
 	(lambda (elem-gi seed)
 	  (values #f '(('"quote" . "<I>example:")
 		       ('"example" . "<Q>&quote;</I>!</Q>?")) '() seed))
-	'())
-	  '(('"DIV" "Example: \"" ('"Q" ('"I" "example:") "ex" "!") "?"
-		 "\""  ('"P")))))
+	'())))
 
  (test "<DIV A:B='A' B='B' xmlns:A='URI1' xmlns='URI1'><A:P xmlns=''><BR/></A:P></DIV>"
 	(lambda (elem-gi seed)
