@@ -186,7 +186,8 @@ vSXML-to-HTML:
 vSSAX:
 	$(call make-$(PLATFORM),\
 	       catch-error.scm srfi-13-local.scm util.scm \
-	       look-for-str.scm char-encoding.scm input-parse.scm,\
+	       look-for-str.scm char-encoding.scm input-parse.scm \
+	       parser-errors-vanilla.scm ssax-warn-vanilla.scm,\
 	       $(LIBDIR)/SSAX)
 
 vSSAX-exp:
