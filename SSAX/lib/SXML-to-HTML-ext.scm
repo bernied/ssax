@@ -9,6 +9,7 @@
 ;
 ; IMPORT
 ; Approporiate Prelude: myenv.scm or myenv-bigloo.scm
+; srfi-13-local.scm or the appropriate native implementation of SRFI-13
 ; util.scm
 ; SXML-tree-trans.scm
 ; SXML-to-HTML.scm
@@ -149,30 +150,30 @@
 ; work for every HTML, present and future
 (define universal-conversion-rules
   `((@
-     ((*default*       ; local override for attributes
-       . ,(lambda (attr-key . value) ((enattr attr-key) value))))
-     . ,(lambda (trigger . value) (list '@ value)))
-    (*default* . ,(lambda (tag . elems) (apply (entag tag) elems)))
+      ((*default*       ; local override for attributes
+        . ,(lambda (attr-key . value) (enattr attr-key value))))
+      . ,(lambda (trigger . value) (cons '@ value)))
+    (*default* . ,(lambda (tag . elems) (entag tag elems)))
     (*text* . ,(lambda (trigger str) 
 		 (if (string? str) (string->goodHTML str) str)))
     (n_		; a non-breaking space
      . ,(lambda (tag . elems)
-	  (list "&nbsp;" elems)))))
+	  (cons "&nbsp;" elems)))))
 
 ; A variation of universal-conversion-rules which keeps '<', '>', '&'
 ; and similar characters intact. The universal-protected-rules are
 ; useful when the tree of fragments has to be traversed one more time.
 (define universal-protected-rules
   `((@
-     ((*default*       ; local override for attributes
-       . ,(lambda (attr-key . value) ((enattr attr-key) value))))
-     . ,(lambda (trigger . value) (list '@ value)))
-    (*default* . ,(lambda (tag . elems) (apply (entag tag) elems)))
+      ((*default*       ; local override for attributes
+        . ,(lambda (attr-key . value) (enattr attr-key value))))
+      . ,(lambda (trigger . value) (cons '@ value)))
+    (*default* . ,(lambda (tag . elems) (entag tag elems)))
     (*text* . ,(lambda (trigger str) 
 		 str))
     (n_		; a non-breaking space
      . ,(lambda (tag . elems)
-	  (list "&nbsp;" elems)))))
+	  (cons "&nbsp;" elems)))))
 
 ; The following rules define the identity transformation
 (define alist-conv-rules
@@ -301,9 +302,9 @@
 		(else "wrong item: " sections)))
 	      nl "</div>" nl))))
 
-     (bibitem
-      . ,(lambda (tag label key . text)
-	   (list nl "<p><a name=\"" key "\">[" label "]</a> " text)))
+     (bibitem *macro*
+       . ,(lambda (tag label key . text)
+	   `(p (a (@ (name ,key)) "[" ,label "]") " " ,text)))
 
      (cite		; ought to locate the label and use the label!
       . ,(lambda (tag key)
@@ -315,9 +316,9 @@
 	   (cerr tag content nl)
 	   '()))
 
-     (URL 
+     (URL  *macro*
       . ,(lambda (tag url)
-	   (list "<br>&lt;<a href=\"" url "\">" url "</a>&gt;")))
+	   `((br) "<" (a (@ (href ,url)) ,url) ">")))
 
 
      (verbatim	; set off pieces of code: one or several lines
@@ -367,7 +368,7 @@
 		; title SXML. All other constructs re-write to
 		; nothing.
      (local-ref
-      *preorder*
+      *macro*
       . ,(lambda (tag target . title)
 	   (let
 	       ((title
@@ -391,9 +392,7 @@
 				   '()))))))))
 	     (assert (pair? title))
 	     (cerr "title: " title nl)
-	     (post-order 
-	      `(a (@ (href #\# ,target)) ,title)
-	      universal-conversion-rules))))
+	     `(a (@ (href #\# ,target)) ,title))))
 
 		; Unit of a description for a piece of code
 		; (Description-unit key title . elems)
