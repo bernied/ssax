@@ -110,3 +110,65 @@
 	(error "Unknown binding for " trigger " and no default"))))))
 )
 
+
+; Pre-Post-order traversal of a tree and creation of a new tree:
+;	pre-post-order:: <tree> x <bindings> -> <new-tree>
+; where
+; <bindings> ::= (<binding> ...)
+; <binding> ::= (<trigger-symbol> *preorder* . <handler>) |
+;		(<trigger-symbol> <new-bindings> . <handler>) |
+;		(<trigger-symbol> . <handler>)
+; <trigger-symbol> ::= XMLname | *text* | *default*
+; <handler> :: <trigger-symbol> x [<tree>] -> <new-tree>
+;
+; The pre-post-order function visits the nodes and nodesets pre-post-order
+; (depth-first).  For each <Node> of the form (name <Node> ...) it
+; looks up an association with the given 'name' among its <bindings>. If
+; failed, pre-post-order tries to locate a *default* binding. It's an
+; error if the latter attempt fails as well.  Having found a binding,
+; the pre-post-order function first checks to see if the binding is
+; of the form
+;	(<trigger-symbol> *preorder* . <handler>)
+; If it is, the handler is 'applied' to the current node. Otherwise,
+; the pre-post-order function first calls itself recursively for each
+; child of the current node, with <new-bindings> prepended to the
+; <bindings> in effect. The result of these calls is passed to the
+; <handler> (along with the head of the current <Node>). To be more
+; precise, the handler is _applied_ to the head of the current node
+; and its processed children. The result of the handler, which should
+; also be a <tree>, replaces the current <Node>. If the current <Node>
+; is a text string, a special binding with a symbol *text* is looked
+; up.
+
+(define (pre-post-order tree bindings)
+  (cond
+   ((nodeset? tree)
+    (map (lambda (a-tree) (pre-post-order a-tree bindings)) tree))
+   ((not (pair? tree))
+    (let ((trigger '*text*))
+      (cond
+       ((or (assq trigger bindings) (assq '*default* bindings)) =>
+	(lambda (binding)
+	  ((if (procedure? (cdr binding)) (cdr binding) (cddr binding))
+	   trigger tree)))
+       (else
+	(error "Unknown binding for " trigger " and no default")))
+      ))
+   (else
+    (let ((trigger (car tree)))
+      (cond
+       ((or (assq trigger bindings) (assq '*default* bindings)) =>
+	(lambda (binding)
+	  (if (and (pair? (cdr binding)) (eq? '*preorder* (cadr binding)))
+	      (apply (cddr binding) tree)
+	      (apply
+	       (if (procedure? (cdr binding)) (cdr binding) (cddr binding))
+	       (cons trigger 
+		     (pre-post-order (cdr tree) 
+				     (if (pair? (cdr binding))
+					 (append (cadr binding) bindings)
+					 bindings)))))))
+       (else
+	(error "Unknown binding for " trigger " and no default"))))))
+)
+
