@@ -1,4 +1,4 @@
-#	    Testing the SSAX and the utility library
+#		Testing my library, including SSAX
 #
 # This Makefile assumes the use of GNU make, which is to be invoked
 # as follows:
@@ -14,6 +14,7 @@
 # 
 # and <target> is one of the following:
 #       vmyenv
+#	vsrfi-13
 #	vinput-parse
 #	vsrfi-12
 #	vland
@@ -28,9 +29,6 @@
 # are assumed.
 #
 # $Id$
-
-# Directory where all the "included" modules are located
-LIBDIR=../lib
 
 # Scheme library directory
 LIBDIR=../lib
@@ -80,19 +78,18 @@ make-scmi= scm -b -l $(LIBDIR)/myenv-scm.scm \
 
 #------------------------------------------------------------------------
 
-gambi-targets=vmyenv vinput-parse vsrfi-12  \
+gambi-targets=vmyenv vsrfi-13 vinput-parse vsrfi-12  \
 	      vland \
 	      vSXML-tree-trans vSXML-to-HTML vSSAX 
-
-biglooi-targets=vmyenv vinput-parse vsrfi-12  \
+biglooi-targets=vmyenv vsrfi-13 vinput-parse vsrfi-12  \
 	      vland \
-	      vSXML-tree-trans vSXML-to-HTML vSSAX
+	      vSXML-tree-trans vSXML-to-HTML vSSAX  #vext-io vipc
 
-biglooc-targets=vmyenv vinput-parse vsrfi-12  \
-	      vSXML-tree-trans vSXML-to-HTML vSSAX
+biglooc-targets=vmyenv vsrfi-13 vinput-parse vsrfi-12  \
+	      vSXML-tree-trans vSXML-to-HTML vSSAX  #vext-io vipc
 
-scmi-targets=vmyenv vinput-parse  \
-	      vSXML-tree-trans vSXML-to-HTML vSSAX
+scmi-targets=vmyenv vsrfi-13 vinput-parse  \
+	      vSXML-tree-trans vSXML-to-HTML vSSAX  #vext-io vipc
 
 all: $($(PLATFORM)-targets)
 .PHONY: $($(PLATFORM)-targets)
@@ -109,17 +106,29 @@ clean:
 
 vmyenv:
 	$(call make-$(PLATFORM),\
-	       catch-error.scm env.scm util.scm,\
+	       catch-error.scm env.scm srfi-13-local.scm util.scm,\
+	$@)
+
+
+vsrfi-13:
+	$(call make-$(PLATFORM),\
+	       catch-error.scm srfi-13-local.scm,\
 	$@)
 
 
 vinput-parse: 
 	$(call make-$(PLATFORM),\
-	       catch-error.scm util.scm look-for-str.scm input-parse.scm,\
+	       catch-error.scm srfi-13-local.scm util.scm look-for-str.scm  \
+	       input-parse.scm,\
 	       $@)
 vsrfi-12:
 	$(call make-$(PLATFORM),\
 	       srfi-12.scm,\
+	       $@)
+
+vreaddir:
+	$(call make-$(PLATFORM),\
+	       catch-error.scm,\
 	       $@)
 
 vtreap:
@@ -129,12 +138,14 @@ vtreap:
 
 vmime:
 	$(call make-$(PLATFORM),\
-	       catch-error.scm util.scm input-parse.scm mime.scm,\
+	       catch-error.scm srfi-13-local.scm util.scm input-parse.scm \
+	       mime.scm,\
 	       $@)
 
 vhttp:
 	$(call make-$(PLATFORM),\
-	srfi-12.scm util.scm input-parse.scm http.scm mime.scm,\
+	srfi-12.scm srfi-13-local.scm util.scm input-parse.scm \
+	       http.scm mime.scm,\
 	       $@)
 
 vland:
@@ -142,17 +153,57 @@ vland:
 	       srfi-12.scm,\
 	       $@)
 
+vext-io:
+	$(call make-$(PLATFORM),\
+	       ,\
+	       $@)
+
+vipc:
+	$(call make-$(PLATFORM),\
+	       catch-error.scm,\
+	       $@)
+
 vSXML-tree-trans:
 	$(call make-$(PLATFORM),\
-	       util.scm SXML-tree-trans.scm,\
+	       srfi-13-local.scm util.scm SXML-tree-trans.scm,\
 	       $@)
 
 vSXML-to-HTML:
 	$(call make-$(PLATFORM),\
-	       util.scm SXML-tree-trans.scm SXML-to-HTML.scm,\
+	       srfi-13-local.scm util.scm SXML-tree-trans.scm \
+	       SXML-to-HTML.scm,\
 	       $@)
 vSSAX:
 	$(call make-$(PLATFORM),\
-	       catch-error.scm util.scm look-for-str.scm input-parse.scm,\
+	       catch-error.scm srfi-13-local.scm util.scm \
+	       look-for-str.scm char-encoding.scm input-parse.scm,\
 	       $(LIBDIR)/SSAX)
+
+#------------------------------------------------------------------------
+
+# Library
+
+# %:	%.o $(LIBRARY)
+# 	gsc -f -l $(MYLINKFILE) -verbose $@.c
+# 	$(CC) $(LDFLAGS) $(MYLINKFILE).o $@_.c -u ___io_open_file $^ \
+# 	-R/usr/lib:/lib:/usr/local/lib -o $@ -lgambc $(EXT_LIBS) -lm
+
+#gsi:	gsi.o $(LIBRARY)
+#	gsc -f -l $(MYLINKFILE) -verbose gsi.c
+#	$(CC) $(LDFLAGS) $(MYLINKFILE).o gsi_.c $^ \
+#	-o $@ -lgambc $(EXT_LIBS) -lm
+
+
+# check-compiled:	vreaddir vext-io
+# #	./vendian_io
+# 	./vreaddir
+# 	./vext-io
+
+# check-mit:
+# 	scheme -load myenv-mit.scm util.scm env.scm vmyenv.scm
+# 	scheme -load myenv-mit.scm util.scm input-parse.scm look-for-str.scm vinput-parse.scm
+#	scheme -load myenv-mit.scm treap.scm vtreap.scm
+#	scheme -load myenv-mit.scm vland.scm
+
+
 
