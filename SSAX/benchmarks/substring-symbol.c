@@ -66,7 +66,7 @@ substring_to_symbol(obj_t str, const int beg, const int end)
   const int total_len = str->string_t.length;
 
 #if 0
-  printf("\nIn substring_to_symbol\n");
+  printf("\nIn substring_to_symbol: %d %d '%.20s' %x\n",beg,end,BSTRING_TO_STRING(str),BSTRING_TO_STRING(str));
 #endif
 
   assert( beg >= 0 && beg < total_len );
