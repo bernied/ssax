@@ -117,143 +117,143 @@
 ;  with its decsednants until the update target
 ; Returns the transformed node
 (define (sxml:tree-trans curr-node targets-alist)
-  (let-values*
-   (((matched         ; handlers which match this node
-      targets-alist   ; the rest
-      )
-     (sxml:separate-list
-      (lambda (pair) (null? (car pair)))
-      targets-alist)))
-   (and-let*
-    ((after-subnodes  ; curr-node after its subnodes are processed
-      (if
-       (or (not (pair? curr-node))  ; leaf node
-           (null? targets-alist)  ; no more handlers
-           )
-       curr-node
-       (let process-attrs ((targets-alist targets-alist)
-                           (src-attrs (sxml:attr-list curr-node))
-                           (res-attrs '()))
-         (if
-          (null? src-attrs)  ; all attributes processed
-          ; Go to proceed child elements
-          (if
-           (null? targets-alist)  ; children don't need to be processed
-           (cons  ; Constructing the result node
-            (car curr-node)  ; node name
-            ((lambda (kids)
-               (if (null? res-attrs)  ; no attributes
-                   kids
-                   (cons (cons '@ (reverse res-attrs))
-                         kids)))
-             ((if (and (not (null? (cdr curr-node)))
-                       (pair? (cadr curr-node))
-                       (eq? (caadr curr-node) '@))
-                  cddr cdr)
-              curr-node)))
-           (let process-kids ((targets-alist targets-alist)
-                              (src-kids (cdr curr-node))
-                              (res-kids '()))
-             (cond
-               ((null? src-kids)  ; all kids processed
-                (let-values*
-                 (((more-attrs kids)
-                   (sxml:separate-list
-                    (lambda (obj)
-                      (and (pair? obj)
-                           (not (null? obj))
-                           (eq? (car obj) '@)))
-                    res-kids)))
-                 (cons  ; Constructing the result node
-                  (car curr-node)  ; node name
-                  (if
-                   (and (null? res-attrs) (null? more-attrs))
-                   kids
-                   (and-let*
-                    ((overall-attrs
-                      (apply
-                       sxml:unite-annot-attributes-lists
-                       (cons
-                        (cons '@ (reverse res-attrs))
-                        more-attrs))))
-                    (cons overall-attrs kids))))))
-               ((and (pair? (car src-kids))
-                     (eq? (caar src-kids) '@))
-                ; attribute node - already processed
-                (process-kids
-                 targets-alist (cdr src-kids) res-kids))
-               (else
-                (let ((kid-templates
+  (call-with-values
+   (lambda () (sxml:separate-list
+               (lambda (pair) (null? (car pair)))
+               targets-alist))
+   (lambda (matched         ; handlers which match this node
+            targets-alist   ; the rest
+            )
+     (and-let*
+      ((after-subnodes  ; curr-node after its subnodes are processed
+        (if
+         (or (not (pair? curr-node))  ; leaf node
+             (null? targets-alist)  ; no more handlers
+             )
+         curr-node
+         (let process-attrs ((targets-alist targets-alist)
+                             (src-attrs (sxml:attr-list curr-node))
+                             (res-attrs '()))
+           (if
+            (null? src-attrs)  ; all attributes processed
+            ; Go to proceed child elements
+            (if
+             (null? targets-alist)  ; children don't need to be processed
+             (cons  ; Constructing the result node
+              (car curr-node)  ; node name
+              ((lambda (kids)
+                 (if (null? res-attrs)  ; no attributes
+                     kids
+                     (cons (cons '@ (reverse res-attrs))
+                           kids)))
+               ((if (and (not (null? (cdr curr-node)))
+                         (pair? (cadr curr-node))
+                         (eq? (caadr curr-node) '@))
+                    cddr cdr)
+                curr-node)))
+             (let process-kids ((targets-alist targets-alist)
+                                (src-kids (cdr curr-node))
+                                (res-kids '()))
+               (cond
+                 ((null? src-kids)  ; all kids processed
+                  (call-with-values
+                   (lambda () (sxml:separate-list
+                               (lambda (obj)
+                                 (and (pair? obj)
+                                      (not (null? obj))
+                                      (eq? (car obj) '@)))
+                               res-kids))
+                   (lambda (more-attrs kids)
+                     (cons  ; Constructing the result node
+                      (car curr-node)  ; node name
+                      (if
+                       (and (null? res-attrs) (null? more-attrs))
+                       kids
+                       (and-let*
+                        ((overall-attrs
+                          (apply
+                           sxml:unite-annot-attributes-lists
+                           (cons
+                            (cons '@ (reverse res-attrs))
+                            more-attrs))))
+                        (cons overall-attrs kids)))))))
+                 ((and (pair? (car src-kids))
+                       (eq? (caar src-kids) '@))
+                  ; attribute node - already processed
+                  (process-kids
+                   targets-alist (cdr src-kids) res-kids))
+                 (else
+                  (let ((kid-templates
+                         (filter
+                          (lambda (pair)
+                            (eq? (caar pair) (car src-kids)))
+                          targets-alist)))
+                    (if
+                     (null? kid-templates)
+                     ; this child node remains as is
+                     (process-kids
+                      targets-alist
+                      (cdr src-kids)
+                      (append res-kids (list (car src-kids))))
+                     (and-let*
+                      ((new-kid
+                        (sxml:tree-trans
+                         (car src-kids)
+                         (map
+                          (lambda (pair)
+                            (cons (cdar pair) (cdr pair)))
+                          kid-templates))))
+                      (process-kids
                        (filter
                         (lambda (pair)
-                          (eq? (caar pair) (car src-kids)))
-                        targets-alist)))
-                  (if
-                   (null? kid-templates)
-                   ; this child node remains as is
-                   (process-kids
-                    targets-alist
-                    (cdr src-kids)
-                    (append res-kids (list (car src-kids))))
-                   (and-let*
-                    ((new-kid
+                          (not (eq? (caar pair) (car src-kids))))
+                        targets-alist)
+                       (cdr src-kids)
+                       (append
+                        res-kids
+                        (if (nodeset? new-kid)
+                            new-kid
+                            (list new-kid)))))))))))
+            (let* ((curr-attr (car src-attrs))
+                   (attr-templates
+                    (filter
+                     (lambda (pair)
+                       (eq? (caar pair) curr-attr))
+                     targets-alist)))
+              (if
+               (null? attr-templates)
+               ; this attribute remains as is
+               (process-attrs targets-alist
+                              (cdr src-attrs)
+                              (cons curr-attr res-attrs))
+               (let ((new-attr  ; cannot produce error for attrs
                       (sxml:tree-trans
-                       (car src-kids)
+                       curr-attr
                        (map
                         (lambda (pair)
                           (cons (cdar pair) (cdr pair)))
-                        kid-templates))))
-                    (process-kids
-                     (filter
-                      (lambda (pair)
-                        (not (eq? (caar pair) (car src-kids))))
-                      targets-alist)
-                     (cdr src-kids)
-                     (append
-                      res-kids
-                      (if (nodeset? new-kid)
-                          new-kid
-                          (list new-kid)))))))))))
-          (let* ((curr-attr (car src-attrs))
-                 (attr-templates
+                        attr-templates))))
+                 (process-attrs
                   (filter
                    (lambda (pair)
-                     (eq? (caar pair) curr-attr))
-                   targets-alist)))
-            (if
-             (null? attr-templates)
-             ; this attribute remains as is
-             (process-attrs targets-alist
-                            (cdr src-attrs)
-                            (cons curr-attr res-attrs))
-             (let ((new-attr  ; cannot produce error for attrs
-                    (sxml:tree-trans
-                     curr-attr
-                     (map
-                      (lambda (pair)
-                        (cons (cdar pair) (cdr pair)))
-                      attr-templates))))
-               (process-attrs
-                (filter
-                 (lambda (pair)
-                   (not (eq? (caar pair) curr-attr)))
-                 targets-alist)
-                (cdr src-attrs)
-                (if (nodeset? new-attr)
-                    (append (reverse new-attr) res-attrs)
-                    (cons new-attr res-attrs)))))))))))
-    (let process-this ((new-curr-node after-subnodes)
-                       (curr-handlers (map cdr matched)))
-      (if
-       (null? curr-handlers)
-       new-curr-node
-       (process-this
-        ((cadar curr-handlers)  ; lambda
+                     (not (eq? (caar pair) curr-attr)))
+                   targets-alist)
+                  (cdr src-attrs)
+                  (if (nodeset? new-attr)
+                      (append (reverse new-attr) res-attrs)
+                      (cons new-attr res-attrs)))))))))))
+      (let process-this ((new-curr-node after-subnodes)
+                         (curr-handlers (map cdr matched)))
+        (if
+         (null? curr-handlers)
          new-curr-node
-         (caar curr-handlers)  ; context
-         (caddar curr-handlers)  ; base-node
-         )                      
-        (cdr curr-handlers)))))))
+         (process-this
+          ((cadar curr-handlers)  ; lambda
+           new-curr-node
+           (caar curr-handlers)  ; context
+           (caddar curr-handlers)  ; base-node
+           )                      
+          (cdr curr-handlers))))))))
 
 ; doc - a source SXML document
 ; update-targets ::= (listof  update-target)
@@ -368,8 +368,8 @@
         (and-let*
          ; Convert Location path to XPath AST
          ((ast (txp:xpath->ast (car curr))))
-         (let-values*
-          (((txpath-pair relative?)
+         (call-with-values
+          (lambda ()
             (if
              (eq? (car ast) 'absolute-location-path)
              (values
@@ -384,92 +384,93 @@
              (values
               (ddo:ast-relative-location-path ast #f #t 0 '(0))
               (not (null? res))   ; absolute for the first rule
-              ))))
-          (if
-           (not txpath-pair)  ; semantic error
-           txpath-pair  ; propagate the error
-           (let ((txpath-lambda (car txpath-pair))
-                 (action (cadr curr)))
-             (if
-              (procedure? action)  ; user-supplied handler
-              (iter (cdr src)
-                    (cons
-                     (list txpath-lambda relative? action)
-                     res))
-              (case action
-                ((delete delete-undeep)
-                 (iter (cdr src)
-                       (cons
-                        (list
-                         txpath-lambda
-                         relative?
-                         (cdr
-                          (assq action
-                                `((delete . ,modif:delete)
-                                  (delete-undeep . ,modif:delete-undeep)))))
-                        res)))
-                ((insert-into insert-following insert-preceding)
-                 (let ((params (cddr curr)))
+              )))
+          (lambda (txpath-pair relative?)
+            (if
+             (not txpath-pair)  ; semantic error
+             txpath-pair  ; propagate the error
+             (let ((txpath-lambda (car txpath-pair))
+                   (action (cadr curr)))
+               (if
+                (procedure? action)  ; user-supplied handler
+                (iter (cdr src)
+                      (cons
+                       (list txpath-lambda relative? action)
+                       res))
+                (case action
+                  ((delete delete-undeep)
                    (iter (cdr src)
                          (cons
                           (list
                            txpath-lambda
                            relative?
-                           ((cdr
-                             (assq
-                              action
-                              `((insert-into . ,modif:insert-into)
-                                (insert-following . ,modif:insert-following)
-                                (insert-preceding . ,modif:insert-preceding))))
-                            (lambda (context base-node) params)))
-                          res))))
-                ((replace)
-                 (let ((params (cddr curr)))
-                   (iter (cdr src)
-                         (cons
-                          (list txpath-lambda relative?
-                                (lambda (node context base-node) params))
-                          res))))
-                ((rename)
-                 (if
-                  (or (null? (cddr curr))  ; no parameter supplied
-                      (not (symbol? (caddr curr))))
-                  (sxml:modification-error
-                   "improper new name for the node to be renamed: "
-                   curr)                  
-                  (iter
-                   (cdr src)
-                   (cons
-                    (let ((new-name (caddr curr)))
-                      (list txpath-lambda relative? (modif:rename new-name)))
-                    res))))
-                ((move-into move-following move-preceding)
-                 (if
-                  (or (null? (cddr curr))  ; no lpath supplied
-                      (not (string? (caddr curr))))
-                  (sxml:modification-error
-                   "improper destination location path for move action: "
-                   curr)
-                  (and-let*
-                   ((ast (txp:xpath->ast (caddr curr)))
-                    (txpath-pair (ddo:ast-location-path ast #f #t 0 '(0))))
-                   (iter (cdr src)
-                         (cons
-                          (list
-                           (car txpath-pair)
-                           #t
-                           ((cdr
-                             (assq
-                              action
-                              `((move-into . ,modif:insert-into)
-                                (move-following . ,modif:insert-following)
-                                (move-preceding . ,modif:insert-preceding))))
-                            (lambda (context base-node) base-node)))
-                          (cons                                
-                           (list txpath-lambda relative? modif:delete)
-                           res))))))
-                (else
-                 (sxml:modification-error "unknown action: " curr)))))))))))))
+                           (cdr
+                            (assq action
+                                  `((delete . ,modif:delete)
+                                    (delete-undeep . ,modif:delete-undeep)))))
+                          res)))
+                  ((insert-into insert-following insert-preceding)
+                   (let ((params (cddr curr)))
+                     (iter (cdr src)
+                           (cons
+                            (list
+                             txpath-lambda
+                             relative?
+                             ((cdr
+                               (assq
+                                action
+                                `((insert-into . ,modif:insert-into)
+                                  (insert-following . ,modif:insert-following)
+                                  (insert-preceding . ,modif:insert-preceding))))
+                              (lambda (context base-node) params)))
+                            res))))
+                  ((replace)
+                   (let ((params (cddr curr)))
+                     (iter (cdr src)
+                           (cons
+                            (list txpath-lambda relative?
+                                  (lambda (node context base-node) params))
+                            res))))
+                  ((rename)
+                   (if
+                    (or (null? (cddr curr))  ; no parameter supplied
+                        (not (symbol? (caddr curr))))
+                    (sxml:modification-error
+                     "improper new name for the node to be renamed: "
+                     curr)                  
+                    (iter
+                     (cdr src)
+                     (cons
+                      (let ((new-name (caddr curr)))
+                        (list txpath-lambda relative? (modif:rename new-name)))
+                      res))))
+                  ((move-into move-following move-preceding)
+                   (if
+                    (or (null? (cddr curr))  ; no lpath supplied
+                        (not (string? (caddr curr))))
+                    (sxml:modification-error
+                     "improper destination location path for move action: "
+                     curr)
+                    (and-let*
+                     ((ast (txp:xpath->ast (caddr curr)))
+                      (txpath-pair (ddo:ast-location-path ast #f #t 0 '(0))))
+                     (iter (cdr src)
+                           (cons
+                            (list
+                             (car txpath-pair)
+                             #t
+                             ((cdr
+                               (assq
+                                action
+                                `((move-into . ,modif:insert-into)
+                                  (move-following . ,modif:insert-following)
+                                  (move-preceding . ,modif:insert-preceding))))
+                              (lambda (context base-node) base-node)))
+                            (cons                                
+                             (list txpath-lambda relative? modif:delete)
+                             res))))))
+                  (else
+                   (sxml:modification-error "unknown action: " curr))))))))))))))
 
 ;==========================================================================
 ; Several popular handlers
@@ -690,29 +691,30 @@
                  (null? (cdr lst))  ; this is the last member
                  #t  ; nothing more to be done
                  (let ((next (cadr lst)))
-                   (let-values*
-                    (((matched   ; handlers which match `next'
-                       targets   ; the rest
-                       )
+                   (call-with-values
+                    (lambda ()
                       (sxml:separate-list
                        (lambda (pair) (eq? (caar pair) next))
-                       targets)))
-                    (if
-                     (null? matched)  ; nothing matched the next node
-                     (loop (cdr lst) targets)
-                     (let ((matched
-                            (map
-                             (lambda (pair) (cons (cdar pair) (cdr pair)))
-                             matched)))
-                       (cond
-                         ((assv '() matched)  ; the `next' is to be mutated
-                          => (lambda (pair)
-                               (let ((k (length (cdr pair))))
-                                 (sxml:replace-next-with-lst! lst (cdr pair))
-                                 (loop (list-tail lst k) targets))))
-                         (else
-                          (tree-walk next matched)
-                          (loop (cdr lst) targets)))))))))))))))
+                       targets))
+                    (lambda (matched   ; handlers which match `next'
+                             targets   ; the rest
+                             )
+                      (if
+                       (null? matched)  ; nothing matched the next node
+                       (loop (cdr lst) targets)
+                       (let ((matched
+                              (map
+                               (lambda (pair) (cons (cdar pair) (cdr pair)))
+                               matched)))
+                         (cond
+                           ((assv '() matched)  ; the `next' is to be mutated
+                            => (lambda (pair)
+                                 (let ((k (length (cdr pair))))
+                                   (sxml:replace-next-with-lst! lst (cdr pair))
+                                   (loop (list-tail lst k) targets))))
+                           (else
+                            (tree-walk next matched)
+                            (loop (cdr lst) targets))))))))))))))))
   (let ((targets-alist
            (map-union
             (lambda (pair)
@@ -758,45 +760,46 @@
        ; anc-upd? - whether an ancestor of the current node us updated
        (tree-walk
         (lambda (curr-node targets-alist)
-          (let-values*
-           (((matched  ; handlers which match this node
-              targets  ; the rest
-              )
-             (sxml:separate-list
-              (lambda (pair) (null? (car pair)))
-              targets-alist)))
-           (if
-            ; No updates both on this level and on ancestor's level
-            (null? matched)
-            (let loop ((targets targets-alist)
-                       (subnodes (append (sxml:attr-list curr-node)
-                                         ((sxml:child sxml:node?) curr-node)))
-                       (res '()))
-              (if
-               (or (null? targets) (null? subnodes))
-               res
-               (let-values*
-                (((matched targets)
-                  (sxml:separate-list
-                   (lambda (pair) (eq? (caar pair) (car subnodes)))
-                   targets)))
-                (loop targets
-                      (cdr subnodes)
-                      (if
-                       (null? matched)
-                       res
-                       (append res
-                               (tree-walk
-                                (car subnodes)
-                                (map
-                                 (lambda (pair) (cons (cdar pair) (cdr pair)))
-                                 matched))))))))
-            (list
-             (cons (cadar matched)  ; context
-                   (sxml:clone-nset-except
-                    (as-nodeset
-                     (sxml:tree-trans curr-node targets-alist))
-                    curr-node))))))))
+          (call-with-values
+           (lambda () (sxml:separate-list
+                       (lambda (pair) (null? (car pair)))
+                       targets-alist))
+           (lambda (matched  ; handlers which match this node
+                    targets  ; the rest
+                    )
+             (if
+              ; No updates both on this level and on ancestor's level
+              (null? matched)
+              (let loop ((targets targets-alist)
+                         (subnodes (append (sxml:attr-list curr-node)
+                                           ((sxml:child sxml:node?) curr-node)))
+                         (res '()))
+                (if
+                 (or (null? targets) (null? subnodes))
+                 res
+                 (call-with-values
+                  (lambda ()
+                    (sxml:separate-list
+                     (lambda (pair) (eq? (caar pair) (car subnodes)))
+                     targets))
+                  (lambda (matched targets)
+                    (loop targets
+                          (cdr subnodes)
+                          (if
+                           (null? matched)
+                           res
+                           (append res
+                                   (tree-walk
+                                    (car subnodes)
+                                    (map
+                                     (lambda (pair) (cons (cdar pair) (cdr pair)))
+                                     matched)))))))))
+              (list
+               (cons (cadar matched)  ; context
+                     (sxml:clone-nset-except
+                      (as-nodeset
+                       (sxml:tree-trans curr-node targets-alist))
+                      curr-node)))))))))
     (let ((targets-alist
            (map-union
             (lambda (triple)

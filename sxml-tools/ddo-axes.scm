@@ -238,20 +238,20 @@
                             ((eq? (car more) next)
                              ; next node is a descendant-or-self candidate
                              ; or the attribute of its descendants
-                             (let-values*
-                              (((add-res new-src)
-                                (child4this (car src) (cdr src))))
-                              (if
-                               (null? new-src)
-                               (iter-cands   ; will exit there
-                                (cdr res-candidates)
-                                new-src
-                                (append res add-res))
-                               (rpt
-                                (cdr more)  ; kids processed by recursive
-                                (sxml:context->node (car new-src))
-                                new-src
-                                (append res add-res)))))
+                             (call-with-values
+                              (lambda () (child4this (car src) (cdr src)))
+                              (lambda (add-res new-src)
+                                (if
+                                 (null? new-src)
+                                 (iter-cands   ; will exit there
+                                  (cdr res-candidates)
+                                  new-src
+                                  (append res add-res))
+                                 (rpt
+                                  (cdr more)  ; kids processed by recursive
+                                  (sxml:context->node (car new-src))
+                                  new-src
+                                  (append res add-res))))))
                             (else
                              (rpt
                               (append (ddo:attr-child (car more))
@@ -265,9 +265,10 @@
            (if
             (null? nset)
             res
-            (let-values*
-             (((add-res new-nset) (child4this (car nset) (cdr nset))))
-             (iter new-nset (append res add-res)))))
+            (call-with-values
+             (lambda () (child4this (car nset) (cdr nset)))
+             (lambda (add-res new-nset)
+               (iter new-nset (append res add-res))))))
          ((draft:child test-pred? num-anc) node))))))
         
 ; Descendant axis
@@ -305,8 +306,8 @@
                      (child (sxml:context->node (car src)))))
                   res)))
          (let ((curr-cntnt (car content-to-scan)))
-           (let-values*
-            (((new-src new-next)
+           (call-with-values
+            (lambda ()
               (if
                ; next input node should be removed from consideration
                (eq? (car curr-cntnt) next-node)
@@ -315,21 +316,22 @@
                 (if (null? (cdr src))  ; no next node
                     #f 
                     (sxml:context->node (cadr src))))
-               (values src next-node))))            
-            (loop new-src
-                  new-next
-                  (append
-                   (map
-                    (lambda (c) (cons c curr-cntnt))
-                    (child (car curr-cntnt)))
-                   (cdr content-to-scan))
-                  (if
-                   (test-pred? (car curr-cntnt))  ; satisfies the node test
-                   (cons
-                    (draft:smart-make-context
-                     (car curr-cntnt) (cdr curr-cntnt) num-anc)
-                    res)
-                   res)))))))))
+               (values src next-node)))
+            (lambda (new-src new-next)
+              (loop new-src
+                    new-next
+                    (append
+                     (map
+                      (lambda (c) (cons c curr-cntnt))
+                      (child (car curr-cntnt)))
+                     (cdr content-to-scan))
+                    (if
+                     (test-pred? (car curr-cntnt))  ; satisfies the node test
+                     (cons
+                      (draft:smart-make-context
+                       (car curr-cntnt) (cdr curr-cntnt) num-anc)
+                      res)
+                     res))))))))))
 
 ; Descendant-or-self axis
 ; See the comment for ddo:descendant
@@ -359,8 +361,8 @@
                   (list (sxml:context->content (car src)))
                   res)))
          (let ((curr-cntnt (car content-to-scan)))
-           (let-values*
-            (((new-src new-next)
+           (call-with-values
+            (lambda ()
               (if
                ; next input node should be removed from consideration
                (eq? (car curr-cntnt) next-node)
@@ -369,21 +371,22 @@
                 (if (null? (cdr src))  ; no next node
                     #f 
                     (sxml:context->node (cadr src))))
-               (values src next-node))))            
-            (loop new-src
-                  new-next
-                  (append
-                   (map
-                    (lambda (c) (cons c curr-cntnt))
-                    (child (car curr-cntnt)))
-                   (cdr content-to-scan))
-                  (if
-                   (test-pred? (car curr-cntnt))  ; satisfies the node test
-                   (cons
-                    (draft:smart-make-context
-                     (car curr-cntnt) (cdr curr-cntnt) num-anc)
-                    res)
-                   res)))))))))
+               (values src next-node)))
+            (lambda (new-src new-next)
+              (loop new-src
+                    new-next
+                    (append
+                     (map
+                      (lambda (c) (cons c curr-cntnt))
+                      (child (car curr-cntnt)))
+                     (cdr content-to-scan))
+                    (if
+                     (test-pred? (car curr-cntnt))  ; satisfies the node test
+                     (cons
+                      (draft:smart-make-context
+                       (car curr-cntnt) (cdr curr-cntnt) num-anc)
+                      res)
+                     res))))))))))
 
 ; Following axis
 ; The implementation exploits the idea expressed in
@@ -494,22 +497,23 @@
                         (loop (cdr res-candidates) src res #t))
                        ((eq? (car more) next)
                         ; next node is a descendant-or-self of res-candidate
-                        (let-values*
-                         (((add-res new-src)
+                        (call-with-values
+                         (lambda ()
                            (reordering
                             (all-following-siblings (car src))
                             (sxml:context->ancestors (car src))
-                            (cdr src))))
-                         (if
-                          (null? new-src)
-                          (loop (cdr res-candidates)
-                                new-src
-                                (append res add-res)
-                                #t)
-                          (rpt (cdr more)  ; kids processed by recursive
-                               (sxml:context->node (car new-src))
-                               new-src
-                               (append res add-res)))))
+                            (cdr src)))
+                         (lambda (add-res new-src)
+                           (if
+                            (null? new-src)
+                            (loop (cdr res-candidates)
+                                  new-src
+                                  (append res add-res)
+                                  #t)
+                            (rpt (cdr more)  ; kids processed by recursive
+                                 (sxml:context->node (car new-src))
+                                 new-src
+                                 (append res add-res))))))
                        ((memq next (ddo:attrs-and-values (car more)))
                         ; the next node is the attribute node or
                         ; attribute value node => it has no siblings
@@ -534,12 +538,13 @@
            (if
             (null? nset)
             res
-            (let-values*
-             (((add-res new-nset)
+            (call-with-values
+             (lambda ()
                (reordering (all-following-siblings (car nset))
                            (sxml:context->ancestors (car nset))
-                           (cdr nset))))
-             (iter new-nset (append res add-res)))))
+                           (cdr nset)))
+             (lambda (add-res new-nset)
+               (iter new-nset (append res add-res))))))
          ((draft:following-sibling test-pred? num-anc) node))))))
     
 ; Namespace axis
@@ -690,36 +695,37 @@
                              res)))
                        ((eq? (car more) next)
                         ; next node is a descendant-or-self of res-candidate
-                        (let-values*
-                         (((add-res new-src)
+                        (call-with-values
+                         (lambda ()
                            (reordering
                             (all-preceding-siblings (car src))
                             (sxml:context->ancestors (car src))
-                            (cdr src))))
-                         (let ((new-src
-                                (cond
-                                  ((null? new-src) new-src)
-                                  ((eq? res-candidate
-                                        (sxml:context->node (car new-src)))
-                                   (cdr new-src))
-                                  (else new-src))))
-                           (if
-                            (null? new-src)
-                            (loop (cdr res-candidates)
-                                  new-src
-                                  (if
-                                   (test-pred? res-candidate)
-                                   (append
-                                    res
-                                    add-res                                 
-                                    (list
-                                     (draft:smart-make-context
-                                      res-candidate res-ancestors num-anc)))
-                                   (append res add-res)))
-                            (rpt (cdr more)  ; kids processed by recursive
-                                 (sxml:context->node (car new-src))
-                                 new-src
-                                 (append res add-res))))))
+                            (cdr src)))
+                         (lambda (add-res new-src)
+                           (let ((new-src
+                                  (cond
+                                    ((null? new-src) new-src)
+                                    ((eq? res-candidate
+                                          (sxml:context->node (car new-src)))
+                                     (cdr new-src))
+                                    (else new-src))))
+                             (if
+                              (null? new-src)
+                              (loop (cdr res-candidates)
+                                    new-src
+                                    (if
+                                     (test-pred? res-candidate)
+                                     (append
+                                      res
+                                      add-res                                 
+                                      (list
+                                       (draft:smart-make-context
+                                        res-candidate res-ancestors num-anc)))
+                                     (append res add-res)))
+                              (rpt (cdr more)  ; kids processed by recursive
+                                   (sxml:context->node (car new-src))
+                                   new-src
+                                   (append res add-res)))))))
                        (else
                         (rpt (append (reverse (child (car more))) (cdr more))
                              next src res)))))))))))
@@ -731,12 +737,13 @@
            (if
             (null? nset)
             (reverse res)
-            (let-values*
-             (((add-res new-nset)
+            (call-with-values
+             (lambda ()
                (reordering (all-preceding-siblings (car nset))
                            (sxml:context->ancestors (car nset))
-                           (cdr nset))))
-             (iter new-nset (append res add-res)))))
+                           (cdr nset)))
+             (lambda (add-res new-nset)
+               (iter new-nset (append res add-res))))))
          ((draft:following-sibling test-pred? num-anc) node))))))
   
 ; Self axis
@@ -989,15 +996,16 @@
                          ; the first repeated found
                          (memq (car curr-ancs) prev-ancestors))
                      => (lambda (prev-tail)
-                          (let-values*
-                           (((prev-ancestors ancs-alist this-nset)
+                          (call-with-values
+                           (lambda()
                              (if
                               (pair? prev-tail)
                               (let ((t
                                      (assmemq (car prev-tail) ancs-alist)))
                                 (values prev-tail t (cdar t)))
-                              (values '() '() '()))))
-                           (let creat ((prev-ancestors prev-ancestors)
+                              (values '() '() '())))
+                           (lambda (prev-ancestors ancs-alist this-nset)
+                             (let creat ((prev-ancestors prev-ancestors)
                                        (ancs-alist ancs-alist)
                                        (vacant-num vacant-num)
                                        (this-nset this-nset)
@@ -1021,7 +1029,7 @@
                                          num-anc)
                                         vacant-num)
                                        this-nset)
-                                      this-nset)))                               
+                                      this-nset)))
                                 (creat (car new-content)
                                        (cons
                                         (cons
@@ -1030,7 +1038,7 @@
                                         ancs-alist)
                                        (+ vacant-num 1)
                                        new-this-nset
-                                       (cdr new-content))))))))
+                                       (cdr new-content)))))))))
                     (else
                      (rpt (cdr curr-ancs)
                           (cons curr-ancs new-content))))))))))))))
@@ -1065,47 +1073,48 @@
                     ; or the first repeated found
                     (memq (car curr-ancs) prev-ancestors))
                 => (lambda (prev-tail)                     
-                     (let-values*
-                      (((prev-ancestors ancs-alist this-nset)
+                     (call-with-values
+                      (lambda ()
                         (if
                          (pair? prev-tail)
                          (let ((t (assmemq (car prev-tail) ancs-alist)))
                            (values prev-tail t (cdar t)))
-                         (values '() '() '()))))
-                      (let creat ((prev-ancestors prev-ancestors)
-                                  (ancs-alist ancs-alist)
-                                  (vacant-num vacant-num)
-                                  (this-nset this-nset)
-                                  (new-content new-content))
-                        (if
-                         (null? new-content)  ; everyone processed
-                         (loop (cdr src)
-                               prev-ancestors
-                               ancs-alist
-                               (cons this-nset pos-res)
-                               vacant-num)
-                         (let ((new-this-nset
-                                (if
-                                 (test-pred? (caar new-content))
-                                 ; add to the result
-                                 (cons
-                                  (cons
-                                   (draft:smart-make-context
-                                    (caar new-content)
-                                    (cdar new-content)
-                                    num-anc)
-                                   vacant-num)
-                                  this-nset)
-                                 this-nset)))                               
-                           (creat (car new-content)
-                                  (cons
+                         (values '() '() '())))
+                      (lambda (prev-ancestors ancs-alist this-nset)
+                        (let creat ((prev-ancestors prev-ancestors)
+                                    (ancs-alist ancs-alist)
+                                    (vacant-num vacant-num)
+                                    (this-nset this-nset)
+                                    (new-content new-content))
+                          (if
+                           (null? new-content)  ; everyone processed
+                           (loop (cdr src)
+                                 prev-ancestors
+                                 ancs-alist
+                                 (cons this-nset pos-res)
+                                 vacant-num)
+                           (let ((new-this-nset
+                                  (if
+                                   (test-pred? (caar new-content))
+                                   ; add to the result
                                    (cons
-                                    (caar new-content)
-                                    new-this-nset)
-                                   ancs-alist)
-                                  (+ vacant-num 1)
-                                  new-this-nset
-                                  (cdr new-content))))))))
+                                    (cons
+                                     (draft:smart-make-context
+                                      (caar new-content)
+                                      (cdar new-content)
+                                      num-anc)
+                                     vacant-num)
+                                    this-nset)
+                                   this-nset)))
+                             (creat (car new-content)
+                                    (cons
+                                     (cons
+                                      (caar new-content)
+                                      new-this-nset)
+                                     ancs-alist)
+                                    (+ vacant-num 1)
+                                    new-this-nset
+                                    (cdr new-content)))))))))
                (else
                 (rpt (cdr curr-ancs)
                      (cons curr-ancs new-content)))))))))))
@@ -1191,31 +1200,32 @@
                               (+ order-num 1))))
                       ; There are descendants to be scanned
                       ((eq? (car desc-to-scan) next-node)
-                       (let-values*
-                           (((new-pos-res new-src new-order-num)
-                             (src-walk (car src)
-                                       (cdr src)
-                                       order-num)))
-                         (if
-                          (null? new-src)  ; no more nodes in src nodeset
-                          (values
-                           (cons
-                            (append
-                             (reverse this-res)
-                             (create-pos-nset
-                              ((sxml:filter test-pred?) curr-children)
-                              curr-ancestors order-num))
-                            (append pos-result new-pos-res))
-                           new-src  ; always null
-                           #f  ; nobody cares of this number anymore
-                           )
-                          (loop new-src
-                                (sxml:context->node (car new-src))
-                                curr-children
-                                (cdr desc-to-scan)  ; descendants processed
-                                this-res
-                                (append pos-result new-pos-res)
-                                new-order-num))))
+                       (call-with-values
+                        (lambda ()
+                          (src-walk (car src)
+                                    (cdr src)
+                                    order-num))
+                        (lambda (new-pos-res new-src new-order-num)
+                          (if
+                           (null? new-src)  ; no more nodes in src nodeset
+                           (values
+                            (cons
+                             (append
+                              (reverse this-res)
+                              (create-pos-nset
+                               ((sxml:filter test-pred?) curr-children)
+                               curr-ancestors order-num))
+                             (append pos-result new-pos-res))
+                            new-src  ; always null
+                            #f  ; nobody cares of this number anymore
+                            )
+                           (loop new-src
+                                 (sxml:context->node (car new-src))
+                                 curr-children
+                                 (cdr desc-to-scan)  ; descendants processed
+                                 this-res
+                                 (append pos-result new-pos-res)
+                                 new-order-num)))))
                       (else  ; proceed to the next descendant
                        (loop src next-node curr-children
                              (append  ; content-to-scan
@@ -1233,12 +1243,12 @@
            (filter  ; removing empty result nodesets
             (lambda (x) (not (null? x)))
             pos-result)
-           (let-values*
-               (((new-pos-res new-src new-order-num)
-                 (src-walk (car src) (cdr src) order-num)))
-             (rpt new-src
-                  (append pos-result new-pos-res)
-                  new-order-num))))))))
+           (call-with-values
+            (lambda () (src-walk (car src) (cdr src) order-num))
+            (lambda (new-pos-res new-src new-order-num)
+              (rpt new-src
+                   (append pos-result new-pos-res)
+                   new-order-num)))))))))
 
 ; Descendant axis, for position-based filtering
 ; When no node in the input node-set is a descendant of another node in the
@@ -1274,29 +1284,29 @@
                (let ((curr-cntnt (car content-to-scan)))
                  (if
                   (eq? (car curr-cntnt) next-node)
-                  (let-values*
-                      (((new-pos-res new-src new-order-num)
-                        (src-walk (car src)
-                                  (cdr src)
-                                  (+ order-num 1))))
-                    (loop new-src
-                          (if (null? new-src)
-                              #f
-                              (sxml:context->node (car new-src)))
-                          (cdr content-to-scan)  ; descendants processed
-                          (append
-                           (reverse (car new-pos-res))
-                           (if  ; this res
-                            (test-pred? (car curr-cntnt))
-                            (cons
+                  (call-with-values
+                   (lambda () (src-walk (car src)
+                                        (cdr src)
+                                        (+ order-num 1)))
+                   (lambda (new-pos-res new-src new-order-num)
+                     (loop new-src
+                           (if (null? new-src)
+                               #f
+                               (sxml:context->node (car new-src)))
+                           (cdr content-to-scan)  ; descendants processed
+                           (append
+                            (reverse (car new-pos-res))
+                            (if  ; this res
+                             (test-pred? (car curr-cntnt))
                              (cons
-                              (draft:smart-make-context
-                               (car curr-cntnt) (cdr curr-cntnt) num-anc)
-                              order-num)
-                             this-res)
-                            this-res))
-                          (append pos-result new-pos-res)
-                          new-order-num))
+                              (cons
+                               (draft:smart-make-context
+                                (car curr-cntnt) (cdr curr-cntnt) num-anc)
+                               order-num)
+                              this-res)
+                             this-res))
+                           (append pos-result new-pos-res)
+                           new-order-num)))
                   (loop src
                         next-node
                         (append  ; content-to-scan
@@ -1324,12 +1334,12 @@
            (filter  ; removing empty result nodesets
             (lambda (x) (not (null? x)))
             pos-result)
-           (let-values*
-               (((new-pos-res new-src new-order-num)
-                 (src-walk (car src) (cdr src) order-num)))             
-             (rpt new-src
-                  (append pos-result new-pos-res)
-                  new-order-num))))))))
+           (call-with-values
+            (lambda () (src-walk (car src) (cdr src) order-num))
+            (lambda (new-pos-res new-src new-order-num)
+              (rpt new-src
+                   (append pos-result new-pos-res)
+                   new-order-num)))))))))
 
 ; Descendant-or-selt axis, for position-based filtering
 ; When no node in the input node-set is a descendant of another node in the
@@ -1361,19 +1371,19 @@
                (let ((curr-cntnt (car content-to-scan)))
                  (if
                   (eq? (car curr-cntnt) next-node)
-                  (let-values*
-                      (((new-pos-res new-src new-order-num)
-                        (src-walk (car src) (cdr src) order-num)))
-                    (loop new-src
-                          (if (null? new-src)
-                              #f
-                              (sxml:context->node (car new-src)))
-                          (cdr content-to-scan)  ; descendants processed
-                          (append
-                           (reverse (car new-pos-res))
-                           this-res)
-                          (append pos-result new-pos-res)
-                          new-order-num))
+                  (call-with-values
+                   (lambda () (src-walk (car src) (cdr src) order-num))
+                   (lambda (new-pos-res new-src new-order-num)
+                     (loop new-src
+                           (if (null? new-src)
+                               #f
+                               (sxml:context->node (car new-src)))
+                           (cdr content-to-scan)  ; descendants processed
+                           (append
+                            (reverse (car new-pos-res))
+                            this-res)
+                           (append pos-result new-pos-res)
+                           new-order-num)))
                   (loop src
                         next-node
                         (append  ; content-to-scan
@@ -1401,12 +1411,12 @@
            (filter  ; removing empty result nodesets
             (lambda (x) (not (null? x)))
             pos-result)
-           (let-values*
-               (((new-pos-res new-src new-order-num)
-                 (src-walk (car src) (cdr src) order-num)))             
-             (rpt new-src
-                  (append pos-result new-pos-res)
-                  new-order-num))))))))
+           (call-with-values
+            (lambda () (src-walk (car src) (cdr src) order-num))
+            (lambda (new-pos-res new-src new-order-num)
+              (rpt new-src
+                   (append pos-result new-pos-res)
+                   new-order-num)))))))))
 
 ; Following-sibling axis, for position-based filtering
 (define (ddo:following-sibling-pos test-pred? . num-ancestors)
@@ -1484,18 +1494,19 @@
                             (if                               
                              (eq? (car foll-siblings)
                                   (sxml:context->node (car src)))
-                             (let-values*
-                              (((new-pos-res new-src new-vacant)
+                             (call-with-values
+                              (lambda ()
                                 (process-single
-                                 (car src) (cdr src) (+ vacant-num 1))))
-                              (values (cons
-                                       (append
-                                        (reverse new-res)
-                                        (if (null? new-pos-res)
-                                            '() (car new-pos-res)))
-                                       (append pos-res new-pos-res))
-                                      new-src
-                                      new-vacant))
+                                 (car src) (cdr src) (+ vacant-num 1)))
+                              (lambda (new-pos-res new-src new-vacant)
+                                (values (cons
+                                         (append
+                                          (reverse new-res)
+                                          (if (null? new-pos-res)
+                                              '() (car new-pos-res)))
+                                         (append pos-res new-pos-res))
+                                        new-src
+                                        new-vacant)))
                              (loop (cdr foll-siblings)
                                    (ddo:attr-child (car foll-siblings))
                                    (ddo:discard-attributes
@@ -1505,16 +1516,17 @@
                                    pos-res)))))
                         ((eq? (car descs) (sxml:context->node (car src)))
                          ; His siblings are on the way
-                         (let-values*
-                          (((new-pos-res new-src new-vacant)
+                         (call-with-values
+                          (lambda ()
                             (process-single
-                             (car src) (cdr src) vacant-num)))
-                          (loop foll-siblings
-                                (cdr descs)  ; descendants processed
-                                new-src
-                                new-vacant
-                                res
-                                (cons pos-res new-pos-res))))
+                             (car src) (cdr src) vacant-num))
+                          (lambda (new-pos-res new-src new-vacant)
+                            (loop foll-siblings
+                                  (cdr descs)  ; descendants processed
+                                  new-src
+                                  new-vacant
+                                  res
+                                  (cons pos-res new-pos-res)))))
                         (else
                          (loop foll-siblings
                                (append (child (car descs)) (cdr descs))
@@ -1535,12 +1547,12 @@
             (filter  ; removing empty result nodesets
              (lambda (x) (not (null? x)))
              pos-res)
-            (let-values*
-             (((new-pos-res new-src new-vacant)
-               (process-single (car src) (cdr src) vacant-num)))
-             (iter new-src
-                   (append pos-res new-pos-res)
-                   new-vacant)))))))))
+            (call-with-values
+             (lambda () (process-single (car src) (cdr src) vacant-num))
+             (lambda (new-pos-res new-src new-vacant)
+               (iter new-src
+                     (append pos-res new-pos-res)
+                     new-vacant))))))))))
 
 ; Parent axis, for position-based filtering
 ; We won't reinvent the wheel here. We'll use ddo:parent and apply the fact
@@ -1643,18 +1655,19 @@
                            (cond                             
                              ((eq? (car prec-siblings)  ; to be now added
                                    (sxml:context->node (car src)))
-                              (let-values*
-                               (((new-pos-res new-src new-vacant)
+                              (call-with-values
+                               (lambda ()
                                  (process-single
-                                  (car src) (cdr src) (- vacant-num 1))))
-                               (values (cons
-                                        (append
-                                         (reverse new-res)
-                                         (if (null? new-pos-res)
-                                             '() (car new-pos-res)))
-                                        (append pos-res new-pos-res))
-                                       new-src
-                                       new-vacant)))
+                                  (car src) (cdr src) (- vacant-num 1)))
+                               (lambda (new-pos-res new-src new-vacant)
+                                 (values (cons
+                                          (append
+                                           (reverse new-res)
+                                           (if (null? new-pos-res)
+                                               '() (car new-pos-res)))
+                                          (append pos-res new-pos-res))
+                                         new-src
+                                         new-vacant))))
                              ((null? (cdr prec-siblings))  ; that stuff is over
                               (values (cons (reverse new-res) pos-res)
                                       src
@@ -1668,18 +1681,17 @@
                                     pos-res)))))
                         ((eq? (car descs) (sxml:context->node (car src)))
                          ; His siblings are on the way
-                         ;(pp (list res pos-res (sxml:context->node (car src))
-                         ;          vacant-num descs))
-                         (let-values*
-                          (((new-pos-res new-src new-vacant)
+                         (call-with-values
+                          (lambda ()
                             (process-single
-                             (car src) (cdr src) vacant-num)))
-                          (loop prec-siblings
+                             (car src) (cdr src) vacant-num))
+                          (lambda (new-pos-res new-src new-vacant)
+                            (loop prec-siblings
                                 (cdr descs)  ; descendants processed
                                 new-src
                                 new-vacant
                                 res
-                                (append pos-res new-pos-res))))
+                                (append pos-res new-pos-res)))))
                         (else
                          (loop prec-siblings                               
                                (cdr descs)
@@ -1700,12 +1712,12 @@
             (filter  ; removing empty result nodesets
              (lambda (x) (not (null? x)))
              pos-res)
-            (let-values*
-             (((new-pos-res new-src new-vacant)
-               (process-single (car src) (cdr src) vacant-num)))
-             (iter new-src
-                   (append new-pos-res pos-res)
-                   new-vacant)))))))))
+            (call-with-values
+             (lambda () (process-single (car src) (cdr src) vacant-num))
+             (lambda (new-pos-res new-src new-vacant)
+               (iter new-src
+                     (append new-pos-res pos-res)
+                     new-vacant))))))))))
 
 ;-------------------------------------------------
 ; Particular case: all nodes in the input node-set are on the same level of

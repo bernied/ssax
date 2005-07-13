@@ -457,8 +457,8 @@
              (lambda (nodeset) (ddo:list-ref nodeset (- num 1)))))
        ((and (memq (car expr) '(= > < >= <=))
              (= (length expr) 3))
-        (let-values*
-         (((cmp-op num)
+        (call-with-values
+         (lambda ()
            (cond
              ((and (ddo:check-ast-position? (cadr expr))
                    (ddo:check4ast-number (caddr expr)))
@@ -468,28 +468,30 @@
               => (lambda (num)
                    (values
                     (cond   ; invert the cmp-op
-                      ((assq (car expr) '((< . >) (> . <) (>= . <=) (<= . >=)))
+                      ((assq (car expr)
+                             '((< . >) (> . <) (>= . <=) (<= . >=)))
                        => cdr)
                       (else (car expr)))
                     num)))
              (else
-              (values #f #f)))))        
-         (if
-          (not num)
-          #f
-          (case cmp-op
-            ((=)
-             (lambda (nodeset) (ddo:list-ref nodeset (- num 1))))
-            ((>)
-             (lambda (nodeset) (ddo:list-tail nodeset num)))
-            ((>=)
-             (lambda (nodeset) (ddo:list-tail nodeset (- num 1))))
-            ((<)
-             (lambda (nodeset) (ddo:list-head nodeset (- num 1))))
-            ((<=)
-             (lambda (nodeset) (ddo:list-head nodeset num)))
-            (else   ; internal error
-             #f)))))
+              (values #f #f))))
+         (lambda (cmp-op num)
+           (if
+            (not num)
+            #f
+            (case cmp-op
+              ((=)
+               (lambda (nodeset) (ddo:list-ref nodeset (- num 1))))
+              ((>)
+               (lambda (nodeset) (ddo:list-tail nodeset num)))
+              ((>=)
+               (lambda (nodeset) (ddo:list-tail nodeset (- num 1))))
+              ((<)
+               (lambda (nodeset) (ddo:list-head nodeset (- num 1))))
+              ((<=)
+               (lambda (nodeset) (ddo:list-head nodeset num)))
+              (else   ; internal error
+               #f))))))
        (else  ; not an equality or relational expr with 2 arguments
         #f)))))
 
@@ -1427,38 +1429,39 @@
                (memq (list-ref expr-res 4)  ; involves position implicitly
                      '(ddo:type-number ddo:type-any))))
           (vars2offsets (list-ref expr-res 6)))
-      (let-values*
-       (((pred-impl deep-predicates vars2offsets)
-       (if
-        (or    ; this is a deep predicate
-         (> pred-nesting 3)
-         (and (not requires-position?) (> pred-nesting 1)))
-        (let ((pred-id (car vars2offsets)
-                       ; was: (ddo:generate-pred-id)
-                       ))
-          (values
-           ((if requires-position?
-                ddo:get-pred-value-pos ddo:get-pred-value)
-            pred-id)
-           (cons
-            (list pred-id
-                  requires-position?
-                  (car expr-res)  ; implementation
-                  )
-            (list-ref expr-res 5)  ; deep-predicates
-            )
-           (cons (+ (car vars2offsets) 1)
-                 (cdr vars2offsets))))
-        (values (car expr-res)  ; implementation
-                (list-ref expr-res 5)
-                vars2offsets))))
-       (list pred-impl
-             (cadr expr-res)  ; num-ancestors required
-             (caddr expr-res)  ; single-level? - we don't care
-             requires-position?
-             (list-ref expr-res 4)  ; return type
-             deep-predicates
-             vars2offsets))))))
+      (call-with-values
+       (lambda ()
+         (if
+          (or    ; this is a deep predicate
+           (> pred-nesting 3)
+           (and (not requires-position?) (> pred-nesting 1)))
+          (let ((pred-id (car vars2offsets)
+                         ; was: (ddo:generate-pred-id)
+                         ))
+            (values
+             ((if requires-position?
+                  ddo:get-pred-value-pos ddo:get-pred-value)
+              pred-id)
+             (cons
+              (list pred-id
+                    requires-position?
+                    (car expr-res)  ; implementation
+                    )
+              (list-ref expr-res 5)  ; deep-predicates
+              )
+             (cons (+ (car vars2offsets) 1)
+                   (cdr vars2offsets))))
+          (values (car expr-res)  ; implementation
+                  (list-ref expr-res 5)
+                  vars2offsets)))
+       (lambda (pred-impl deep-predicates vars2offsets)
+         (list pred-impl
+               (cadr expr-res)  ; num-ancestors required
+               (caddr expr-res)  ; single-level? - we don't care
+               requires-position?
+               (list-ref expr-res 4)  ; return type
+               deep-predicates
+               vars2offsets)))))))
 
 ; {8a} ( <Predicate>+ )
 ; Returns (list (listof pred-impl)
@@ -1942,8 +1945,8 @@
 (define (ddo:ast-variable-reference
          op num-anc single-level? pred-nesting vars2offsets)
   (let ((name (string->symbol (cadr op))))
-    (let-values*
-     (((var-offset new-vars2offsets)
+    (call-with-values
+     (lambda ()
        (cond
          ((assq name (cdr vars2offsets))  ; this variable already in alist
           => (lambda (pair)
@@ -1953,25 +1956,26 @@
                   (cons
                    (+ (car vars2offsets) 1)
                    (cons (cons name (car vars2offsets))      
-                         (cdr vars2offsets))))))))
-     (list
-      (lambda (nodeset position+size var-binding)
-        (cond
-          ((and (not (null? var-binding))
-                (eq? (caar var-binding) '*var-vector*))
-           (vector-ref (cdar var-binding) var-offset))
-          ; For backward compatibility
-          ((assq name var-binding)
-           => cdr)
-          (else
-           (sxml:xpointer-runtime-error "unbound variable - " name)
-           '())))
-      0
-      #t  ; ATTENTION: in is not generally on the single-level
-      #f
-      ddo:type-any  ; type cannot be statically determined
-      '()  ; deep-predicates     
-      new-vars2offsets))))
+                         (cdr vars2offsets)))))))
+     (lambda (var-offset new-vars2offsets)
+       (list
+        (lambda (nodeset position+size var-binding)
+          (cond
+            ((and (not (null? var-binding))
+                  (eq? (caar var-binding) '*var-vector*))
+             (vector-ref (cdar var-binding) var-offset))
+            ; For backward compatibility
+            ((assq name var-binding)
+             => cdr)
+            (else
+             (sxml:xpointer-runtime-error "unbound variable - " name)
+             '())))
+        0
+        #t  ; ATTENTION: in is not generally on the single-level
+        #f
+        ddo:type-any  ; type cannot be statically determined
+        '()  ; deep-predicates     
+        new-vars2offsets)))))
 
 ; {20} <Literal> ::= (literal  <String> )
 (define (ddo:ast-literal op num-anc single-level? pred-nesting vars2offsets)
@@ -2156,33 +2160,34 @@
 ; Helper for constructing several highest-level API functions
 (define (ddo:api-helper grammar-parser ast-parser)
   (lambda (xpath-string . ns+na)
-    (let-values*
-        (((ns-binding num-anc) (draft:arglist->ns+na ns+na)))
-      (and-let*
-       ((ast (grammar-parser xpath-string ns-binding))
-        (impl-lst (ast-parser ast num-anc
-                              #t  ; we suppose single-level?=#t for src
-                              0  ; predicate nesting is zero
-                              '(0)  ; initial vars2offsets
-                              )))
-       (let ((impl-lambda
-              (if
-               (and num-anc (zero? num-anc))
-               (let ((impl-car (car impl-lst)))
-                 (lambda (node position+size var-binding)
-                   (draft:contextset->nodeset
-                    (impl-car node position+size var-binding))))                
-               (car impl-lst))))
-         (lambda (node . var-binding)   ; common implementation
-           (impl-lambda
-            (as-nodeset node)
-            (cons 1 1)
-            (ddo:add-vector-to-var-binding
-             (list-ref impl-lst 6)  ; vars2offsets
-             (reverse  ; deep-predicates: need to reverse
-              (list-ref impl-lst 5))
-             node
-             (if (null? var-binding) var-binding (car var-binding))))))))))
+    (call-with-values
+     (lambda () (draft:arglist->ns+na ns+na))
+     (lambda (ns-binding num-anc)
+       (and-let*
+        ((ast (grammar-parser xpath-string ns-binding))
+         (impl-lst (ast-parser ast num-anc
+                               #t  ; we suppose single-level?=#t for src
+                               0  ; predicate nesting is zero
+                               '(0)  ; initial vars2offsets
+                               )))
+        (let ((impl-lambda
+               (if
+                (and num-anc (zero? num-anc))
+                (let ((impl-car (car impl-lst)))
+                  (lambda (node position+size var-binding)
+                    (draft:contextset->nodeset
+                     (impl-car node position+size var-binding))))                
+                (car impl-lst))))
+          (lambda (node . var-binding)   ; common implementation
+            (impl-lambda
+             (as-nodeset node)
+             (cons 1 1)
+             (ddo:add-vector-to-var-binding
+              (list-ref impl-lst 6)  ; vars2offsets
+              (reverse  ; deep-predicates: need to reverse
+               (list-ref impl-lst 5))
+              node
+              (if (null? var-binding) var-binding (car var-binding)))))))))))
 
 (define ddo:txpath (ddo:api-helper txp:xpath->ast ddo:ast-location-path))
 (define ddo:xpath-expr (ddo:api-helper txp:expr->ast ddo:ast-expr))

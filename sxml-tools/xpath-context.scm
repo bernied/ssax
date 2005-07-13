@@ -1093,12 +1093,12 @@
       (list draft:preceding-sibling (draft:na-max num-anc 1) #f))
      ((self)
       (list draft:self num-anc #f))
-     ;((arc)
-     ; (list xlink:axis-arc #f #f))
-     ;((traverse)
-     ; (list xlink:axis-traverse #f #t))
-     ;((traverse-arc)
-     ; (list xlink:axis-traverse-arc #f #t))
+;     ((arc)
+;      (list xlink:axis-arc #f #f))
+;     ((traverse)
+;      (list xlink:axis-traverse #f #t))
+;     ((traverse-arc)
+;      (list xlink:axis-traverse-arc #f #t))
      (else
       (draft:signal-semantic-error "unknown AxisName - " op)))))
 
@@ -1902,23 +1902,24 @@
 ; Helper for constructing several highest-level API functions
 (define (draft:api-helper grammar-parser ast-parser)
   (lambda (xpath-string . ns+na)
-    (let-values*
-        (((ns-binding num-anc) (draft:arglist->ns+na ns+na)))
-      (and-let*
-       ((ast (grammar-parser xpath-string ns-binding))
-        (impl-lst (ast-parser ast num-anc)))
-       (let ((res (car impl-lst)))
-         (lambda (node . var-binding)
-           ((if (and num-anc (zero? num-anc))
-                draft:contextset->nodeset
-                (lambda (x) x))             
-            (res (as-nodeset node) (cons 1 1)
-                 ;(xlink:add-docs-to-vars
-                 ; node
+    (call-with-values
+     (lambda () (draft:arglist->ns+na ns+na))
+     (lambda (ns-binding num-anc)
+       (and-let*
+        ((ast (grammar-parser xpath-string ns-binding))
+         (impl-lst (ast-parser ast num-anc)))
+        (let ((res (car impl-lst)))
+          (lambda (node . var-binding)
+            ((if (and num-anc (zero? num-anc))
+                 draft:contextset->nodeset
+                 (lambda (x) x))             
+             (res (as-nodeset node) (cons 1 1)
+                  ;(xlink:add-docs-to-vars
+                  ; node
                   (if (null? var-binding)
                       var-binding (car var-binding))
-                 ; )
-                 ))))))))
+                  ; )
+                  )))))))))
 
 (define draft:xpath (draft:api-helper txp:xpath->ast draft:ast-location-path))
 (define draft:xpointer (draft:api-helper txp:xpointer->ast draft:ast-xpointer))

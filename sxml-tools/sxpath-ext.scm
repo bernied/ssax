@@ -340,30 +340,30 @@
                                   (map sxml:string-value obj1)
                                   bool-op)))))
       (else  ; one of the objects is a nodeset, another is not
-       (let-values*
-        (((nset elem)
-          ; Equality operations are commutative
-          (if (nodeset? obj1) (values obj1 obj2) (values obj2 obj1))))
-        (cond
-          ((boolean? elem) (bool-op elem (sxml:boolean nset)))
-          ((number? elem)
-           (let loop ((nset 
-                       (map
-                        (lambda (node) (sxml:number (sxml:string-value node)))
-                        nset)))
-             (cond
-               ((null? nset) #f)
-               ((number-op elem (car nset)) #t)
-               (else (loop (cdr nset))))))
-          ((string? elem)
-           (let loop ((nset (map sxml:string-value nset)))
-             (cond
-               ((null? nset) #f)
-               ((string-op elem (car nset)) #t)
-               (else (loop (cdr nset))))))
-          (else  ; unknown datatype
-           (cerr "Unknown datatype: " elem nl)
-           #f)))))))
+       (call-with-values
+        (lambda ()  ; Equality operations are commutative
+          (if (nodeset? obj1) (values obj1 obj2) (values obj2 obj1)))
+        (lambda (nset elem)
+          (cond
+            ((boolean? elem) (bool-op elem (sxml:boolean nset)))
+            ((number? elem)
+             (let loop ((nset 
+                         (map
+                          (lambda (node) (sxml:number (sxml:string-value node)))
+                          nset)))
+               (cond
+                 ((null? nset) #f)
+                 ((number-op elem (car nset)) #t)
+                 (else (loop (cdr nset))))))
+            ((string? elem)
+             (let loop ((nset (map sxml:string-value nset)))
+               (cond
+                 ((null? nset) #f)
+                 ((string-op elem (car nset)) #t)
+                 (else (loop (cdr nset))))))
+            (else  ; unknown datatype
+             (cerr "Unknown datatype: " elem nl)
+             #f))))))))
 
 (define sxml:equal? (sxml:equality-cmp eq? = string=?))
 

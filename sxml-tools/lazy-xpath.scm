@@ -38,6 +38,18 @@
    (plt promise?)
    (bigloo procedure?   ; ATTENTION: returns #t in more general situations
            )
+   (chicken
+    ; Chichen implementation relies on internal Chichen procedures,
+    ; whose names start with ##
+    ; Such identifiers cannot be _read_ on many other systems
+    ; The following macro constructs Chicken-specific ids on the fly
+    (define-macro (chk:id id)
+      (string->symbol (string-append "##" (symbol->string id))))
+    
+    ; Thanks to Zbigniew <zbigniewsz@gmail.com>
+    ; for the insight of this function
+    (lambda (p) ((chk:id sys#structure?) p 'promise))
+    )
    (else
     (lambda (obj) #f)   ; ATTENTION: just makes the approach applicable for
                         ; conventional SXML documents
@@ -934,36 +946,35 @@
            (else
             (first (cdr str-set1) str-set2)))))
       (else  ; one of the objects is a nodeset, the other is not
-       (let-values*
-        (((nset elem)
-          ; Equality operations are commutative
-          (if (nodeset? obj1) (values obj1 obj2) (values obj2 obj1))))
-        (cond
-          ((boolean? elem) (bool-op elem (lazy:boolean nset)))
-          ((number? elem)
-           (let loop ((nset
-                       (lazy:map
-                        (lambda (node) (lazy:number (lazy:string-value node)))
-                        nset)))
-             (cond
-               ((null? nset) #f)
-               ((lazy:promise? (car nset))  ; time to get the next portion
-                (loop (append (as-nodeset (force (car nset)))
-                              (cdr nset))))
-               ((number-op elem (car nset)) #t)
-               (else (loop (cdr nset))))))
-          ((string? elem)
-           (let loop ((nset (lazy:map lazy:string-value nset)))
-             (cond
-               ((null? nset) #f)
-               ((lazy:promise? (car nset))  ; time to get the next portion
-                (loop (append (as-nodeset (force (car nset)))
-                              (cdr nset))))
-               ((string-op elem (car nset)) #t)
-               (else (loop (cdr nset))))))
-          (else  ; unknown datatype
-           (cerr "Unknown datatype: " elem nl)
-           #f)))))))
+       (call-with-values
+        (if (nodeset? obj1) (values obj1 obj2) (values obj2 obj1))
+        (lambda (nset elem)
+          (cond
+            ((boolean? elem) (bool-op elem (lazy:boolean nset)))
+            ((number? elem)
+             (let loop ((nset
+                         (lazy:map
+                          (lambda (node) (lazy:number (lazy:string-value node)))
+                          nset)))
+               (cond
+                 ((null? nset) #f)
+                 ((lazy:promise? (car nset))  ; time to get the next portion
+                  (loop (append (as-nodeset (force (car nset)))
+                                (cdr nset))))
+                 ((number-op elem (car nset)) #t)
+                 (else (loop (cdr nset))))))
+            ((string? elem)
+             (let loop ((nset (lazy:map lazy:string-value nset)))
+               (cond
+                 ((null? nset) #f)
+                 ((lazy:promise? (car nset))  ; time to get the next portion
+                  (loop (append (as-nodeset (force (car nset)))
+                                (cdr nset))))
+                 ((string-op elem (car nset)) #t)
+                 (else (loop (cdr nset))))))
+            (else  ; unknown datatype
+             (cerr "Unknown datatype: " elem nl)
+             #f))))))))
 
 (define lazy:equal? (lazy:equality-cmp eq? = string=?))
 
@@ -2259,21 +2270,22 @@
 ; Helper for constructing several highest-level API functions
 (define (lazy:api-helper grammar-parser ast-parser)
   (lambda (xpath-string . ns+na)
-    (let-values*
-        (((ns-binding num-anc) (draft:arglist->ns+na ns+na)))
-      (and-let*
-       ((ast (grammar-parser xpath-string ns-binding))
-        (impl-lst (ast-parser ast num-anc)))
-       (let ((query-impl (car impl-lst)))
-         (lambda (node . var-binding)
-           (let ((query-res
-                  (query-impl
-                   (as-nodeset node) (cons 1 1)
-                   (if (null? var-binding) var-binding (car var-binding)))))
-             (if
+    (call-with-values
+     (lambda () (draft:arglist->ns+na ns+na))
+     (lambda (ns-binding num-anc)
+       (and-let*
+        ((ast (grammar-parser xpath-string ns-binding))
+         (impl-lst (ast-parser ast num-anc)))
+        (let ((query-impl (car impl-lst)))
+          (lambda (node . var-binding)
+            (let ((query-res
+                   (query-impl
+                    (as-nodeset node) (cons 1 1)
+                    (if (null? var-binding) var-binding (car var-binding)))))
+              (if
                (and num-anc (zero? num-anc) (nodeset? query-res))
                (lazy:map sxml:context->node query-res)
-               query-res))))))))
+               query-res)))))))))
 
 (define lazy:txpath (lazy:api-helper txp:xpath->ast lazy:ast-location-path))
 (define lazy:xpath-expr (lazy:api-helper txp:expr->ast lazy:ast-expr))

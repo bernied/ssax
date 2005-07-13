@@ -163,7 +163,7 @@
        (xlink:set-uri req-uri doc)))
     ((html)
      (let* ((port (open-input-resource req-uri))
-            (doc (htmlprag:html->sxml port)))
+            (doc (html->sxml port)))
        (close-input-port port)
        (SHTML->SHTML+xlink
         (xlink:set-uri req-uri doc))))    
@@ -520,62 +520,65 @@
              ; Text node or aux node
              (values node outgoing-alist #f))
             ((eq? (car node) '@)
-             (let-values*
-                 (((content new-out-alist changed?)
-                   ((process-nodeset process-attribute-node)
-                    (cdr node) outgoing-alist)))
-               (if changed?
-                   (values (cons '@ content)
-                           new-out-alist
-                           changed?)
-                   (values node outgoing-alist changed?))))
-            (else  ; this is the element node
-             (let-values*
-                 (((outgoing-arcs new-out-alist)
-                   (cond
-                     ((assq node outgoing-alist)
-                      => (lambda (alist-member)
-                           (values
-                            (cdr alist-member)
-                            (filter
-                             (lambda (memb) (not (eq? memb alist-member)))
-                             outgoing-alist))))
-                     (else  ; the node is not the starting resource
-                      (values #f outgoing-alist))))
-                  ((content new-out-alist changed?)
-                   ((process-nodeset process-element-node)
-                    (cdr node) new-out-alist)))
-                 (cond
-                   ((not (or outgoing-arcs changed?))
-                    ; node remains unchanged                    
-                    (values node outgoing-alist changed?))
-                   ((not outgoing-arcs)  ; no arcs from that node
-                    (values (cons (car node) content)
+             (call-with-values
+              (lambda ()
+                ((process-nodeset process-attribute-node)
+                 (cdr node) outgoing-alist))
+              (lambda (content new-out-alist changed?)
+                (if changed?
+                    (values (cons '@ content)
                             new-out-alist
-                            changed?))
-                   (else  ; the node is the starting resource
-                    (let ((new-content
-                           (if changed? content (cdr node))))
-                      (values
-                       (cond
-                         ((not (null?  ; aux list presented
-                                ((select-kids (ntype?? '@@)) new-content)))
-                          (xlink:append-branch
-                           (cons (car node) new-content)
-                           '(@@ sxlink) outgoing-arcs))
-                         (((ntype?? '@)  ; attribute node presented                         
-                           (car new-content))
-                          `(,(car node)
-                            ,(car content)  ; attribute node
-                            (@@ (sxlink ,@outgoing-arcs))
-                            ,@(cdr content)))
-                         (else  ; no attribute node
-                          `(,(car node)
-                            (@)
-                            (@@ (sxlink ,@outgoing-arcs))
-                            ,@content)))
-                       new-out-alist
-                       #t)))))))))
+                            changed?)
+                    (values node outgoing-alist changed?)))))
+            (else  ; this is the element node
+             (call-with-values
+              (lambda ()
+                (cond
+                  ((assq node outgoing-alist)
+                   => (lambda (alist-member)
+                        (values
+                         (cdr alist-member)
+                         (filter
+                          (lambda (memb) (not (eq? memb alist-member)))
+                          outgoing-alist))))
+                  (else  ; the node is not the starting resource
+                   (values #f outgoing-alist)))
+                (lambda (outgoing-arcs new-out-alist)
+                  (call-with-values
+                   (lambda () ((process-nodeset process-element-node)
+                               (cdr node) new-out-alist))
+                   (lambda (content new-out-alist changed?)
+                     (cond
+                       ((not (or outgoing-arcs changed?))
+                        ; node remains unchanged                    
+                        (values node outgoing-alist changed?))
+                       ((not outgoing-arcs)  ; no arcs from that node
+                        (values (cons (car node) content)
+                                new-out-alist
+                                changed?))
+                       (else  ; the node is the starting resource
+                        (let ((new-content
+                               (if changed? content (cdr node))))
+                          (values
+                           (cond
+                             ((not (null?  ; aux list presented
+                                    ((select-kids (ntype?? '@@)) new-content)))
+                              (xlink:append-branch
+                               (cons (car node) new-content)
+                               '(@@ sxlink) outgoing-arcs))
+                             (((ntype?? '@)  ; attribute node presented                         
+                               (car new-content))
+                              `(,(car node)
+                                ,(car content)  ; attribute node
+                                (@@ (sxlink ,@outgoing-arcs))
+                                ,@(cdr content)))
+                             (else  ; no attribute node
+                              `(,(car node)
+                                (@)
+                                (@@ (sxlink ,@outgoing-arcs))
+                                ,@content)))
+                           new-out-alist
+                           #t)))))))))))))
        (process-attribute-node
         (lambda (node outgoing-alist)
           (cond
@@ -610,27 +613,27 @@
                (values (reverse res)
                        out-alist
                        changed?)
-               (let-values*
-                   (((new-node new-out-alist ch?)
-                     (processing-func (car nset) out-alist)))
-                 (loop (cdr nset)
-                       new-out-alist
-                       (or changed? ch?)
-                       (cons new-node res)))))))))
-    (let-values*
-        (((content new-out-alist changed?)
-          ((process-nodeset process-element-node)
-           (cdr document)
-           (xlink:arcs-outgoing document))))
-      (if (not changed?)  ; the document remains unchanged
-          (xlink:replace-branch
-           document '(@@ sxlink embedded) '())
-          (xlink:replace-branch
-           (cons '*TOP* content)
-           '(@@ sxlink)
-           `((declared-here ,@(xlink:arcs-declared-here document))
-             (embedded)
-             (outgoing ,@new-out-alist)))))))
+               (call-with-values
+                (lambda () (processing-func (car nset) out-alist))
+                (lambda (new-node new-out-alist ch?)
+                  (loop (cdr nset)
+                        new-out-alist
+                        (or changed? ch?)
+                        (cons new-node res))))))))))
+    (call-with-values
+     (lambda () ((process-nodeset process-element-node)
+                 (cdr document)
+                 (xlink:arcs-outgoing document)))
+     (lambda (content new-out-alist changed?)
+       (if (not changed?)  ; the document remains unchanged
+           (xlink:replace-branch
+            document '(@@ sxlink embedded) '())
+           (xlink:replace-branch
+            (cons '*TOP* content)
+            '(@@ sxlink)
+            `((declared-here ,@(xlink:arcs-declared-here document))
+              (embedded)
+              (outgoing ,@new-out-alist))))))))
 
 ; Returns all embedded SXLink arcs in the document
 ; Result: (listof sxlink-arc)
@@ -784,7 +787,7 @@
     ((#f)  ; resource doesn't exist
      (xlink:api-error "resource doesn't exist: " req-uri)
      #f)
-    ((xml)
+    ((xml plain)
      (let* ((port (open-input-resource req-uri))
             (doc (ssax:xml->sxml port '())))
        (close-input-port port)
@@ -792,7 +795,7 @@
        ))
     ((html)
      (let* ((port (open-input-resource req-uri))
-            (doc (htmlprag:html->sxml port)))
+            (doc (html->sxml port)))
        (close-input-port port)
        doc   ; DL: can also add URI: (xlink:set-uri req-uri doc)
        ))
