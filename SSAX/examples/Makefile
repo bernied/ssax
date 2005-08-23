@@ -108,7 +108,8 @@ scmi-targets=remove-markup outline run-sxml \
 	parent-pointers \
 	validate-doctype-simple \
 	sxml-nesting-depth-label \
-	sxml-to-sxml
+	sxml-to-sxml \
+	streams-diff
 
 petite-targets=remove-markup outline run-sxml \
 	html-parser \
@@ -120,7 +121,8 @@ petite-targets=remove-markup outline run-sxml \
 	parent-pointers \
 	validate-doctype-simple \
 	sxml-nesting-depth-label \
-	sxml-to-sxml
+	sxml-to-sxml \
+	streams-diff
 
 .PHONY: all $($(PLATFORM)-targets)
 all: $($(PLATFORM)-targets)
@@ -194,6 +196,9 @@ run-sxml-depend=srfi-13-local.scm char-encoding.scm util.scm look-for-str.scm in
 html-parser-depend=srfi-13-local.scm catch-error.scm char-encoding.scm util.scm look-for-str.scm input-parse.scm SSAX-code.scm
 
 daml-parse-unparse-depend=assert.scm output.scm ppretty-prints.scm SXML-tree-trans.scm srfi-13-local.scm util.scm char-encoding.scm ssax-warn-vanilla.scm parser-errors-vanilla.scm define-opt.scm input-parse.scm look-for-str.scm control.scm SSAX-code.scm 
+
+streams-diff-depend=assert.scm output.scm ppretty-prints.scm srfi-13-local.scm util.scm char-encoding.scm shift-reset.scm
+
 
 #sxml-to-sxml-depend= #srfi-13-local.scm #util.scm
 #sxml-nesting-depth-label-depend= SXML-tree-trans.scm
