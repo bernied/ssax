@@ -44,11 +44,11 @@
     ; Such identifiers cannot be _read_ on many other systems
     ; The following macro constructs Chicken-specific ids on the fly
     (define-macro (chk:id id)
-      (string->symbol (string-append "##" (symbol->string id))))
+      (string->symbol (string-append "##sys#" (symbol->string id))))
     
-    ; Thanks to Zbigniew <zbigniewsz@gmail.com>
+    ; Thanks to Zbigniew Szadkowski <zbigniewsz@gmail.com>
     ; for the insight of this function
-    (lambda (p) ((chk:id sys#structure?) p 'promise))
+    (lambda (p) ((chk:id structure?) p 'promise))
     )
    (else
     (lambda (obj) #f)   ; ATTENTION: just makes the approach applicable for
