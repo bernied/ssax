@@ -542,43 +542,43 @@
                           (lambda (memb) (not (eq? memb alist-member)))
                           outgoing-alist))))
                   (else  ; the node is not the starting resource
-                   (values #f outgoing-alist)))
-                (lambda (outgoing-arcs new-out-alist)
-                  (call-with-values
-                   (lambda () ((process-nodeset process-element-node)
-                               (cdr node) new-out-alist))
-                   (lambda (content new-out-alist changed?)
-                     (cond
-                       ((not (or outgoing-arcs changed?))
-                        ; node remains unchanged                    
-                        (values node outgoing-alist changed?))
-                       ((not outgoing-arcs)  ; no arcs from that node
-                        (values (cons (car node) content)
-                                new-out-alist
-                                changed?))
-                       (else  ; the node is the starting resource
-                        (let ((new-content
-                               (if changed? content (cdr node))))
-                          (values
-                           (cond
-                             ((not (null?  ; aux list presented
-                                    ((select-kids (ntype?? '@@)) new-content)))
-                              (xlink:append-branch
-                               (cons (car node) new-content)
-                               '(@@ sxlink) outgoing-arcs))
-                             (((ntype?? '@)  ; attribute node presented                         
-                               (car new-content))
-                              `(,(car node)
-                                ,(car content)  ; attribute node
-                                (@@ (sxlink ,@outgoing-arcs))
-                                ,@(cdr content)))
-                             (else  ; no attribute node
-                              `(,(car node)
-                                (@)
-                                (@@ (sxlink ,@outgoing-arcs))
-                                ,@content)))
-                           new-out-alist
-                           #t)))))))))))))
+                   (values #f outgoing-alist))))
+              (lambda (outgoing-arcs new-out-alist)
+                (call-with-values
+                 (lambda () ((process-nodeset process-element-node)
+                             (cdr node) new-out-alist))
+                 (lambda (content new-out-alist changed?)
+                   (cond
+                     ((not (or outgoing-arcs changed?))
+                      ; node remains unchanged                    
+                      (values node outgoing-alist changed?))
+                     ((not outgoing-arcs)  ; no arcs from that node
+                      (values (cons (car node) content)
+                              new-out-alist
+                              changed?))
+                     (else  ; the node is the starting resource
+                      (let ((new-content
+                             (if changed? content (cdr node))))
+                        (values
+                         (cond
+                           ((not (null?  ; aux list presented
+                                  ((select-kids (ntype?? '@@)) new-content)))
+                            (xlink:append-branch
+                             (cons (car node) new-content)
+                             '(@@ sxlink) outgoing-arcs))
+                           (((ntype?? '@)  ; attribute node presented                         
+                             (car new-content))
+                            `(,(car node)
+                              ,(car content)  ; attribute node
+                              (@@ (sxlink ,@outgoing-arcs))
+                              ,@(cdr content)))
+                           (else  ; no attribute node
+                            `(,(car node)
+                              (@)
+                              (@@ (sxlink ,@outgoing-arcs))
+                              ,@content)))
+                         new-out-alist
+                         #t))))))))))))
        (process-attribute-node
         (lambda (node outgoing-alist)
           (cond
