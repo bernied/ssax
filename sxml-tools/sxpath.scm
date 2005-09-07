@@ -93,7 +93,7 @@
              (cdr path)))
       ((string? (car path))
        (and-let*
-        ((f (txpath (car path) ns-binding)))
+        ((f (sxml:xpath-expr (car path) ns-binding)))  ; DL: was: txpath
         (loop (cons f converters)
               (cons #t root-vars)
               (cdr path))))
