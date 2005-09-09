@@ -5,7 +5,7 @@
 ;   lizorkin@hotbox.ru    Dmitry Lizorkin
 
 ;@ Document
-(define old-doc
+(define vtxp:old-doc
 '(*TOP*
  (*PI* xml "version='1.0' encoding=\"Shift_JIS\"")
  (doc
@@ -96,7 +96,8 @@
 ; 'id-index subtree. If the source document already contains such a
 ; subtree, it will be replaced. Other subtrees in an auxiliary list will
 ; remain unchanged.
-(define (SXML->SXML+id document id-attrs)
+; DL: local version of the function - prefixed with `vtxp:'
+(define (vtxp:SXML->SXML+id document id-attrs)
   (let((aux-subtrees
         (let((aux ((select-kids (ntype?? '@@)) document)))
           (if(null? aux)
@@ -146,13 +147,13 @@
                (append ((select-kids (ntype?? '*)) (car nodeset)) (cdr nodeset))
                id-index))))))))
 
-(define doc
-  (SXML->SXML+id
-   old-doc
+(define vtxp:doc
+  (vtxp:SXML->SXML+id
+   vtxp:old-doc
    '((item id) (chapter id) (section ID) (appendix id))))
 
 ;@ Namespace binding
-(define ns-binding (list (cons 'xlink "http://www.w3.org/1999/xlink")))
+(define vtxp:ns-binding (list (cons 'xlink "http://www.w3.org/1999/xlink")))
 
 
 ;=========================================================================
@@ -164,7 +165,7 @@
                  (sxml:xpath+index xpath-string (car ns-binding)))))
     (if (not lst)
         '@error@    ; this can never be an expected result
-        ((car lst) doc))))
+        ((car lst) vtxp:doc))))
 
 (define (sxml:test-xpointer+index xpath-string . ns-binding)
   (let ((lst (if (null? ns-binding)
@@ -172,7 +173,7 @@
 	       (sxml:xpointer+index xpath-string (car ns-binding)))))
     (if (not lst)
         '@error@    ; this can never be an expected result
-        ((car lst) doc))))
+        ((car lst) vtxp:doc))))
        
 
 (define (sxml:test-xpath+root+vars xpath-string var-binding . ns-binding)
@@ -181,7 +182,7 @@
                  (sxml:xpath+root+vars xpath-string (car ns-binding)))))
     (if (not lst)
         '@error@    ; this can never be an expected result
-        (lst doc (cons `(*root* . ,doc) var-binding)))))
+        (lst vtxp:doc (cons `(*root* . ,vtxp:doc) var-binding)))))
 
 (define (sxml:test-xpath+root xpath-string . ns-binding)
   (let ((lst (if (null? ns-binding)
@@ -189,7 +190,7 @@
                  (sxml:xpath+root xpath-string (car ns-binding)))))
     (if (not lst)
         '@error@    ; this can never be an expected result
-        (lst doc `((*root* . ,doc))))))
+        (lst vtxp:doc `((*root* . ,vtxp:doc))))))
 
 (define (sxml:test-xpointer+root+vars xpath-string var-binding . ns-binding)
   (let ((lst (if (null? ns-binding)
@@ -197,7 +198,7 @@
                  (sxml:xpointer+root+vars xpath-string (car ns-binding)))))
     (if (not lst)
         '@error@    ; this can never be an expected result
-        (lst doc (cons `(*root* . ,doc) var-binding)))))
+        (lst vtxp:doc (cons `(*root* . ,vtxp:doc) var-binding)))))
 
 
 ;=========================================================================
@@ -356,7 +357,7 @@ sxml:test-xpath+index
 ; <--- of:
 sxml:test-xpath+index
 "//attribute::xlink:type"
-ns-binding
+vtxp:ns-binding
 )
 
 ; sxml:test-xpath+index
@@ -367,7 +368,7 @@ ns-binding
 ; <--- of:
 sxml:test-xpath+index
 "//attribute::xlink:*[ self::* = 'hoge' ]"
-ns-binding
+vtxp:ns-binding
 )
 
 ; sxml:test-xpath+index
@@ -2001,7 +2002,7 @@ sxml:test-xpath+index
 ; <--- of:
 sxml:test-xpath+index
 "*[1]/*[1]/*[attribute::xlink:*][attribute::* = 'boo']"
-ns-binding
+vtxp:ns-binding
 )
 
 ; sxml:test-xpath+index
@@ -2468,7 +2469,7 @@ sxml:test-xpointer+index
 ; <--- of:
 sxml:test-xpointer+index
 "xpointer( //xlink:label[self::* = 'hoge'] > id( 'chap6' ) )"
-ns-binding
+vtxp:ns-binding
 )
 
 
@@ -2616,20 +2617,20 @@ sxml:test-xpointer+index
 
 ; sxml:xpath
 (xtest-assert ; Expected result:
-(list doc)
+(list vtxp:doc)
 ; <--- of:
 (sxml:xpath "/")
-doc
+vtxp:doc
 )
 
 
 ; sxml:xpath+root+vars
 (xtest-assert ; Expected result:
-(list doc)
+(list vtxp:doc)
 ;"dgdgf"
 ; <--- of:
 (sxml:xpath+root+vars "/")
-doc
+vtxp:doc
 '()
 )
 

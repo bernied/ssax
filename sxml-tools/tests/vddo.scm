@@ -5,7 +5,7 @@
 ;   lizorkin@hotbox.ru    Dmitry Lizorkin
 
 ; We define a document
-(define old-doc
+(define vddo:old-doc
   '(*TOP*
     (*PI* xml "version='1.0'")
     (doc
@@ -85,7 +85,8 @@
            (ref "boo.com"))))))))
 
 ; Function for attaching id-index to document
-(define (SXML->SXML+id document id-attrs)
+; DL: local version of the function - prefixed with `vddo:'
+(define (vddo:SXML->SXML+id document id-attrs)
   (let ((aux-subtrees
           (let ((aux ((select-kids (ntype?? '@@)) document)))
             (if (null? aux)
@@ -131,11 +132,11 @@
              id-index))))))))
 
 ; Document with id-index added
-(define doc
-  (SXML->SXML+id old-doc '((item id) (chapter id) (section ID) (appendix id))))
+(define vddo:doc
+  (vddo:SXML->SXML+id vddo:old-doc '((item id) (chapter id) (section ID) (appendix id))))
 
 ; Namespace binding
-(define ns-binding (list (cons 'xlink "http://www.w3.org/1999/xlink")))
+(define vddo:ns-binding (list (cons 'xlink "http://www.w3.org/1999/xlink")))
 
 ; (lambda (x) x)
 (xtest-assert ; Expected result:
@@ -271,7 +272,7 @@
         (ref "boo.com")))))))
 ; <--- of:
 (lambda (x) x)
-doc
+vddo:doc
 )
 
 
@@ -286,7 +287,7 @@ doc
 '((item (@ (id "toc1")) "chapter1"))
 ; <--- of:
 (ddo:txpath "child::*/child::*[2]")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath */*[2])
@@ -294,7 +295,7 @@ doc
 '((item (@ (id "toc1")) "chapter1"))
 ; <--- of:
 (ddo:txpath "*/*[2]")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath /*/*[2])
@@ -302,7 +303,7 @@ doc
 '((item (@ (id "toc1")) "chapter1"))
 ; <--- of:
 (ddo:txpath "/*/*[2]")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath descendant-or-self::node()[attribute::id ='toc1'])
@@ -310,7 +311,7 @@ doc
 '((item (@ (id "toc1")) "chapter1"))
 ; <--- of:
 (ddo:txpath "descendant-or-self::node()[attribute::id ='toc1']")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath //*[attribute::* ='toc1'])
@@ -318,7 +319,7 @@ doc
 '((item (@ (id "toc1")) "chapter1"))
 ; <--- of:
 (ddo:txpath "//*[attribute::* ='toc1']")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath //node()[attribute::id][1])
@@ -330,7 +331,7 @@ doc
    (p "This document describes about XLink Engine...")))
 ; <--- of:
 (ddo:txpath "//node()[attribute::id][1]")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath //*[ self::node() = id('toc1') ])
@@ -338,7 +339,7 @@ doc
 '((item (@ (id "toc1")) "chapter1"))
 ; <--- of:
 (ddo:txpath "//*[ self::node() = id('toc1') ]")
-doc
+vddo:doc
 )
 
 
@@ -350,7 +351,7 @@ doc
 '((*PI* xml "version='1.0'"))
 ; <--- of:
 (ddo:txpath "descendant::processing-instruction()")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath descendant::processing-instruction( 'xml' ))
@@ -358,7 +359,7 @@ doc
 '((*PI* xml "version='1.0'"))
 ; <--- of:
 (ddo:txpath "descendant::processing-instruction( 'xml' )")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath descendant::processing-instruction( 'smth else' ))
@@ -366,7 +367,7 @@ doc
 '()
 ; <--- of:
 (ddo:txpath "descendant::processing-instruction( 'smth else' )")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath //*[ self::processing-instruction('smth else') ])
@@ -374,7 +375,7 @@ doc
 '()
 ; <--- of:
 (ddo:txpath "//*[ self::processing-instruction('smth else') ]")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath descendant-or-self::text())
@@ -407,7 +408,7 @@ doc
  "boo.com")
 ; <--- of:
 (ddo:txpath "descendant-or-self::text()")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath descendant-or-self::text()[ self::node() = 'boo.com' ])
@@ -415,7 +416,7 @@ doc
 '("boo.com")
 ; <--- of:
 (ddo:txpath "descendant-or-self::text()[ self::node() = 'boo.com' ]")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath */*/text())
@@ -423,7 +424,7 @@ doc
 '("chapter1" "chapter2" "chapter3" "chapter4" "chapter5" "chapter6" "chapter7")
 ; <--- of:
 (ddo:txpath "*/*/text()")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath //attribute::xlink:type ns-binding)
@@ -434,8 +435,8 @@ doc
  (http://www.w3.org/1999/xlink:type "arc")
  (http://www.w3.org/1999/xlink:type "arc"))
 ; <--- of:
-(ddo:txpath "//attribute::xlink:type" ns-binding)
-doc
+(ddo:txpath "//attribute::xlink:type" vddo:ns-binding)
+vddo:doc
 )
 
 ; (ddo:txpath //attribute::xlink:*[ self::* = 'hoge' ] ns-binding)
@@ -444,8 +445,8 @@ doc
  (http://www.w3.org/1999/xlink:to "hoge")
  (http://www.w3.org/1999/xlink:from "hoge"))
 ; <--- of:
-(ddo:txpath "//attribute::xlink:*[ self::* = 'hoge' ]" ns-binding)
-doc
+(ddo:txpath "//attribute::xlink:*[ self::* = 'hoge' ]" vddo:ns-binding)
+vddo:doc
 )
 
 ; (ddo:txpath //attribute::xlink:* (quote ((xlink . http://www.else.com))))
@@ -453,7 +454,7 @@ doc
 '()
 ; <--- of:
 (ddo:txpath "//attribute::xlink:*" '((xlink . "http://www.else.com")))
-doc
+vddo:doc
 )
 
 
@@ -465,7 +466,7 @@ doc
 '((id "chap3"))
 ; <--- of:
 (ddo:txpath "*[1]/*[9]/*[3]/@*")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath *[1]/*[4]/@id)
@@ -473,7 +474,7 @@ doc
 '((id "toc3"))
 ; <--- of:
 (ddo:txpath "*[1]/*[4]/@id")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath *[1]/*[9]/*[3]/.)
@@ -481,7 +482,7 @@ doc
 '((chapter (@ (id "chap3")) (title "What is XLink?") (p "hyperlink")))
 ; <--- of:
 (ddo:txpath "*[1]/*[9]/*[3]/.")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath *[1]/*[4]/@id/.)
@@ -489,7 +490,7 @@ doc
 '((id "toc3"))
 ; <--- of:
 (ddo:txpath "*[1]/*[4]/@id/.")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath *[1]/*[9]/*[3]/..)
@@ -531,7 +532,7 @@ doc
        (ref "boo.com"))))))
 ; <--- of:
 (ddo:txpath "*[1]/*[9]/*[3]/..")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath *[1]/*[4]/@id/..)
@@ -539,7 +540,7 @@ doc
 '((item (@ (id "toc3")) "chapter3"))
 ; <--- of:
 (ddo:txpath "*[1]/*[4]/@id/..")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath *[1]/*[9]/*[3]/following-sibling::*)
@@ -568,7 +569,7 @@ doc
       (ref "boo.com")))))
 ; <--- of:
 (ddo:txpath "*[1]/*[9]/*[3]/following-sibling::*")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath *[1]/*[4]/@id/following-sibling::*)
@@ -576,7 +577,7 @@ doc
 '()
 ; <--- of:
 (ddo:txpath "*[1]/*[4]/@id/following-sibling::*")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath *[1]/*[9]/*[3]/preceding-sibling::*)
@@ -594,7 +595,7 @@ doc
       "This document is written in XML (eXtensible Markup Language) ver.1.0."))))
 ; <--- of:
 (ddo:txpath "*[1]/*[9]/*[3]/preceding-sibling::*")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath *[1]/*[4]/@id/preceding-sibling::*)
@@ -602,7 +603,7 @@ doc
 '()
 ; <--- of:
 (ddo:txpath "*[1]/*[4]/@id/preceding-sibling::*")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath *[1]/*[9]/*[3]/following::*)
@@ -659,7 +660,7 @@ doc
  (ref "boo.com"))
 ; <--- of:
 (ddo:txpath "*[1]/*[9]/*[3]/following::*")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath *[1]/*[4]/@id/following::node())
@@ -800,7 +801,7 @@ doc
  "boo.com")
 ; <--- of:
 (ddo:txpath "*[1]/*[4]/@id/following::node()")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath *[1]/*[9]/*[3]/preceding::*)
@@ -894,7 +895,7 @@ doc
  (p "This document is written in XML (eXtensible Markup Language) ver.1.0."))
 ; <--- of:
 (ddo:txpath "*[1]/*[9]/*[3]/preceding::*")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath *[1]/*[4]/@id/preceding::*)
@@ -965,7 +966,7 @@ doc
  (item (@ (id "toc2")) "chapter2"))
 ; <--- of:
 (ddo:txpath "*[1]/*[4]/@id/preceding::*")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath *[1]/*[9]/*[3]/parent::*)
@@ -1007,7 +1008,7 @@ doc
        (ref "boo.com"))))))
 ; <--- of:
 (ddo:txpath "*[1]/*[9]/*[3]/parent::*")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath *[1]/*[4]/@id/parent::*)
@@ -1015,12 +1016,12 @@ doc
 '((item (@ (id "toc3")) "chapter3"))
 ; <--- of:
 (ddo:txpath "*[1]/*[4]/@id/parent::*")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath *[1]/*[9]/*[3]/ancestor::*)
 (xtest-assert ; Expected result:
-`(,doc  ; document node
+`(,vddo:doc  ; document node
  (doc
   (multidirectional
     (@ (http://www.w3.org/1999/xlink:type "extended"))
@@ -1133,12 +1134,12 @@ doc
        (ref "boo.com"))))))
 ; <--- of:
 (ddo:txpath "*[1]/*[9]/*[3]/ancestor::*")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath *[1]/*[4]/@id/ancestor::*)
 (xtest-assert ; Expected result:
-`(,doc  ; document node
+`(,vddo:doc  ; document node
  (doc
   (multidirectional
     (@ (http://www.w3.org/1999/xlink:type "extended"))
@@ -1217,12 +1218,12 @@ doc
  (item (@ (id "toc3")) "chapter3"))
 ; <--- of:
 (ddo:txpath "*[1]/*[4]/@id/ancestor::*")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath *[1]/*[9]/*[3]/ancestor-or-self::*)
 (xtest-assert ; Expected result:
-`(,doc  ; document node
+`(,vddo:doc  ; document node
  (doc
   (multidirectional
     (@ (http://www.w3.org/1999/xlink:type "extended"))
@@ -1336,12 +1337,12 @@ doc
  (chapter (@ (id "chap3")) (title "What is XLink?") (p "hyperlink")))
 ; <--- of:
 (ddo:txpath "*[1]/*[9]/*[3]/ancestor-or-self::*")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath *[1]/*[4]/@id/ancestor-or-self::*)
 (xtest-assert ; Expected result:
-`(,doc  ; document node
+`(,vddo:doc  ; document node
  (doc
   (multidirectional
     (@ (http://www.w3.org/1999/xlink:type "extended"))
@@ -1421,7 +1422,7 @@ doc
  (id "toc3"))
 ; <--- of:
 (ddo:txpath "*[1]/*[4]/@id/ancestor-or-self::*")
-doc
+vddo:doc
 )
 
 
@@ -1433,7 +1434,7 @@ doc
 '((item (@ (id "toc1")) "chapter1"))
 ; <--- of:
 (ddo:txpath "*/*[position()=2]")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath */*[position()=last()-4])
@@ -1441,7 +1442,7 @@ doc
 '((item (@ (id "toc4")) "chapter4"))
 ; <--- of:
 (ddo:txpath "*/*[position()=last()-4]")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath */*[position()>=4 and position()<last()-1])
@@ -1452,7 +1453,7 @@ doc
  (item (@ (id "toc6")) "chapter6"))
 ; <--- of:
 (ddo:txpath "*/*[position()>=4 and position()<last()-1]")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath */*[9]/*[position()=last()-position()])
@@ -1464,7 +1465,7 @@ doc
     "XPointer is the fragment identifier of documents having the mime-type hogehoge.")))
 ; <--- of:
 (ddo:txpath "*/*[9]/*[position()=last()-position()]")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath */*[9]/*[position()=4])
@@ -1476,7 +1477,7 @@ doc
     "XPointer is the fragment identifier of documents having the mime-type hogehoge.")))
 ; <--- of:
 (ddo:txpath "*/*[9]/*[position()=4]")
-doc
+vddo:doc
 )
 
 
@@ -1509,8 +1510,8 @@ doc
    (http://www.w3.org/1999/xlink:from "hoge")
    (http://www.w3.org/1999/xlink:actuate "onRequest"))))
 ; <--- of:
-(ddo:txpath "*[1]/*[1]/*[attribute::xlink:*][attribute::* = 'boo']" ns-binding)
-doc
+(ddo:txpath "*[1]/*[1]/*[attribute::xlink:*][attribute::* = 'boo']" vddo:ns-binding)
+vddo:doc
 )
 
 ; (ddo:txpath descendant-or-self::node()[self::chapter][self::* = id(' chap1 chap3 chap6 chap7   ')][*[1] = 'What is XLink?'])
@@ -1519,7 +1520,7 @@ doc
 ; <--- of:
 (ddo:txpath
   "descendant-or-self::node()[self::chapter][self::* = id(' chap1 chap3 chap6 chap7   ')][*[1] = 'What is XLink?']")
-doc
+vddo:doc
 )
 
 
@@ -1579,7 +1580,7 @@ doc
 ; <--- of:
 (ddo:txpath
   "doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]")
-doc
+vddo:doc
 )
 
 
@@ -1588,7 +1589,7 @@ doc
 
 ; (ddo:txpath doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/ancestor::node())
 (xtest-assert ; Expected result:
-`(,doc  ; document node
+`(,vddo:doc  ; document node
  (doc
   (multidirectional
     (@ (http://www.w3.org/1999/xlink:type "extended"))
@@ -1713,12 +1714,12 @@ doc
 ; <--- of:
 (ddo:txpath
   "doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/ancestor::node()")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/ancestor-or-self::node())
 (xtest-assert ; Expected result:
-`(,doc  ; document node
+`(,vddo:doc  ; document node
  (doc
   (multidirectional
     (@ (http://www.w3.org/1999/xlink:type "extended"))
@@ -1845,7 +1846,7 @@ doc
 ; <--- of:
 (ddo:txpath
   "doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/ancestor-or-self::node()")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/attribute::node())
@@ -1854,7 +1855,7 @@ doc
 ; <--- of:
 (ddo:txpath
   "doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/attribute::node()")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/child::node())
@@ -1900,7 +1901,7 @@ doc
 ; <--- of:
 (ddo:txpath
   "doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/child::node()")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/descendant::node())
@@ -2004,7 +2005,7 @@ doc
 ; <--- of:
 (ddo:txpath
   "doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/descendant::node()")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/descendant-or-self::node())
@@ -2149,7 +2150,7 @@ doc
 ; <--- of:
 (ddo:txpath
   "doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/descendant-or-self::node()")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/following::node())
@@ -2232,7 +2233,7 @@ doc
 ; <--- of:
 (ddo:txpath
   "doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/following::node()")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/following-sibling::node())
@@ -2263,7 +2264,7 @@ doc
 ; <--- of:
 (ddo:txpath
   "doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/following-sibling::node()")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/namespace::node())
@@ -2272,7 +2273,7 @@ doc
 ; <--- of:
 (ddo:txpath
   "doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/namespace::node()")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/parent::node())
@@ -2401,7 +2402,7 @@ doc
 ; <--- of:
 (ddo:txpath
   "doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/parent::node()")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/preceding::node())
@@ -2523,7 +2524,7 @@ doc
 ; <--- of:
 (ddo:txpath
   "doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/preceding::node()")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/preceding-sibling::node())
@@ -2591,7 +2592,7 @@ doc
 ; <--- of:
 (ddo:txpath
   "doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/preceding-sibling::node()")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/self::node())
@@ -2647,7 +2648,7 @@ doc
 ; <--- of:
 (ddo:txpath
   "doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/self::node()")
-doc
+vddo:doc
 )
 
 
@@ -2656,7 +2657,7 @@ doc
 
 ; (ddo:txpath doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/ancestor::node()[position()])
 (xtest-assert ; Expected result:
-`(,doc  ; document node
+`(,vddo:doc  ; document node
  (doc
   (multidirectional
     (@ (http://www.w3.org/1999/xlink:type "extended"))
@@ -2781,12 +2782,12 @@ doc
 ; <--- of:
 (ddo:txpath
   "doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/ancestor::node()[position()]")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/ancestor-or-self::node()[position()])
 (xtest-assert ; Expected result:
-`(,doc  ; document node
+`(,vddo:doc  ; document node
  (doc
   (multidirectional
     (@ (http://www.w3.org/1999/xlink:type "extended"))
@@ -2913,7 +2914,7 @@ doc
 ; <--- of:
 (ddo:txpath
   "doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/ancestor-or-self::node()[position()]")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/attribute::node()[position()])
@@ -2922,7 +2923,7 @@ doc
 ; <--- of:
 (ddo:txpath
   "doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/attribute::node()[position()]")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/child::node()[position()])
@@ -2972,7 +2973,7 @@ doc
 ; <--- of:
 (ddo:txpath
   "doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/child::node()[position()]")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/descendant::node()[position()])
@@ -3072,7 +3073,7 @@ doc
 ; <--- of:
 (ddo:txpath
   "doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/descendant::node()[position()]")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/descendant-or-self::node()[position()])
@@ -3209,7 +3210,7 @@ doc
 ; <--- of:
 (ddo:txpath
   "doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/descendant-or-self::node()[position()]")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/following::node()[position()])
@@ -3360,7 +3361,7 @@ doc
 ; <--- of:
 (ddo:txpath
   "doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/following::node()[position()]")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/following-sibling::node()[position()])
@@ -3391,7 +3392,7 @@ doc
 ; <--- of:
 (ddo:txpath
   "doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/following-sibling::node()[position()]")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/namespace::node()[position()])
@@ -3400,7 +3401,7 @@ doc
 ; <--- of:
 (ddo:txpath
   "doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/namespace::node()[position()]")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/parent::node()[position()])
@@ -3529,7 +3530,7 @@ doc
 ; <--- of:
 (ddo:txpath
   "doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/parent::node()[position()]")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/preceding::node()[position()])
@@ -3651,7 +3652,7 @@ doc
 ; <--- of:
 (ddo:txpath
   "doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/preceding::node()[position()]")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/preceding-sibling::node()[position()])
@@ -3715,7 +3716,7 @@ doc
 ; <--- of:
 (ddo:txpath
   "doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/preceding-sibling::node()[position()]")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/self::node()[position()])
@@ -3771,7 +3772,7 @@ doc
 ; <--- of:
 (ddo:txpath
   "doc/body/chapter[position()=2 or position()=5]/@id/ancestor-or-self::node()[position()<=3]/self::node()[position()]")
-doc
+vddo:doc
 )
 
 
@@ -4077,7 +4078,7 @@ doc
       "This document is written in XML (eXtensible Markup Language) ver.1.0."))))
 ; <--- of:
 (ddo:xpath-expr "*[1]/*[7] | *[1]/*[9]/*[2] ")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr  id('toc2') | id('chap4') | id('here') )
@@ -4101,7 +4102,7 @@ doc
       (ref "boo.com")))))
 ; <--- of:
 (ddo:xpath-expr " id('toc2') | id('chap4') | id('here') ")
-doc
+vddo:doc
 )
 
 
@@ -4113,7 +4114,7 @@ doc
 '#t
 ; <--- of:
 (ddo:xpath-expr " */*[9]/*[5]/following::node() = 'ConclusionThanks a lot.'")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr  */*[9]/*[5]/following::node() = //appendix//item[1] )
@@ -4121,7 +4122,7 @@ doc
 '#t
 ; <--- of:
 (ddo:xpath-expr " */*[9]/*[5]/following::node() = //appendix//item[1] ")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr  */*[9]/*[5]/following::node() = */*[9]/*[6]/preceding-sibling::node() )
@@ -4130,7 +4131,7 @@ doc
 ; <--- of:
 (ddo:xpath-expr
   " */*[9]/*[5]/following::node() = */*[9]/*[6]/preceding-sibling::node() ")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr  (//text()[23] | //text()[24]) = ( //*[self::node() = 'foo.com'] | *[1]/*[1] ) )
@@ -4139,15 +4140,15 @@ doc
 ; <--- of:
 (ddo:xpath-expr
   " (//text()[23] | //text()[24]) = ( //*[self::node() = 'foo.com'] | *[1]/*[1] ) ")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr  //xlink:label[self::* = 'hoge'] > id( 'chap6' )  ns-binding)
 (xtest-assert ; Expected result:
 '#f
 ; <--- of:
-(ddo:xpath-expr " //xlink:label[self::* = 'hoge'] > id( 'chap6' ) " ns-binding)
-doc
+(ddo:xpath-expr " //xlink:label[self::* = 'hoge'] > id( 'chap6' ) " vddo:ns-binding)
+vddo:doc
 )
 
 
@@ -4192,7 +4193,7 @@ doc
       (ref "boo.com")))))
 ; <--- of:
 (ddo:xpath-expr "(doc/body/*)[position()]")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr (doc/body/*)[position()=4])
@@ -4204,7 +4205,7 @@ doc
    "XPointer is the fragment identifier of documents having the mime-type hogehoge."))
 ; <--- of:
 (ddo:xpath-expr "(doc/body/*)[position()=4]")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr (doc/body/*)[4])
@@ -4216,7 +4217,7 @@ doc
    "XPointer is the fragment identifier of documents having the mime-type hogehoge."))
 ; <--- of:
 (ddo:xpath-expr "(doc/body/*)[4]")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr (doc/body/*)[4=position()])
@@ -4228,7 +4229,7 @@ doc
    "XPointer is the fragment identifier of documents having the mime-type hogehoge."))
 ; <--- of:
 (ddo:xpath-expr "(doc/body/*)[4=position()]")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr (doc/body/*)[last()])
@@ -4246,7 +4247,7 @@ doc
       (ref "boo.com")))))
 ; <--- of:
 (ddo:xpath-expr "(doc/body/*)[last()]")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr (doc/body/*)[position()<=6])
@@ -4275,7 +4276,7 @@ doc
  (chapter (@ (id "chap6")) (title "samples")))
 ; <--- of:
 (ddo:xpath-expr "(doc/body/*)[position()<=6]")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr (doc/body/*)[position()<6])
@@ -4303,7 +4304,7 @@ doc
    (p "There are important keywords.")))
 ; <--- of:
 (ddo:xpath-expr "(doc/body/*)[position()<6]")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr (doc/body/*)[position()>=6])
@@ -4323,7 +4324,7 @@ doc
       (ref "boo.com")))))
 ; <--- of:
 (ddo:xpath-expr "(doc/body/*)[position()>=6]")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr (doc/body/*)[position()>6])
@@ -4342,7 +4343,7 @@ doc
       (ref "boo.com")))))
 ; <--- of:
 (ddo:xpath-expr "(doc/body/*)[position()>6]")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr (doc/body/*)[3>position()])
@@ -4360,7 +4361,7 @@ doc
       "This document is written in XML (eXtensible Markup Language) ver.1.0."))))
 ; <--- of:
 (ddo:xpath-expr "(doc/body/*)[3>position()]")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr (doc/body/*)[3>=position()])
@@ -4379,7 +4380,7 @@ doc
  (chapter (@ (id "chap3")) (title "What is XLink?") (p "hyperlink")))
 ; <--- of:
 (ddo:xpath-expr "(doc/body/*)[3>=position()]")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr (doc/body/*)[3<position()])
@@ -4408,7 +4409,7 @@ doc
       (ref "boo.com")))))
 ; <--- of:
 (ddo:xpath-expr "(doc/body/*)[3<position()]")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr (doc/body/*)[3<=position()])
@@ -4438,7 +4439,7 @@ doc
       (ref "boo.com")))))
 ; <--- of:
 (ddo:xpath-expr "(doc/body/*)[3<=position()]")
-doc
+vddo:doc
 )
 
 
@@ -4464,7 +4465,7 @@ doc
  (chapter (@ (id "chap7")) (title "Conclusion") (p "Thanks a lot.")))
 ; <--- of:
 (ddo:txpath "doc/body/chapter[@id[../title[../p[count(ancestor::*)=4]]]]")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath doc/body/chapter[title[count(following-sibling::*[self::section or self::p[text()[1]]])=1]])
@@ -4494,7 +4495,7 @@ doc
 ; <--- of:
 (ddo:txpath
   "doc/body/chapter[title[count(following-sibling::*[self::section or self::p[text()[1]]])=1]]")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath doc/item[following-sibling::body[chapter[title[../parent::body]]]])
@@ -4509,7 +4510,7 @@ doc
 ; <--- of:
 (ddo:txpath
   "doc/item[following-sibling::body[chapter[title[../parent::body]]]]")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath doc/item[@id[../text()[parent::item[count(preceding-sibling::item[position()<5])=4]]]])
@@ -4520,7 +4521,7 @@ doc
 ; <--- of:
 (ddo:txpath
   "doc/item[@id[../text()[parent::item[count(preceding-sibling::item[position()<5])=4]]]]")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath doc/body/chapter[title[../@id[../section[@ID[../p[text()[1]]]]]]])
@@ -4535,7 +4536,7 @@ doc
 ; <--- of:
 (ddo:txpath
   "doc/body/chapter[title[../@id[../section[@ID[../p[text()[1]]]]]]]")
-doc
+vddo:doc
 )
 
 ; (ddo:txpath para[self::*[self::*[self::*[1]]]])
@@ -4576,7 +4577,7 @@ doc
 '9
 ; <--- of:
 (ddo:xpath-expr " count( //item ) ")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr  count( id('no_such_element') ) )
@@ -4584,7 +4585,7 @@ doc
 '0
 ; <--- of:
 (ddo:xpath-expr " count( id('no_such_element') ) ")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr  count( doc/body/chapter/p/text() ) )
@@ -4592,7 +4593,7 @@ doc
 '5
 ; <--- of:
 (ddo:xpath-expr " count( doc/body/chapter/p/text() ) ")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr id('chap4'))
@@ -4604,7 +4605,7 @@ doc
     "XPointer is the fragment identifier of documents having the mime-type hogehoge.")))
 ; <--- of:
 (ddo:xpath-expr "id('chap4')")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr id('toc1 toc5 chap6 here'))
@@ -4625,7 +4626,7 @@ doc
       (ref "boo.com")))))
 ; <--- of:
 (ddo:xpath-expr "id('toc1 toc5 chap6 here')")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr id('not-exist'))
@@ -4633,7 +4634,7 @@ doc
 '()
 ; <--- of:
 (ddo:xpath-expr "id('not-exist')")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr local-name(*))
@@ -4641,7 +4642,7 @@ doc
 '"doc"
 ; <--- of:
 (ddo:xpath-expr "local-name(*)")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr local-name(doc/body/*[position()<4]))
@@ -4649,7 +4650,7 @@ doc
 '"chapter"
 ; <--- of:
 (ddo:xpath-expr "local-name(doc/body/*[position()<4])")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr local-name(empty))
@@ -4657,7 +4658,7 @@ doc
 '""
 ; <--- of:
 (ddo:xpath-expr "local-name(empty)")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr local-name(descendant::text()[1]))
@@ -4665,7 +4666,7 @@ doc
 '""
 ; <--- of:
 (ddo:xpath-expr "local-name(descendant::text()[1])")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr local-name(doc/multidirectional/@*))
@@ -4673,7 +4674,7 @@ doc
 '"type"
 ; <--- of:
 (ddo:xpath-expr "local-name(doc/multidirectional/@*)")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr namespace-uri(doc/multidirectional/@*))
@@ -4681,7 +4682,7 @@ doc
 '"http://www.w3.org/1999/xlink"
 ; <--- of:
 (ddo:xpath-expr "namespace-uri(doc/multidirectional/@*)")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr namespace-uri(*))
@@ -4689,7 +4690,7 @@ doc
 '""
 ; <--- of:
 (ddo:xpath-expr "namespace-uri(*)")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr name(doc/multidirectional/@*))
@@ -4697,7 +4698,7 @@ doc
 '"http://www.w3.org/1999/xlink:type"
 ; <--- of:
 (ddo:xpath-expr "name(doc/multidirectional/@*)")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr name(empty))
@@ -4705,7 +4706,7 @@ doc
 '""
 ; <--- of:
 (ddo:xpath-expr "name(empty)")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr name(descendant::text()[1]))
@@ -4713,7 +4714,7 @@ doc
 '""
 ; <--- of:
 (ddo:xpath-expr "name(descendant::text()[1])")
-doc
+vddo:doc
 )
 
 
@@ -4773,7 +4774,7 @@ doc
 '"samples"
 ; <--- of:
 (ddo:xpath-expr "string( doc/body/chapter[6] )")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr string( doc/body/chapter[1] ))
@@ -4781,7 +4782,7 @@ doc
 '"AbstractThis document describes about XLink Engine..."
 ; <--- of:
 (ddo:xpath-expr "string( doc/body/chapter[1] )")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr string( doc/body/chapter ))
@@ -4789,7 +4790,7 @@ doc
 '"AbstractThis document describes about XLink Engine..."
 ; <--- of:
 (ddo:xpath-expr "string( doc/body/chapter )")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr concat( 'one', ' ', 'beer' ))
@@ -4805,7 +4806,7 @@ doc
 '"chapter1 & chapter7"
 ; <--- of:
 (ddo:xpath-expr "concat( doc/item[1], ' & ', doc/item[7] )")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr starts-with( 'one gin', 'one' ))
@@ -4872,7 +4873,7 @@ doc
    (p "This document describes about XLink Engine...")))
 ; <--- of:
 (ddo:xpath-expr "doc/body/chapter[contains( p , 'XLink')]")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr substring-before( '1999/04/01', '/'))
@@ -4896,7 +4897,7 @@ doc
 '"IntroductionThis document is written in "
 ; <--- of:
 (ddo:xpath-expr "substring-before( doc/body/chapter[2] , 'XML')")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr substring-after( '1999/04/01', '/'))
@@ -4928,7 +4929,7 @@ doc
 '" (eXtensible Markup Language) ver.1.0."
 ; <--- of:
 (ddo:xpath-expr "substring-after( doc/body/chapter[2] , 'XML')")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr substring('12345', 1.5, 2.6) )
@@ -4984,7 +4985,7 @@ doc
 '8
 ; <--- of:
 (ddo:xpath-expr "string-length(doc/item[position()=1])")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr doc/item[string-length()-1])
@@ -4992,7 +4993,7 @@ doc
 '((item (@ (id "toc7")) "chapter7"))
 ; <--- of:
 (ddo:xpath-expr "doc/item[string-length()-1]")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr normalize-space('   Want   to    have   a lunch       '))
@@ -5056,7 +5057,7 @@ doc
 '"absr."
 ; <--- of:
 (ddo:xpath-expr "translate(doc/body/chapter[1]/title, 'Aact', 'a.') ")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr translate(doc/body/chapter[2]/title, doc/body/chapter[2]/title, doc/body/chapter[1]/title) )
@@ -5065,7 +5066,7 @@ doc
 ; <--- of:
 (ddo:xpath-expr
   "translate(doc/body/chapter[2]/title, doc/body/chapter[2]/title, doc/body/chapter[1]/title) ")
-doc
+vddo:doc
 )
 
 
@@ -5077,7 +5078,7 @@ doc
 '#t
 ; <--- of:
 (ddo:xpath-expr "boolean(*/*)")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr boolean(*/no_such))
@@ -5085,7 +5086,7 @@ doc
 '#f
 ; <--- of:
 (ddo:xpath-expr "boolean(*/no_such)")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr boolean( name(*) ))
@@ -5093,7 +5094,7 @@ doc
 '#t
 ; <--- of:
 (ddo:xpath-expr "boolean( name(*) )")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr boolean( name(doc/item[1]/text()) ))
@@ -5101,7 +5102,7 @@ doc
 '#f
 ; <--- of:
 (ddo:xpath-expr "boolean( name(doc/item[1]/text()) )")
-doc
+vddo:doc
 )
 
 ; (ddo:xpath-expr boolean( 1 ))
@@ -5157,7 +5158,7 @@ doc
 '#f
 ; <--- of:
 (ddo:xpath-expr "lang('en')")
-((ddo:txpath "doc/body/chapter[1]" -1) doc)
+((ddo:txpath "doc/body/chapter[1]" -1) vddo:doc)
 )
 
 ; (ddo:xpath-expr lang('en'))

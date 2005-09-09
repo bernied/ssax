@@ -4,7 +4,7 @@
 ;   lisovsky@acm.org      Kirill Lisovsky
 ;   lizorkin@hotbox.ru    Dmitry Lizorkin
 
-(define tree1 
+(define vsxplb:tree1 
   '(html
     (head (title "Slides"))
     (body
@@ -29,7 +29,7 @@
 ; Example from a posting "Re: DrScheme and XML", 
 ; Shriram Krishnamurthi, comp.lang.scheme, Nov. 26. 1999.
 ; http://www.deja.com/getdoc.xp?AN=553507805
-(define tree3
+(define vsxplb:tree3
   '(poem (@ (title "The Lovesong of J. Alfred Prufrock")
 	    (poet "T. S. Eliot"))
 	 (stanza
@@ -42,7 +42,8 @@
 
 ; Validation Test harness
 
-(define-macro (run-test selector node expected-result)
+; The `sxp:' prefix added to prevent name collision with "SSAX-code.scm"
+(define-macro (sxp:run-test selector node expected-result)
   (let ((res (gensym)))
     `(begin
        (cerr "\nApplying " ',selector "\nto " ,node nl)
@@ -70,8 +71,8 @@
        )
       (expected '((para (@) "para") (para (@) "second par")))
       )
-  (run-test (select-kids (ntype?? 'para)) tree expected)
-  (run-test (test-sxpath '(para)) tree expected)
+  (sxp:run-test (select-kids (ntype?? 'para)) tree expected)
+  (sxp:run-test (test-sxpath '(para)) tree expected)
 )
 
 ; Location path, full form: child::* 
@@ -84,8 +85,8 @@
       (expected
        '((para (@) "para") (br (@)) (para "second par")))
       )
-  (run-test (select-kids (ntype?? '*)) tree expected)
-  (run-test (test-sxpath '(*)) tree expected)
+  (sxp:run-test (select-kids (ntype?? '*)) tree expected)
+  (sxp:run-test (test-sxpath '(*)) tree expected)
 )
 
 
@@ -99,8 +100,8 @@
       (expected
        '("cdata"))
       )
-  (run-test (select-kids (ntype?? '*text*)) tree expected)
-  (run-test (test-sxpath '(*text*)) tree expected)
+  (sxp:run-test (select-kids (ntype?? '*text*)) tree expected)
+  (sxp:run-test (test-sxpath '(*text*)) tree expected)
 )
 
 
@@ -112,8 +113,8 @@
        )
       (expected (cdr tree))
       )
-  (run-test (select-kids (ntype?? '*any*)) tree expected)
-  (run-test (test-sxpath '(*any*)) tree expected)
+  (sxp:run-test (select-kids (ntype?? '*any*)) tree expected)
+  (sxp:run-test (test-sxpath '(*any*)) tree expected)
 )
 
 ; Location path, full form: child::*/child::para 
@@ -127,11 +128,11 @@
       (expected
        '((para "third para")))
       )
-  (run-test
+  (sxp:run-test
    (node-join (select-kids (ntype?? '*))
 	      (select-kids (ntype?? 'para)))
    tree expected)
-  (run-test (test-sxpath '(* para)) tree expected)
+  (sxp:run-test (test-sxpath '(* para)) tree expected)
 )
 
 
@@ -147,11 +148,11 @@
       (expected
        '((name "elem")))
       )
-  (run-test
+  (sxp:run-test
    (node-join (select-kids (ntype?? '@))
 	      (select-kids (ntype?? 'name)))
    tree expected)
-  (run-test (test-sxpath '(@ name)) tree expected)
+  (sxp:run-test (test-sxpath '(@ name)) tree expected)
 )
 
 ; Location path, full form:  attribute::* 
@@ -165,11 +166,11 @@
       (expected
        '((name "elem") (id "idz")))
       )
-  (run-test
+  (sxp:run-test
    (node-join (select-kids (ntype?? '@))
 	      (select-kids (ntype?? '*)))
    tree expected)
-  (run-test (test-sxpath '(@ *)) tree expected)
+  (sxp:run-test (test-sxpath '(@ *)) tree expected)
 )
 
 
@@ -185,10 +186,10 @@
       (expected
        '((para (@) "para") (para "second par") (para (@) "third para")))
       )
-  (run-test
+  (sxp:run-test
    (node-closure (ntype?? 'para))
    tree expected)
-  (run-test (test-sxpath '(// para)) tree expected)
+  (sxp:run-test (test-sxpath '(// para)) tree expected)
 )
 
 ; Location path, full form: self::para 
@@ -201,8 +202,8 @@
 	(div (@ (name "aa")) (para (@) "third para")))
        )
       )
-  (run-test (node-self (ntype?? 'para)) tree '())
-  (run-test (node-self (ntype?? 'elem)) tree (list tree))
+  (sxp:run-test (node-self (ntype?? 'para)) tree '())
+  (sxp:run-test (node-self (ntype?? 'elem)) tree (list tree))
 )
 
 ; Location path, full form: descendant-or-self::node()
@@ -228,10 +229,10 @@
                (para (@) "third para")
                "third para")))
       )
-  (run-test
+  (sxp:run-test
    (sxml:descendant-or-self sxml:node?)
    tree expected)
-  (run-test (test-sxpath '(//)) tree expected)
+  (sxp:run-test (test-sxpath '(//)) tree expected)
 )
 
 ; Location path, full form: ancestor::div 
@@ -273,7 +274,7 @@
 		  (node-closure (node-eq? context-node))
 		  ))
      )
-  (run-test
+  (sxp:run-test
    (node-or
      (node-self pred)
      (node-closure pred))
@@ -298,12 +299,12 @@
       (expected
        '((para (@) "third para") (para "fourth para")))
       )
-  (run-test
+  (sxp:run-test
    (node-join 
     (select-kids (ntype?? 'div))
     (node-closure (ntype?? 'para)))
    tree expected)
-  (run-test (test-sxpath '(div // para)) tree expected)
+  (sxp:run-test (test-sxpath '(div // para)) tree expected)
 )
 
 
@@ -316,29 +317,29 @@
 ; Location path, full form: /descendant::td/attribute::align 
 ; Location path, abbreviated form: //td/@align
 ; Selects 'align' attributes of all 'td' elements in tree1
-(let ((tree tree1)
+(let ((tree vsxplb:tree1)
       (expected
        '((align "right") (align "center") (align "center") (align "center"))
       ))
-  (run-test
+  (sxp:run-test
    (node-join 
     (node-closure (ntype?? 'td))
     (select-kids (ntype?? '@))
     (select-kids (ntype?? 'align)))
    tree expected)
-  (run-test (test-sxpath '(// td @ align)) tree expected)
+  (sxp:run-test (test-sxpath '(// td @ align)) tree expected)
 )
 
 
 ; Location path, full form: /descendant::td[attribute::align] 
 ; Location path, abbreviated form: //td[@align]
 ; Selects all td elements that have an attribute 'align' in tree1
-(let ((tree tree1)
+(let ((tree vsxplb:tree1)
       (expected
        '((td (@ (align "right")) "Talks ") (td (@ (align "center")) " = ")
 	 (td (@ (align "center")) " = ") (td (@ (align "center")) " = "))
        ))
-  (run-test
+  (sxp:run-test
    (node-reduce 
     (node-closure (ntype?? 'td))
     (sxml:filter
@@ -346,17 +347,17 @@
       (select-kids (ntype?? '@))
       (select-kids (ntype?? 'align)))))
    tree expected)
-  (run-test (test-sxpath 
+  (sxp:run-test (test-sxpath 
              `(// td
                   ,(lambda (node . var-binding)
                      ((node-self (test-sxpath '(@ align))) node))))
              tree expected)
-  (run-test (test-sxpath '(// (td (@ align)))) tree expected)
-  (run-test (test-sxpath '(// ((td) (@ align)))) tree expected)
+  (sxp:run-test (test-sxpath '(// (td (@ align)))) tree expected)
+  (sxp:run-test (test-sxpath '(// ((td) (@ align)))) tree expected)
   ; note! (test-sxpath ...) is a converter. Therefore, it can be used
   ; as any other converter, for example, in the full-form test-sxpath.
   ; Thus we can mix the full and abbreviated form test-sxpath's freely.
-  (run-test
+  (sxp:run-test
    (node-reduce 
     (node-closure (ntype?? 'td))
     (sxml:filter
@@ -368,11 +369,11 @@
 ; Location path, full form: /descendant::td[attribute::align = "right"] 
 ; Location path, abbreviated form: //td[@align = "right"]
 ; Selects all td elements that have an attribute align = "right" in tree1
-(let ((tree tree1)
+(let ((tree vsxplb:tree1)
       (expected
        '((td (@ (align "right")) "Talks "))
        ))
-  (run-test
+  (sxp:run-test
    (node-reduce 
     (node-closure (ntype?? 'td))
     (sxml:filter
@@ -380,7 +381,7 @@
       (select-kids (ntype?? '@))
       (select-kids (node-equal? '(align "right"))))))
    tree expected)
-  (run-test (test-sxpath '(// (td (@ (equal? (align "right")))))) tree expected)
+  (sxp:run-test (test-sxpath '(// (td (@ (equal? (align "right")))))) tree expected)
 )
 
 ; Location path, full form: child::para[position()=1] 
@@ -394,12 +395,12 @@
       (expected
        '((para (@) "para"))
       ))
-  (run-test
+  (sxp:run-test
    (node-reduce
     (select-kids (ntype?? 'para))
     (node-pos 1))
    tree expected)
-  (run-test (test-sxpath '((para 1))) tree expected)
+  (sxp:run-test (test-sxpath '((para 1))) tree expected)
 )
 
 ; Location path, full form: child::para[position()=last()] 
@@ -413,12 +414,12 @@
       (expected
        '((para "second par"))
       ))
-  (run-test
+  (sxp:run-test
    (node-reduce
     (select-kids (ntype?? 'para))
     (node-pos -1))
    tree expected)
-  (run-test (test-sxpath '((para -1))) tree expected)
+  (sxp:run-test (test-sxpath '((para -1))) tree expected)
 )
 
 ; Illustrating the following Note of Sec 2.5 of XPath:
@@ -433,12 +434,12 @@
 	(div (@ (name "aa")) (para (@) "third para")))
        )
       )
-  (run-test
+  (sxp:run-test
    (node-reduce	; /descendant::para[1] in test-sxpath
     (node-closure (ntype?? 'para))
     (node-pos 1))
    tree '((para (@) "para")))
-  (run-test (test-sxpath '(// (para 1))) tree
+  (sxp:run-test (test-sxpath '(// (para 1))) tree
 	    '((para (@) "para") (para (@) "third para")))
 )
 
@@ -463,22 +464,22 @@
        (div		; div node
 	(car ((test-sxpath '(// div)) tree)))
        )
-  (run-test
+  (sxp:run-test
    (node-parent tree)
    para1 (list tree))
-  (run-test
+  (sxp:run-test
    (node-parent tree)
    para3 (list div))
-  (run-test		; checking the parent of an attribute node
+  (sxp:run-test		; checking the parent of an attribute node
    (node-parent tree)
    ((test-sxpath '(@ name)) div) (list div))
-  (run-test
+  (sxp:run-test
    (node-join
     (node-parent tree)
     (select-kids (ntype?? '@))
     (select-kids (ntype?? 'name)))
    para3 '((name "aa")))
-  (run-test
+  (sxp:run-test
    (test-sxpath `(,(lambda (node . var-binding)
                      ((node-parent tree) node))
                   @ name))
@@ -509,7 +510,7 @@
        (expected
        '((chapter (@ (id "three")) "Chap 3 text")))
       )
-  (run-test
+  (sxp:run-test
    (node-reduce
     (node-join
      (node-parent tree)
@@ -543,7 +544,7 @@
        (expected
        '((chapter (@ (id "two")) "Chap 2 text")))
       )
-  (run-test
+  (sxp:run-test
    (node-reduce
     (node-join
      (node-parent tree)
@@ -563,11 +564,11 @@
 ;    child::table/child::tr[position()=2]/child::td[position()=3] 
 ; Location path, abbreviated form: table/tr[2]/td[3]
 ; selects the third td of the second tr of the table
-(let ((tree ((node-closure (ntype?? 'p)) tree1))
+(let ((tree ((node-closure (ntype?? 'p)) vsxplb:tree1))
       (expected
        '((td " data + control"))
        ))
-  (run-test
+  (sxp:run-test
    (node-join
     (select-kids (ntype?? 'table))
     (node-reduce (select-kids (ntype?? 'tr))
@@ -596,7 +597,7 @@
       (expected
        '((para (@ (type "warning")) "para 6"))
       ))
-  (run-test
+  (sxp:run-test
    (node-reduce
     (select-kids (ntype?? 'para))
     (sxml:filter
@@ -605,7 +606,7 @@
       (select-kids (node-equal? '(type "warning")))))
     (node-pos 5))
    tree expected)
-  (run-test (test-sxpath '( (((para (@ (equal? (type "warning"))))) 5 )  ))
+  (sxp:run-test (test-sxpath '( (((para (@ (equal? (type "warning"))))) 5 )  ))
 	    tree expected)
   ((test-sxpath '( (para (@ (equal? (type "warning"))) 5 )  ))
 	    tree)
@@ -629,7 +630,7 @@
       (expected
        '((para (@ (type "warning")) "para 5"))
       ))
-  (run-test
+  (sxp:run-test
    (node-reduce
     (select-kids (ntype?? 'para))
     (node-pos 5)
@@ -638,9 +639,9 @@
       (select-kids (ntype?? '@))
       (select-kids (node-equal? '(type "warning"))))))
    tree expected)
-  (run-test (test-sxpath '( (( (para 5))  (@ (equal? (type "warning"))))))
+  (sxp:run-test (test-sxpath '( (( (para 5))  (@ (equal? (type "warning"))))))
 	    tree expected)
-  (run-test (test-sxpath '( (para 5 (@ (equal? (type "warning")))) ))
+  (sxp:run-test (test-sxpath '( (para 5 (@ (equal? (type "warning")))) ))
 	    tree expected)
 )
 
@@ -664,7 +665,7 @@
 	 (chapter (@ (id "three")) "Chap 3 text")
 	 (appendix (@ (id "A")) "App A text"))
       ))
-  (run-test
+  (sxp:run-test
    (node-join
     (select-kids (ntype?? '*))
     (sxml:filter
@@ -672,7 +673,7 @@
       (node-self (ntype?? 'chapter))
       (node-self (ntype?? 'appendix)))))
    tree expected)
-  (run-test (test-sxpath `(* ,(lambda (node . var-binding)
+  (sxp:run-test (test-sxpath `(* ,(lambda (node . var-binding)
                                 ((node-or
                                   (node-self (ntype?? 'chapter))
 				  (node-self (ntype?? 'appendix)))
@@ -694,18 +695,18 @@
 ; See a similar example //td[@align] above.
 
 (cerr "\nExample with tree3: extracting the first lines of every stanza\n")
-(let ((tree tree3)
+(let ((tree vsxplb:tree3)
       (expected
        '("Let us go then, you and I," "In the room the women come and go")
       ))
-  (run-test
+  (sxp:run-test
    (node-join
     (node-closure (ntype?? 'stanza))
     (node-reduce 
      (select-kids (ntype?? 'line)) (node-pos 1))
     (select-kids (ntype?? '*text*)))
    tree expected)
-  (run-test (test-sxpath '(// stanza (line 1) *text*)) tree expected)
+  (sxp:run-test (test-sxpath '(// stanza (line 1) *text*)) tree expected)
 )
 
 (cout nl "Sxpathlib tests passed successfully!" nl)

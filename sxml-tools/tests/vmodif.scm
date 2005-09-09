@@ -4,7 +4,7 @@
 ;   lisovsky@acm.org      Kirill Lisovsky
 ;   lizorkin@hotbox.ru    Dmitry Lizorkin
 
-(define tree1
+(define vmdf:tree1
   '(html
     (head (title "Slides"))
     (body
@@ -21,7 +21,7 @@
      (ul
       (li (a (@ (href "slides/slide0001.gif")) "Introduction"))
       (li (a (@ (href "slides/slide0010.gif")) "Summary"))))))
-(define tree2
+(define vmdf:tree2
   '(poem
     (@ (title "The Lovesong of J. Alfred Prufrock") (poet "T. S. Eliot"))
     (stanza
@@ -46,7 +46,7 @@
  (stanza (line "Talking of Michaelangelo.")))
 ; <--- of:
 (sxml:modify `("/stanza/line[1]" ,modif:delete))
-tree2
+vmdf:tree2
 )
 
 ; (sxml:modify (quasiquote (/stanza (unquote modif:delete-undeep))))
@@ -60,7 +60,7 @@ tree2
  (line "Talking of Michaelangelo."))
 ; <--- of:
 (sxml:modify `("/stanza" ,modif:delete-undeep))
-tree2
+vmdf:tree2
 )
 
 ; (sxml:modify (quasiquote (/stanza (unquote (modif:rename (quote para))))))
@@ -76,7 +76,7 @@ tree2
   (line "Talking of Michaelangelo.")))
 ; <--- of:
 (sxml:modify `("/stanza" ,(modif:rename 'para)))
-tree2
+vmdf:tree2
 )
 
 ; (sxml:modify (quasiquote (/stanza[2] (unquote (modif:insert-into (lambda (context base-node) (quote (line Whatever))))))))
@@ -95,7 +95,7 @@ tree2
 (sxml:modify
   `("/stanza[2]"
     ,(modif:insert-into (lambda (context base-node) '(line "Whatever")))))
-tree2
+vmdf:tree2
 )
 
 ; (sxml:modify (quasiquote (/stanza[2]/line[last()] (unquote (modif:insert-following (lambda (context base-node) (quote (line Whatever))))))))
@@ -114,7 +114,7 @@ tree2
 (sxml:modify
   `("/stanza[2]/line[last()]"
     ,(modif:insert-following (lambda (context base-node) '(line "Whatever")))))
-tree2
+vmdf:tree2
 )
 
 ; (sxml:modify (quasiquote (@poet (unquote modif:delete))))
@@ -130,7 +130,7 @@ tree2
    (line "Talking of Michaelangelo.")))
 ; <--- of:
 (sxml:modify `("@poet" ,modif:delete))
-tree2
+vmdf:tree2
 )
 
 ; (sxml:modify (quasiquote (/stanza[2] (unquote modif:delete))) (quasiquote (preceding-sibling::*[last()] (unquote (lambda (node context base-node) (list base-node node))))))
@@ -149,7 +149,7 @@ tree2
   `("/stanza[2]" ,modif:delete)
   `("preceding-sibling::*[last()]"
     ,(lambda (node context base-node) (list base-node node))))
-tree2
+vmdf:tree2
 )
 
 ; (sxml:modify (quasiquote (/stanza/line[1] (unquote modif:delete))) (quasiquote (/stanza (unquote (modif:rename (quote para))))) (quasiquote (/stanza[2]/line[last()] (unquote (modif:insert-following (lambda (context base-node) (quote (line Whatever))))))))
@@ -166,7 +166,7 @@ tree2
   `("/stanza" ,(modif:rename 'para))
   `("/stanza[2]/line[last()]"
     ,(modif:insert-following (lambda (context base-node) '(line "Whatever")))))
-tree2
+vmdf:tree2
 )
 
 
@@ -186,7 +186,7 @@ tree2
   (ul (li (a "Introduction")) (li (a "Summary")))))
 ; <--- of:
 (sxml:modify `("//@*" ,modif:delete))
-tree1
+vmdf:tree1
 )
 
 ; (sxml:modify (quasiquote (/head/title/text() (unquote modif:delete))) (quasiquote (/head/title (unquote (modif:insert-into (lambda (context base-node) (quote Presentation)))))))
@@ -212,7 +212,7 @@ tree1
   `("/head/title/text()" ,modif:delete)
   `("/head/title"
     ,(modif:insert-into (lambda (context base-node) '"Presentation"))))
-tree1
+vmdf:tree1
 )
 
 ; (sxml:modify (quasiquote (//text() (unquote modif:delete-undeep))))
@@ -232,7 +232,7 @@ tree1
    (li (a (@ (href "slides/slide0010.gif")))))))
 ; <--- of:
 (sxml:modify `("//text()" ,modif:delete-undeep))
-tree1
+vmdf:tree1
 )
 
 ; (sxml:modify (quasiquote (//* (unquote modif:delete-undeep))))
@@ -250,7 +250,7 @@ tree1
  "Summary")
 ; <--- of:
 (sxml:modify `("//*" ,modif:delete-undeep))
-((sxml:modify `("//@*" ,modif:delete) `("//*" ,(modif:rename 'common))) tree1)
+((sxml:modify `("//@*" ,modif:delete) `("//*" ,(modif:rename 'common))) vmdf:tree1)
 )
 
 
@@ -267,7 +267,7 @@ tree1
  (stanza (line "Talking of Michaelangelo.")))
 ; <--- of:
 (sxml:modify '("/stanza/line[1]" delete))
-tree2
+vmdf:tree2
 )
 
 ; (sxml:modify (quote (/stanza delete-undeep)))
@@ -281,7 +281,7 @@ tree2
  (line "Talking of Michaelangelo."))
 ; <--- of:
 (sxml:modify '("/stanza" delete-undeep))
-tree2
+vmdf:tree2
 )
 
 ; (sxml:modify (quote (/stanza rename para)))
@@ -297,7 +297,7 @@ tree2
   (line "Talking of Michaelangelo.")))
 ; <--- of:
 (sxml:modify '("/stanza" rename para))
-tree2
+vmdf:tree2
 )
 
 ; (sxml:modify (quote (/stanza[2] insert-into (line Whatever))))
@@ -314,7 +314,7 @@ tree2
    (line "Whatever")))
 ; <--- of:
 (sxml:modify '("/stanza[2]" insert-into (line "Whatever")))
-tree2
+vmdf:tree2
 )
 
 ; (sxml:modify (quote (/stanza[2]/line[last()] insert-following (line Whatever))))
@@ -331,7 +331,7 @@ tree2
    (line "Whatever")))
 ; <--- of:
 (sxml:modify '("/stanza[2]/line[last()]" insert-following (line "Whatever")))
-tree2
+vmdf:tree2
 )
 
 ; (sxml:modify (quote (@poet delete)))
@@ -347,7 +347,7 @@ tree2
    (line "Talking of Michaelangelo.")))
 ; <--- of:
 (sxml:modify '("@poet" delete))
-tree2
+vmdf:tree2
 )
 
 ; (sxml:modify (quote (/stanza[2] move-preceding preceding-sibling::*[last()])))
@@ -363,7 +363,7 @@ tree2
    (line "Like a patient etherized upon a table:")))
 ; <--- of:
 (sxml:modify '("/stanza[2]" move-preceding "preceding-sibling::*[last()]"))
-tree2
+vmdf:tree2
 )
 
 ; (sxml:modify (quote (/stanza/line[1] delete)) (quote (/stanza rename para)) (quote (/stanza[2]/line[last()] insert-following (line Whatever))))
@@ -379,7 +379,7 @@ tree2
   '("/stanza/line[1]" delete)
   '("/stanza" rename para)
   '("/stanza[2]/line[last()]" insert-following (line "Whatever")))
-tree2
+vmdf:tree2
 )
 
 
@@ -399,7 +399,7 @@ tree2
   (ul (li (a "Introduction")) (li (a "Summary")))))
 ; <--- of:
 (sxml:modify '("//@*" delete))
-tree1
+vmdf:tree1
 )
 
 ; (sxml:modify (quote (/head/title/text() delete)) (quote (/head/title insert-into Presentation)))
@@ -424,7 +424,7 @@ tree1
 (sxml:modify
   '("/head/title/text()" delete)
   '("/head/title" insert-into "Presentation"))
-tree1
+vmdf:tree1
 )
 
 ; (sxml:modify (quote (//text() delete-undeep)))
@@ -444,7 +444,7 @@ tree1
    (li (a (@ (href "slides/slide0010.gif")))))))
 ; <--- of:
 (sxml:modify '("//text()" delete-undeep))
-tree1
+vmdf:tree1
 )
 
 ; (sxml:modify (quote (//* delete-undeep)))
@@ -462,7 +462,7 @@ tree1
  "Summary")
 ; <--- of:
 (sxml:modify '("//*" delete-undeep))
-((sxml:modify '("//@*" delete) '("//*" rename common)) tree1)
+((sxml:modify '("//@*" delete) '("//*" rename common)) vmdf:tree1)
 )
 
 (cout nl "SXML modification tests passed successfully!" nl)

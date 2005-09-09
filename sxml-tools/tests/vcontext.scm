@@ -5,7 +5,7 @@
 ;   lizorkin@hotbox.ru    Dmitry Lizorkin
 
 ;@ Document
-(define old-doc
+(define vcntxt:old-doc
 '(*TOP*
  (*PI* xml "version='1.0' encoding=\"Shift_JIS\"")
  (doc
@@ -95,7 +95,8 @@
 ; 'id-index subtree. If the source document already contains such a
 ; subtree, it will be replaced. Other subtrees in an auxiliary list will
 ; remain unchanged.
-(define (SXML->SXML+id document id-attrs)
+; DL: local version of the function - prefixed with `vcntxt:'
+(define (vcntxt:SXML->SXML+id document id-attrs)
   (let((aux-subtrees
         (let((aux ((select-kids (ntype?? '@@)) document)))
           (if(null? aux)
@@ -145,13 +146,13 @@
                (append ((select-kids (ntype?? '*)) (car nodeset)) (cdr nodeset))
                id-index))))))))
 
-(define doc
-  (SXML->SXML+id
-   old-doc
+(define vcntxt:doc
+  (vcntxt:SXML->SXML+id
+   vcntxt:old-doc
    '((item id) (chapter id) (section ID) (appendix id))))
 
 ;@ Namespace binding
-(define ns-binding (list (cons 'xlink "http://www.w3.org/1999/xlink")))
+(define vcntxt:ns-binding (list (cons 'xlink "http://www.w3.org/1999/xlink")))
 
 
 ;=========================================================================
@@ -163,7 +164,7 @@
                  (draft:xpath xpath-string (car ns-binding)))))
     (if (not res)
         '@error@    ; this can never be an expected result
-        (res doc))))
+        (res vcntxt:doc))))
 
 (define (draft:test-xpointer xpath-string . ns-binding)  
   (let ((res (if (null? ns-binding)
@@ -171,7 +172,7 @@
 	       (draft:xpointer xpath-string (car ns-binding)))))
     (if (not res)
         '@error@    ; this can never be an expected result
-        (res doc))))
+        (res vcntxt:doc))))
        
 (define (draft:test-xpointer+vars xpath-string var-binding . ns-binding)
   (let ((res (if (null? ns-binding)
@@ -179,7 +180,7 @@
                  (draft:xpointer xpath-string (car ns-binding)))))
     (if (not res)
         '@error@    ; this can never be an expected result
-        (res doc var-binding))))
+        (res vcntxt:doc var-binding))))
 
 
 ;=========================================================================
@@ -338,7 +339,7 @@ draft:test-xpath
 ; <--- of:
 draft:test-xpath
 "//attribute::xlink:type"
-ns-binding
+vcntxt:ns-binding
 )
 
 ; draft:test-xpath
@@ -349,7 +350,7 @@ ns-binding
 ; <--- of:
 draft:test-xpath
 "//attribute::xlink:*[ self::* = 'hoge' ]"
-ns-binding
+vcntxt:ns-binding
 )
 
 ; draft:test-xpath
@@ -1983,7 +1984,7 @@ draft:test-xpath
 ; <--- of:
 draft:test-xpath
 "*[1]/*[1]/*[attribute::xlink:*][attribute::* = 'boo']"
-ns-binding
+vcntxt:ns-binding
 )
 
 ; draft:test-xpath
@@ -2450,7 +2451,7 @@ draft:test-xpointer
 ; <--- of:
 draft:test-xpointer
 "xpointer( //xlink:label[self::* = 'hoge'] > id( 'chap6' ) )"
-ns-binding
+vcntxt:ns-binding
 )
 
 
@@ -2598,20 +2599,20 @@ draft:test-xpointer
 
 ; sxml:xpath
 (xtest-assert ; Expected result:
-(list doc)
+(list vcntxt:doc)
 ; <--- of:
 (sxml:xpath "/")
-doc
+vcntxt:doc
 )
 
 
 ; sxml:xpath+root+vars
 (xtest-assert ; Expected result:
-(list doc)
+(list vcntxt:doc)
 ;"dgdgf"
 ; <--- of:
 (sxml:xpath+root+vars "/")
-doc
+vcntxt:doc
 '()
 )
 
@@ -2619,7 +2620,7 @@ doc
 ;=========================================================================
 ; SXPath native syntax with context support
 
-(define tree1 
+(define vcntxt:tree1 
   '(html
     (head (title "Slides"))
     (body
@@ -2644,7 +2645,7 @@ doc
 ; Example from a posting "Re: DrScheme and XML", 
 ; Shriram Krishnamurthi, comp.lang.scheme, Nov. 26. 1999.
 ; http://www.deja.com/getdoc.xp?AN=553507805
-(define tree3
+(define vcntxt:tree3
   '(poem (@ (title "The Lovesong of J. Alfred Prufrock")
 	    (poet "T. S. Eliot"))
 	 (stanza
@@ -2657,7 +2658,7 @@ doc
 
 ; Validation Test harness
 
-(define-macro (run-test selector node expected-result)
+(define-macro (vcntxt:sxp:run-test selector node expected-result)
   (let ((res (gensym)))
     `(begin
        (cerr "\nApplying " ',selector "\nto " ,node nl)
@@ -2685,8 +2686,8 @@ doc
        )
       (expected '((para (@) "para") (para (@) "second par")))
       )
-  (run-test (select-kids (ntype?? 'para)) tree expected)
-  (run-test (test-draft-sxpath '(para)) tree expected)
+  (vcntxt:sxp:run-test (select-kids (ntype?? 'para)) tree expected)
+  (vcntxt:sxp:run-test (test-draft-sxpath '(para)) tree expected)
 )
 
 ; Location path, full form: child::* 
@@ -2699,8 +2700,8 @@ doc
       (expected
        '((para (@) "para") (br (@)) (para "second par")))
       )
-  (run-test (select-kids (ntype?? '*)) tree expected)
-  (run-test (test-draft-sxpath '(*)) tree expected)
+  (vcntxt:sxp:run-test (select-kids (ntype?? '*)) tree expected)
+  (vcntxt:sxp:run-test (test-draft-sxpath '(*)) tree expected)
 )
 
 
@@ -2714,8 +2715,8 @@ doc
       (expected
        '("cdata"))
       )
-  (run-test (select-kids (ntype?? '*text*)) tree expected)
-  (run-test (test-draft-sxpath '(*text*)) tree expected)
+  (vcntxt:sxp:run-test (select-kids (ntype?? '*text*)) tree expected)
+  (vcntxt:sxp:run-test (test-draft-sxpath '(*text*)) tree expected)
 )
 
 
@@ -2727,8 +2728,8 @@ doc
        )
       (expected (cdr tree))
       )
-  (run-test (select-kids (ntype?? '*any*)) tree expected)
-  (run-test (test-draft-sxpath '(*any*)) tree expected)
+  (vcntxt:sxp:run-test (select-kids (ntype?? '*any*)) tree expected)
+  (vcntxt:sxp:run-test (test-draft-sxpath '(*any*)) tree expected)
 )
 
 ; Location path, full form: child::*/child::para 
@@ -2742,11 +2743,11 @@ doc
       (expected
        '((para "third para")))
       )
-  (run-test
+  (vcntxt:sxp:run-test
    (node-join (select-kids (ntype?? '*))
 	      (select-kids (ntype?? 'para)))
    tree expected)
-  (run-test (test-draft-sxpath '(* para)) tree expected)
+  (vcntxt:sxp:run-test (test-draft-sxpath '(* para)) tree expected)
 )
 
 
@@ -2762,11 +2763,11 @@ doc
       (expected
        '((name "elem")))
       )
-  (run-test
+  (vcntxt:sxp:run-test
    (node-join (select-kids (ntype?? '@))
 	      (select-kids (ntype?? 'name)))
    tree expected)
-  (run-test (test-draft-sxpath '(@ name)) tree expected)
+  (vcntxt:sxp:run-test (test-draft-sxpath '(@ name)) tree expected)
 )
 
 ; Location path, full form:  attribute::* 
@@ -2780,11 +2781,11 @@ doc
       (expected
        '((name "elem") (id "idz")))
       )
-  (run-test
+  (vcntxt:sxp:run-test
    (node-join (select-kids (ntype?? '@))
 	      (select-kids (ntype?? '*)))
    tree expected)
-  (run-test (test-draft-sxpath '(@ *)) tree expected)
+  (vcntxt:sxp:run-test (test-draft-sxpath '(@ *)) tree expected)
 )
 
 
@@ -2800,10 +2801,10 @@ doc
       (expected
        '((para (@) "para") (para "second par") (para (@) "third para")))
       )
-  (run-test
+  (vcntxt:sxp:run-test
    (node-closure (ntype?? 'para))
    tree expected)
-  (run-test (test-draft-sxpath '(// para)) tree expected)
+  (vcntxt:sxp:run-test (test-draft-sxpath '(// para)) tree expected)
 )
 
 ; Location path, full form: self::para 
@@ -2816,8 +2817,8 @@ doc
 	(div (@ (name "aa")) (para (@) "third para")))
        )
       )
-  (run-test (node-self (ntype?? 'para)) tree '())
-  (run-test (node-self (ntype?? 'elem)) tree (list tree))
+  (vcntxt:sxp:run-test (node-self (ntype?? 'para)) tree '())
+  (vcntxt:sxp:run-test (node-self (ntype?? 'elem)) tree (list tree))
 )
 
 ; Location path, full form: descendant-or-self::node()
@@ -2838,13 +2839,13 @@ doc
 	 (@ (name "aa")) (para (@) "third para")
 	 (@) "third para"))))
       )
-  (run-test
+  (vcntxt:sxp:run-test
    (node-or
     (node-self (ntype?? '*any*))
     (node-closure (ntype?? '*any*)))
    tree expected)
 ; DL: In draft:xpath the order is different, because descendant axis is used
-;  (run-test (test-draft-sxpath '(//)) tree expected)
+;  (vcntxt:sxp:run-test (test-draft-sxpath '(//)) tree expected)
 )
 
 ; Location path, full form: ancestor::div 
@@ -2886,7 +2887,7 @@ doc
 		  (node-closure (node-eq? context-node))
 		  ))
      )
-  (run-test
+  (vcntxt:sxp:run-test
    (node-or
      (node-self pred)
      (node-closure pred))
@@ -2911,12 +2912,12 @@ doc
       (expected
        '((para (@) "third para") (para "fourth para")))
       )
-  (run-test
+  (vcntxt:sxp:run-test
    (node-join 
     (select-kids (ntype?? 'div))
     (node-closure (ntype?? 'para)))
    tree expected)
-  (run-test (test-draft-sxpath '(div // para)) tree expected)
+  (vcntxt:sxp:run-test (test-draft-sxpath '(div // para)) tree expected)
 )
 
 
@@ -2928,30 +2929,30 @@ doc
 
 ; Location path, full form: /descendant::td/attribute::align 
 ; Location path, abbreviated form: //td/@align
-; Selects 'align' attributes of all 'td' elements in tree1
-(let ((tree tree1)
+; Selects 'align' attributes of all 'td' elements in vcntxt:tree1
+(let ((tree vcntxt:tree1)
       (expected
        '((align "right") (align "center") (align "center") (align "center"))
       ))
-  (run-test
+  (vcntxt:sxp:run-test
    (node-join 
     (node-closure (ntype?? 'td))
     (select-kids (ntype?? '@))
     (select-kids (ntype?? 'align)))
    tree expected)
-  (run-test (test-draft-sxpath '(// td @ align)) tree expected)
+  (vcntxt:sxp:run-test (test-draft-sxpath '(// td @ align)) tree expected)
 )
 
 
 ; Location path, full form: /descendant::td[attribute::align] 
 ; Location path, abbreviated form: //td[@align]
-; Selects all td elements that have an attribute 'align' in tree1
-(let ((tree tree1)
+; Selects all td elements that have an attribute 'align' in vcntxt:tree1
+(let ((tree vcntxt:tree1)
       (expected
        '((td (@ (align "right")) "Talks ") (td (@ (align "center")) " = ")
 	 (td (@ (align "center")) " = ") (td (@ (align "center")) " = "))
        ))
-  (run-test
+  (vcntxt:sxp:run-test
    (node-reduce 
     (node-closure (ntype?? 'td))
     (sxml:filter
@@ -2959,17 +2960,17 @@ doc
       (select-kids (ntype?? '@))
       (select-kids (ntype?? 'align)))))
    tree expected)
-  (run-test (test-draft-sxpath 
+  (vcntxt:sxp:run-test (test-draft-sxpath 
              `(// td
                   ,(lambda (node . var-binding)
                      ((node-self (test-draft-sxpath '(@ align))) node))))
              tree expected)
-  (run-test (test-draft-sxpath '(// (td (@ align)))) tree expected)
-  (run-test (test-draft-sxpath '(// ((td) (@ align)))) tree expected)
+  (vcntxt:sxp:run-test (test-draft-sxpath '(// (td (@ align)))) tree expected)
+  (vcntxt:sxp:run-test (test-draft-sxpath '(// ((td) (@ align)))) tree expected)
   ; note! (test-draft-sxpath ...) is a converter. Therefore, it can be used
   ; as any other converter, for example, in the full-form test-sxpath.
   ; Thus we can mix the full and abbreviated form test-sxpath's freely.
-  (run-test
+  (vcntxt:sxp:run-test
    (node-reduce 
     (node-closure (ntype?? 'td))
     (sxml:filter
@@ -2980,12 +2981,12 @@ doc
 
 ; Location path, full form: /descendant::td[attribute::align = "right"] 
 ; Location path, abbreviated form: //td[@align = "right"]
-; Selects all td elements that have an attribute align = "right" in tree1
-(let ((tree tree1)
+; Selects all td elements that have an attribute align = "right" in vcntxt:tree1
+(let ((tree vcntxt:tree1)
       (expected
        '((td (@ (align "right")) "Talks "))
        ))
-  (run-test
+  (vcntxt:sxp:run-test
    (node-reduce 
     (node-closure (ntype?? 'td))
     (sxml:filter
@@ -2993,7 +2994,7 @@ doc
       (select-kids (ntype?? '@))
       (select-kids (node-equal? '(align "right"))))))
    tree expected)
-  (run-test (test-draft-sxpath '(// (td (@ (equal? (align "right")))))) tree expected)
+  (vcntxt:sxp:run-test (test-draft-sxpath '(// (td (@ (equal? (align "right")))))) tree expected)
 )
 
 ; Location path, full form: child::para[position()=1] 
@@ -3007,12 +3008,12 @@ doc
       (expected
        '((para (@) "para"))
       ))
-  (run-test
+  (vcntxt:sxp:run-test
    (node-reduce
     (select-kids (ntype?? 'para))
     (node-pos 1))
    tree expected)
-  (run-test (test-draft-sxpath '((para 1))) tree expected)
+  (vcntxt:sxp:run-test (test-draft-sxpath '((para 1))) tree expected)
 )
 
 ; Location path, full form: child::para[position()=last()] 
@@ -3026,12 +3027,12 @@ doc
       (expected
        '((para "second par"))
       ))
-  (run-test
+  (vcntxt:sxp:run-test
    (node-reduce
     (select-kids (ntype?? 'para))
     (node-pos -1))
    tree expected)
-  (run-test (test-draft-sxpath '((para -1))) tree expected)
+  (vcntxt:sxp:run-test (test-draft-sxpath '((para -1))) tree expected)
 )
 
 ; Illustrating the following Note of Sec 2.5 of XPath:
@@ -3046,12 +3047,12 @@ doc
 	(div (@ (name "aa")) (para (@) "third para")))
        )
       )
-  (run-test
+  (vcntxt:sxp:run-test
    (node-reduce	; /descendant::para[1] in test-sxpath
     (node-closure (ntype?? 'para))
     (node-pos 1))
    tree '((para (@) "para")))
-  (run-test (test-draft-sxpath '(// (para 1))) tree
+  (vcntxt:sxp:run-test (test-draft-sxpath '(// (para 1))) tree
 	    '((para (@) "para") (para (@) "third para")))
 )
 
@@ -3076,22 +3077,22 @@ doc
        (div		; div node
 	(car ((test-draft-sxpath '(// div)) tree)))
        )
-  (run-test
+  (vcntxt:sxp:run-test
    (node-parent tree)
    para1 (list tree))
-  (run-test
+  (vcntxt:sxp:run-test
    (node-parent tree)
    para3 (list div))
-  (run-test		; checking the parent of an attribute node
+  (vcntxt:sxp:run-test		; checking the parent of an attribute node
    (node-parent tree)
    ((test-draft-sxpath '(@ name)) div) (list div))
-  (run-test
+  (vcntxt:sxp:run-test
    (node-join
     (node-parent tree)
     (select-kids (ntype?? '@))
     (select-kids (ntype?? 'name)))
    para3 '((name "aa")))
-  (run-test
+  (vcntxt:sxp:run-test
    (test-draft-sxpath `(,(lambda (node . var-binding)
                      ((node-parent tree) node))
                   @ name))
@@ -3122,7 +3123,7 @@ doc
        (expected
        '((chapter (@ (id "three")) "Chap 3 text")))
       )
-  (run-test
+  (vcntxt:sxp:run-test
    (node-reduce
     (node-join
      (node-parent tree)
@@ -3156,7 +3157,7 @@ doc
        (expected
        '((chapter (@ (id "two")) "Chap 2 text")))
       )
-  (run-test
+  (vcntxt:sxp:run-test
    (node-reduce
     (node-join
      (node-parent tree)
@@ -3176,11 +3177,11 @@ doc
 ;    child::table/child::tr[position()=2]/child::td[position()=3] 
 ; Location path, abbreviated form: table/tr[2]/td[3]
 ; selects the third td of the second tr of the table
-(let ((tree ((node-closure (ntype?? 'p)) tree1))
+(let ((tree ((node-closure (ntype?? 'p)) vcntxt:tree1))
       (expected
        '((td " data + control"))
        ))
-  (run-test
+  (vcntxt:sxp:run-test
    (node-join
     (select-kids (ntype?? 'table))
     (node-reduce (select-kids (ntype?? 'tr))
@@ -3209,7 +3210,7 @@ doc
       (expected
        '((para (@ (type "warning")) "para 6"))
       ))
-  (run-test
+  (vcntxt:sxp:run-test
    (node-reduce
     (select-kids (ntype?? 'para))
     (sxml:filter
@@ -3218,7 +3219,7 @@ doc
       (select-kids (node-equal? '(type "warning")))))
     (node-pos 5))
    tree expected)
-  (run-test (test-draft-sxpath '( (((para (@ (equal? (type "warning"))))) 5 )  ))
+  (vcntxt:sxp:run-test (test-draft-sxpath '( (((para (@ (equal? (type "warning"))))) 5 )  ))
 	    tree expected)
   ((test-draft-sxpath '( (para (@ (equal? (type "warning"))) 5 )  ))
 	    tree)
@@ -3242,7 +3243,7 @@ doc
       (expected
        '((para (@ (type "warning")) "para 5"))
       ))
-  (run-test
+  (vcntxt:sxp:run-test
    (node-reduce
     (select-kids (ntype?? 'para))
     (node-pos 5)
@@ -3251,9 +3252,9 @@ doc
       (select-kids (ntype?? '@))
       (select-kids (node-equal? '(type "warning"))))))
    tree expected)
-  (run-test (test-draft-sxpath '( (( (para 5))  (@ (equal? (type "warning"))))))
+  (vcntxt:sxp:run-test (test-draft-sxpath '( (( (para 5))  (@ (equal? (type "warning"))))))
 	    tree expected)
-  (run-test (test-draft-sxpath '( (para 5 (@ (equal? (type "warning")))) ))
+  (vcntxt:sxp:run-test (test-draft-sxpath '( (para 5 (@ (equal? (type "warning")))) ))
 	    tree expected)
 )
 
@@ -3277,7 +3278,7 @@ doc
 	 (chapter (@ (id "three")) "Chap 3 text")
 	 (appendix (@ (id "A")) "App A text"))
       ))
-  (run-test
+  (vcntxt:sxp:run-test
    (node-join
     (select-kids (ntype?? '*))
     (sxml:filter
@@ -3285,7 +3286,7 @@ doc
       (node-self (ntype?? 'chapter))
       (node-self (ntype?? 'appendix)))))
    tree expected)
-  (run-test (test-draft-sxpath `(* ,(lambda (node . var-binding)
+  (vcntxt:sxp:run-test (test-draft-sxpath `(* ,(lambda (node . var-binding)
                                 ((node-or
                                   (node-self (ntype?? 'chapter))
 				  (node-self (ntype?? 'appendix)))
@@ -3307,18 +3308,18 @@ doc
 ; See a similar example //td[@align] above.
 
 (cerr "\nExample with tree3: extracting the first lines of every stanza\n")
-(let ((tree tree3)
+(let ((tree vcntxt:tree3)
       (expected
        '("Let us go then, you and I," "In the room the women come and go")
       ))
-  (run-test
+  (vcntxt:sxp:run-test
    (node-join
     (node-closure (ntype?? 'stanza))
     (node-reduce 
      (select-kids (ntype?? 'line)) (node-pos 1))
     (select-kids (ntype?? '*text*)))
    tree expected)
-  (run-test (test-draft-sxpath '(// stanza (line 1) *text*)) tree expected)
+  (vcntxt:sxp:run-test (test-draft-sxpath '(// stanza (line 1) *text*)) tree expected)
 )
 
 (cout nl "XPath-with-context tests passed successfully!" nl)
