@@ -42,6 +42,15 @@
 
 ; Validation Test harness
 
+(cond-expand
+ (bigloo  ; Bigloo has specific 3-argument error procedure
+  (define (sxp:error msg . args)
+    (error "myerror" msg args))
+  )
+ (else
+  (define sxp:error error)
+  ))
+
 ; The `sxp:' prefix added to prevent name collision with "SSAX-code.scm"
 (define-macro (sxp:run-test selector node expected-result)
   (let ((res (gensym)))
@@ -51,8 +60,8 @@
 	 (if (equal? ,res ,expected-result)
 	     (cerr "gave the expected result: "
 		   (lambda (port) (write ,res port)) nl)
-	     (error "Unexpected result: " ,res "\nexpected"
-		    ,expected-result))))))
+	     (sxp:error "Unexpected result: " ,res "\nexpected"
+                        ,expected-result))))))
 
 (define (test-sxpath path)
   (let ((func (sxpath path)))
