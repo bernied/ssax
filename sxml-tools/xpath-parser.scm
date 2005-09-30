@@ -567,18 +567,18 @@
                (self-value (txp:param-value 'self axis-param-value))
                (parent-value (txp:param-value 'parent axis-param-value))
                (ntest-param-value (txp:param-value 'node-test txp-params))
-               (star-value (txp:param-value 'star ntest-param-value)))
+               (node-value (txp:param-value 'node ntest-param-value)))
           (lambda (path ns-binding add-on)
             (cond
               ((sxml:parse-check ".." path)
                (list
                 (common-value (parent-value add-on)
-                              (star-value add-on) '() add-on)
+                              (node-value add-on) '() add-on)
                 (sxml:parse-assert ".." path)))
               ((sxml:parse-check "." path)
                (list
                 (common-value (self-value add-on)
-                              (star-value add-on) '() add-on)
+                              (node-value add-on) '() add-on)
                 (sxml:parse-assert "." path)))
               ((sxml:parse-check "range-to" path)
                (and-let*
