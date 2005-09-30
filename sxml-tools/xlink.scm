@@ -156,7 +156,7 @@
     ((#f)  ; resource doesn't exist
      (xlink:api-error "resource doesn't exist: " req-uri)
      #f)
-    ((xml)
+    ((xml plain)
      (let* ((port (open-input-resource req-uri))
             (doc (xlink:parser port)))
        (close-input-port port)
@@ -215,8 +215,11 @@
     (else
      (cons (car lst) (xlink:remove-equal-duplicates (cdr lst))))))
 
-; Finding a document in 'doc-set' by its 'uri-string'
-; If there is no such document, #f is returned
+; procedure xlink:find-doc :: URI-STRING (listof SXML-TREE) -> SXML-TREE
+;
+; Finding a document in 'doc-set' by its 'uri-string'.
+; If there is no such document, #f is returned.
+;  doc-set ::= (listof SXML-TREE)
 (define (xlink:find-doc uri-string doc-set)
   (let loop ((doc-set doc-set))
     (cond
@@ -744,31 +747,38 @@
      (lambda (uri . uris)
        (xlink:docs-exchange-arcs (apply doc-getter (cons uri uris)))))))
 
-; Each of these 2 functions has the following signature:
-;  (lambda (string . more-strings) ...)
-; Accepts one or more strings as arguments. Each string denotes the URI of
-; the requested document to be loaded. The requested document(s) are loaded
-; and are represented in SXML. All XLink links declared in these document(s)
-; are represented as a set of SXLink arcs. If XLink links refer to XLink
-; linkbases, these linkbases are additionally loaded, for additional SXLink
-; arcs declared there.
+; procedure xlink:documents :: {REQ-URI}+  -> (listof SXML-TREE)
+; procedure xlink:documents-embed :: {REQ-URI}+  -> (listof SXML-TREE)
 ;
-; The starting resource for each SXLink arc is determined.
-;  1. For each loaded SXML document, the function 'xlink:document' adds all
-; SXLink arcs whose starting resource is located within this document, to the
-; auxiliary list of its document node *TOP*.
-;  2. The function 'xlink:documents-embed' embeds each SXLink arc into its
-; starting resource-node, via auxiliary list of that node. For text nodes
-; serving for starting resources, their SXLink arcs are stored in the auxiliary
-; list of the document node *TOP* (since SXML text nodes do not support their
-; own auxiliary lists).
+; Both `xlink:documents' and `xlink:documents-embed' accept one or more
+; strings as their arguments. Each string supplied denotes the URI of the
+; requested document to be loaded. The requested document(s) are loaded
+; and are represented in SXML. All XLink links declared in these document(s)
+; are represented as a set of SXLink arcs. If any XLink links refer to XLink
+; linkbases [<a href="http://www.w3.org/TR/xlink/#xlg">XLink</a>],
+; these linkbases are additionally loaded, for additional SXLink arcs
+; declared there.
+;
+; The starting resource for each SXLink arc is determined:
+; 1. For each SXML document loaded, the function `xlink:document' adds all
+;    SXLink arcs whose starting resource is located within this document, to
+;    the auxiliary list of its document node (*TOP*).
+; 2. The function 'xlink:documents-embed' embeds each SXLink arc into its
+;    starting resource-node, via auxiliary list of that node. For text nodes
+;    serving for starting resources, their SXLink arcs are stored in the
+;    auxiliary list of the document node (*TOP*), since SXML text nodes do
+;    not support their own auxiliary lists.
 ;
 ; Supported URI formats:
-;  - local file
-;  - http:// schema
+;  + local file
+;  + http:// schema
 ;
-; Supported document formats: XML and HTML. In the case of HTML, <a> hyperlinks
-; are considered as XLink simple links.
+; Supported document formats: XML and HTML. In the case of HTML,
+; <A> hyperlinks are considered as XLink simple links.
+;
+; Result: (listof SXML-TREE)
+; A particular SXML document can be located in this list using the
+; function `xlink:find-doc'.
 (define xlink:documents
   (xlink:load-linked-docs-with-params 'linkbases))
 (define xlink:documents-embed
@@ -777,19 +787,33 @@
 ;-------------------------------------------------
 ; Convenient function for getting a document by its URI
 
-; Get a (possibly remote) document by its URI
-; Supported URI formats: local file and HTTP schema
-; Supported document formats: XML and HTML
-; req-uri - a string that contains the URI of the requested document
+; procedure sxml:document :: REQ-URI [NAMESPACE-PREFIX-ASSIG] ->
+;                             -> SXML-TREE
+;
+; Obtain a [possibly, remote] document by its URI
+; Supported URI formats:  local file and HTTP schema
+; Supported document formats:  XML and HTML
+;
+; REQ-URI - a string that contains the URI of the requested document
+; NAMESPACE-PREFIX-ASSIG - is passed as-is to the SSAX parser: there it is
+;  used for assigning certain user prefixes to certain namespaces.
+;  NAMESPACE-PREFIX-ASSIG is an optional argument and has an effect for an
+;  XML resource only. For an HTML resource requested, NAMESPACE-PREFIX-ASSIG
+;  is silently ignored.
+;
 ; Result: the SXML representation for the requested document
-(define (sxml:document req-uri)
+(define (sxml:document req-uri . namespace-prefix-assig)
   (case (ar:resource-type req-uri)
     ((#f)  ; resource doesn't exist
      (xlink:api-error "resource doesn't exist: " req-uri)
      #f)
-    ((xml plain)
+    ((xml plain unknown)
      (let* ((port (open-input-resource req-uri))
-            (doc (ssax:xml->sxml port '())))
+            (doc (ssax:xml->sxml
+                  port
+                  (if (null? namespace-prefix-assig)
+                      namespace-prefix-assig
+                      (car namespace-prefix-assig)))))
        (close-input-port port)
        doc   ; DL: can also add URI: (xlink:set-uri req-uri doc)
        ))
