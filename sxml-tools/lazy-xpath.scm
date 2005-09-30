@@ -963,7 +963,8 @@
             (first (cdr str-set1) str-set2)))))
       (else  ; one of the objects is a nodeset, the other is not
        (call-with-values
-        (if (nodeset? obj1) (values obj1 obj2) (values obj2 obj1))
+        (lambda ()
+          (if (nodeset? obj1) (values obj1 obj2) (values obj2 obj1)))
         (lambda (nset elem)
           (cond
             ((boolean? elem) (bool-op elem (lazy:boolean nset)))
