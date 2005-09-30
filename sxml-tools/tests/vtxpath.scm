@@ -206,6 +206,14 @@
 
  ; SXPath testing
 
+; sxml:xpath
+(xtest-assert ; Expected result:
+'("Text node")
+; <--- of:
+(sxml:xpath ".")
+'("Text node")
+)
+
  ; These XPath expressions are equal:
 
 ; sxml:test-xpath+index

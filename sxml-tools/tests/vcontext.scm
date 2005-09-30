@@ -187,6 +187,13 @@
 ; Test assertions are performed here
 
  ; SXPath testing
+; sxml:xpath
+(xtest-assert ; Expected result:
+'("Text node")
+; <--- of:
+(draft:xpath ".")
+'("Text node")
+)
 
  ; These XPath expressions are equal:
 
@@ -2601,7 +2608,7 @@ draft:test-xpointer
 (xtest-assert ; Expected result:
 (list vcntxt:doc)
 ; <--- of:
-(sxml:xpath "/")
+(draft:xpath "/")
 vcntxt:doc
 )
 
@@ -2611,7 +2618,7 @@ vcntxt:doc
 (list vcntxt:doc)
 ;"dgdgf"
 ; <--- of:
-(sxml:xpath+root+vars "/")
+(draft:xpointer "xpointer(/)")
 vcntxt:doc
 '()
 )

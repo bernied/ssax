@@ -279,6 +279,14 @@ vddo:doc
 ;=========================================================================
 ; Location Path testing
 
+; sxml:xpath
+(xtest-assert ; Expected result:
+'("Text node")
+; <--- of:
+(ddo:txpath ".")
+'("Text node")
+)
+
 ;------------------------------------------------
 ; Equal results for all these calls
 
