@@ -1434,7 +1434,9 @@
          (if
           (or    ; this is a deep predicate
            (> pred-nesting 3)
-           (and (not requires-position?) (> pred-nesting 1)))
+           ; DL: theoretically reasonable although impractical condition:
+           ;(and (not requires-position?) (> pred-nesting 1))
+          )
           (let ((pred-id (car vars2offsets)
                          ; was: (ddo:generate-pred-id)
                          ))
