@@ -144,8 +144,8 @@
     (if
      (not href)   ; the link is untraversable
      sxlink-arcs  ; no arc added
-     (let-values*
-      (((uri-ending fragment)
+     (call-with-values
+      (lambda ()
         (let ((lst (string-split href (list #\#) 2)))
           (cond
             ((= (length lst) 1)  ; no XPointer fragment identifier
@@ -153,28 +153,29 @@
             ((= (string-length (car lst)) 0)  ; addresses the same document
              (values #f (cadr lst)))
             (else
-             (values (car lst) (cadr lst)))))))
-      (cons
-       `(,(if (equal? arcrole xlink:linkbase-uri)
-              'linkbase 'simple)
-         (from
-          (uri)  ; goes from this document
-          (nodes ,element)
-          (xpointer ,(xlink:sxpointer->childseq sxpointer)))
-         (to
-          (uri ,@(if uri-ending (list uri-ending) '()))
-          ,@(if fragment `((xpointer ,fragment)) '())
-          ,@(if role `((role ,role)) '())
-          ,@(if title `((title ,title)) '()))
-         ,@(if arcrole `((arcrole ,arcrole)) '())
-         ,@(if show `((show ,show)) '())
-         ,@(if actuate `((actuate ,actuate)) '())
-         (declaration
-          (uri)  ; in this document
-          (nodes ,element)
-          (xpointer ,(xlink:sxpointer->childseq sxpointer))
-          (position ,position)))
-       sxlink-arcs)))))
+             (values (car lst) (cadr lst))))))
+      (lambda (uri-ending fragment)
+        (cons
+         `(,(if (equal? arcrole xlink:linkbase-uri)
+                'linkbase 'simple)
+           (from
+            (uri)  ; goes from this document
+            (nodes ,element)
+            (xpointer ,(xlink:sxpointer->childseq sxpointer)))
+           (to
+            (uri ,@(if uri-ending (list uri-ending) '()))
+            ,@(if fragment `((xpointer ,fragment)) '())
+            ,@(if role `((role ,role)) '())
+            ,@(if title `((title ,title)) '()))
+           ,@(if arcrole `((arcrole ,arcrole)) '())
+           ,@(if show `((show ,show)) '())
+           ,@(if actuate `((actuate ,actuate)) '())
+           (declaration
+            (uri)  ; in this document
+            (nodes ,element)
+            (xpointer ,(xlink:sxpointer->childseq sxpointer))
+            (position ,position)))
+         sxlink-arcs))))))
 
 ; This function appends information to 'sxlink-arcs' according to
 ; 'locators+resources' and 'arcs' parameters.
@@ -312,20 +313,21 @@
        locators+resources)
       (else
        (let ((lst (string-split href (list #\#) 2)))
-         (let-values*
-          (((uri fragment) 
+         (call-with-values
+          (lambda ()
             (cond
               ((= (length lst) 1) (values (car lst) #f))
               ((= (string-length (car lst)) 0) (values #f (cadr lst)))
-              (else (values (car lst) (cadr lst))))))          
-          (cons
-           (xlink:make-locator-or-resource
-            label
-            `((uri ,@(if uri (list uri) '()))
-              ,@(if fragment `((xpointer ,fragment)) '())
-              ,@(if role `((role ,role)) '())
-              ,@(if title `((title ,title)) '())))
-           locators+resources)))))))
+              (else (values (car lst) (cadr lst)))))
+          (lambda (uri fragment)
+            (cons
+             (xlink:make-locator-or-resource
+              label
+              `((uri ,@(if uri (list uri) '()))
+                ,@(if fragment `((xpointer ,fragment)) '())
+                ,@(if role `((role ,role)) '())
+                ,@(if title `((title ,title)) '())))
+             locators+resources))))))))
 
 ; Adds information concerning XLink resource element to 'locators+resources'
 (define (xlink:add-resource xlink-values element sxpointer locators+resources)
@@ -591,8 +593,8 @@
          type href role arcrole title show actuate label from to)
         (let ((attribute-name (symbol->string (caar attr-list)))
               (attribute-value (cadar attr-list)))
-          (let-values*
-           (((prefix local)
+          (call-with-values
+           (lambda ()
              (cond
                ((string-rindex attribute-name #\:)
                 => (lambda (pos)
@@ -602,46 +604,47 @@
                        (substring attribute-name (+ pos 1)
                                   (string-length attribute-name))))))
                (else
-                (values #f attribute-name)))))
-           (if
-            (not prefix)   ; this is a non-qualified name
-            (loop (cdr attr-list)
-                  type href role arcrole title show actuate label from to)
-            (let ((namespace-uri
-                   (cond
-                     ((assoc prefix ns-prefixes)
-                      => (lambda (pair)
-                           (string->symbol (cadr pair))))
-                     (else
-                      prefix))))
-              (if
-               (not (equal? namespace-uri xlink:namespace-uri))
-               (loop (cdr attr-list)
-                     type href role arcrole title show actuate label from to)
-               (case local
-                 ((type) (loop (cdr attr-list) attribute-value href role 
-                               arcrole title show actuate label from to))
-                 ((href) (loop (cdr attr-list) type attribute-value role
-                               arcrole title show actuate label from to))
-                 ((role) (loop (cdr attr-list) type href attribute-value
-                               arcrole title show actuate label from to))
-                 ((arcrole)
-                  (loop (cdr attr-list) type href role attribute-value title
-                        show actuate label from to))
-                 ((title) (loop (cdr attr-list) type href role arcrole
-                                attribute-value show actuate label from to))
-                 ((show) (loop (cdr attr-list) type href role arcrole title
-                               attribute-value actuate label from to))
-                 ((actuate) (loop (cdr attr-list) type href role arcrole title
-                                  show attribute-value label from to))
-                 ((label) (loop (cdr attr-list) type href role arcrole title
-                                show actuate attribute-value from to))
-                 ((from) (loop (cdr attr-list) type href role arcrole title
-                               show actuate label attribute-value to))
-                 ((to) (loop (cdr attr-list) type href role arcrole title show 
-                             actuate label from attribute-value))
-                 (else (loop (cdr attr-list) type href role arcrole title show 
-                             actuate label from to)))))))))))))
+                (values #f attribute-name))))
+           (lambda (prefix local)
+             (if
+              (not prefix)   ; this is a non-qualified name
+              (loop (cdr attr-list)
+                    type href role arcrole title show actuate label from to)
+              (let ((namespace-uri
+                     (cond
+                       ((assoc prefix ns-prefixes)
+                        => (lambda (pair)
+                             (string->symbol (cadr pair))))
+                       (else
+                        prefix))))
+                (if
+                 (not (equal? namespace-uri xlink:namespace-uri))
+                 (loop (cdr attr-list)
+                       type href role arcrole title show actuate label from to)
+                 (case local
+                   ((type) (loop (cdr attr-list) attribute-value href role 
+                                 arcrole title show actuate label from to))
+                   ((href) (loop (cdr attr-list) type attribute-value role
+                                 arcrole title show actuate label from to))
+                   ((role) (loop (cdr attr-list) type href attribute-value
+                                 arcrole title show actuate label from to))
+                   ((arcrole)
+                    (loop (cdr attr-list) type href role attribute-value title
+                          show actuate label from to))
+                   ((title) (loop (cdr attr-list) type href role arcrole
+                                  attribute-value show actuate label from to))
+                   ((show) (loop (cdr attr-list) type href role arcrole title
+                                 attribute-value actuate label from to))
+                   ((actuate) (loop (cdr attr-list) type href role arcrole title
+                                    show attribute-value label from to))
+                   ((label) (loop (cdr attr-list) type href role arcrole title
+                                  show actuate attribute-value from to))
+                   ((from) (loop (cdr attr-list) type href role arcrole title
+                                 show actuate label attribute-value to))
+                   ((to) (loop (cdr attr-list) type href role arcrole title show 
+                               actuate label from attribute-value))
+                   (else (loop (cdr attr-list) type href role arcrole title show 
+                               actuate label from to))))))))))))))
 
 ;------------------------------------------------
 ; These functions check XLink constrains which limit some attributes' xlink-values
@@ -894,7 +897,10 @@
     (string-append
      "line " (number->string (receive (row col) (port-position port) row))))
    (gambit
-    (string-append "line " (number->string (port-input-line-count port))))
+    ; DL: was
+    ;(string-append "line " (number->string (port-input-line-count port)))
+    (string-append "position "
+                   (number->string (input-port-byte-position port))))
    (guile
     (string-append "line " (number->string (port-line port))))
    (plt
@@ -999,11 +1005,11 @@
             ((linkbase simple inbound outbound third-party local-to-local
               from to declaration)
              ; Recursive application to children
-             (let-values*
-                 (((new-children new-uri-alist)
-                   (process-nodeset (cdr node) uri-alist)))
-               (values (cons (car node) new-children)
-                       new-uri-alist)))
+             (call-with-values
+              (lambda () (process-nodeset (cdr node) uri-alist))
+              (lambda (new-children new-uri-alist)
+                (values (cons (car node) new-children)
+                        new-uri-alist))))
             ((uri)
              (cond
                ((null? (cdr node))  ; no URI is set
@@ -1029,16 +1035,16 @@
             (if
              (null? nset)
              (values (reverse res) uri-alist)
-             (let-values*
-                 (((new-node new-uri-alist)
-                   (process-arc (car nset) uri-alist)))
-               (loop (cdr nset)
-                     (cons new-node res)
-                     new-uri-alist)))))))
-    (let-values*
-        (((new-sxlink-arcs dummy)
-          (process-nodeset sxlink-arcs '())))
-      new-sxlink-arcs)))
+             (call-with-values
+              (lambda () (process-arc (car nset) uri-alist))
+              (lambda (new-node new-uri-alist)
+                (loop (cdr nset)
+                      (cons new-node res)
+                      new-uri-alist))))))))
+    (call-with-values
+     (lambda () (process-nodeset sxlink-arcs '()))
+     (lambda (new-sxlink-arcs dummy)
+       new-sxlink-arcs))))
                  
 
 ;=========================================================================
@@ -1214,8 +1220,8 @@
                  (if
                   (null? href)  ; <A> doesn't contain href attribute
                   '()
-                  (let-values*
-                   (((uri-ending fragment)
+                  (call-with-values
+                   (lambda ()
                      (let ((lst (string-split (car href) (list #\#) 2)))
                        (cond
                          ((null? lst)  ; (car href)=""  - the real situation
@@ -1225,24 +1231,26 @@
                          ((= (string-length (car lst)) 0)
                           (values #f (cadr lst)))
                          (else
-                          (values (car lst) (cadr lst)))))))
-                   `((simple
-                      (from
-                       (uri)  ; from this document
-                       (nodes ,node)
-                       (xpointer ,(xlink:sxpointer->childseq sxpointer)))
-                      (to
-                       (uri ,@(if uri-ending (list uri-ending) '()))
-                       ,@(if fragment
-                             `((xpointer
-                                ,(string-append
-                                  "xpointer(descendant::*[a/@name='"
-                                  fragment "'])")))
-                             '()))
-                      (declaration
-                       (uri)
-                       (nodes ,node)
-                       (xpointer ,(xlink:sxpointer->childseq sxpointer)))))
+                          (values (car lst) (cadr lst))))))
+                   (lambda (uri-ending fragment)
+                     `((simple
+                        (from
+                         (uri)  ; from this document
+                         (nodes ,node)
+                         (xpointer ,(xlink:sxpointer->childseq sxpointer)))
+                        (to
+                         (uri ,@(if uri-ending (list uri-ending) '()))
+                         ,@(if fragment
+                               `((xpointer
+                                  ,(string-append
+                                    "xpointer(descendant::*[a/@name='"
+                                    fragment "'])")))
+                               '()))
+                        (declaration
+                         (uri)
+                         (nodes ,node)
+                         (xpointer
+                          ,(xlink:sxpointer->childseq sxpointer))))))
                    )))))
              (kids ((select-kids (ntype?? '*)) node))
              (kid-pos 1))
