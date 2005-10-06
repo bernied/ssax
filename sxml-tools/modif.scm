@@ -159,24 +159,23 @@
                   (call-with-values
                    (lambda () (sxml:separate-list
                                (lambda (obj)
-                                 (and (pair? obj)
-                                      (not (null? obj))
-                                      (eq? (car obj) '@)))
+                                 (and (pair? obj) (eq? (car obj) '@)))
                                res-kids))
                    (lambda (more-attrs kids)
-                     (cons  ; Constructing the result node
-                      (car curr-node)  ; node name
-                      (if
-                       (and (null? res-attrs) (null? more-attrs))
-                       kids
-                       (and-let*
-                        ((overall-attrs
-                          (apply
-                           sxml:unite-annot-attributes-lists
-                           (cons
-                            (cons '@ (reverse res-attrs))
-                            more-attrs))))
-                        (cons overall-attrs kids)))))))
+                     (if
+                      (and (null? res-attrs) (null? more-attrs))
+                      (cons  ; Constructing the result node
+                       (car curr-node)  ; node name
+                       kids)
+                      (and-let*
+                       ((overall-attrs
+                         (apply
+                          sxml:unite-annot-attributes-lists
+                          (cons
+                           (cons '@ (reverse res-attrs))
+                           more-attrs))))
+                       (cons (car curr-node)  ; node name
+                             (cons overall-attrs kids)))))))
                  ((and (pair? (car src-kids))
                        (eq? (caar src-kids) '@))
                   ; attribute node - already processed
@@ -246,7 +245,22 @@
                          (curr-handlers (map cdr matched)))
         (if
          (null? curr-handlers)
-         new-curr-node
+         (if  ; all handlers processed
+          (not (pair? new-curr-node))         
+          new-curr-node  ; atomic node
+          (call-with-values  ; otherwise - unite attr lists
+           (lambda () (sxml:separate-list
+                       (lambda (obj) (and (pair? obj) (eq? (car obj) '@)))
+                       (cdr new-curr-node)))
+           (lambda (attrs kids)
+             (if (null? attrs)
+                 new-curr-node  ; node remains unchanged
+                 (and-let*
+                  ((overall-attrs
+                    (apply sxml:unite-annot-attributes-lists attrs)))
+                  (cons
+                   (car new-curr-node)  ; node name                
+                   (cons overall-attrs kids)))))))
          (process-this
           ((cadar curr-handlers)  ; lambda
            new-curr-node
