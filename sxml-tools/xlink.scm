@@ -156,7 +156,7 @@
     ((#f)  ; resource doesn't exist
      (xlink:api-error "resource doesn't exist: " req-uri)
      #f)
-    ((xml plain)
+    ((xml plain unknown)
      (let* ((port (open-input-resource req-uri))
             (doc (xlink:parser port)))
        (close-input-port port)
