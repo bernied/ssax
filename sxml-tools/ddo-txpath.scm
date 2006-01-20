@@ -2136,30 +2136,41 @@
 
 ;=========================================================================
 ; Highest level API functions
+;
+; procedure ddo:sxpath :: query [ns-binding] [num-ancestors] ->
+;                          -> node-or-nodeset [var-binding] -> nodeset
+; procedure ddo:txpath :: location-path [ns-binding] [num-ancestors] ->
+;                          -> node-or-nodeset [var-binding] -> nodeset
+;
+; Polynomial-time XPath implementation with distinct document order support.
+;
 ; The API is identical to the API of a context-based SXPath (here we even use
 ; API helpers from "xpath-context.scm"). For convenience, below we repeat
-; comments for the API (borrowed from "xpath-context.scm")
+; comments for the API (borrowed from "xpath-context.scm").
 ;
-; xpath-string - an XPath location path (a string)
-; ns+na - can contain 'ns-binding' and/or 'num-ancestors' and/or none of them
+; query - a query in SXPath native syntax
+; location-path - XPath location path represented as a string
 ; ns-binding - declared namespace prefixes (an optional argument)
 ;  ns-binding ::= (listof (prefix . uri))
 ;  prefix - a symbol
 ;  uri - a string
 ; num-ancestors - number of ancestors required for resulting nodeset. Can
-;  generally be omitted and is than defaulted to 0, which denotes a _usual_
-;  nodeset. If a negative number, this signals that all ancestors should be
-;  remembered in the context
+;  generally be omitted and is than defaulted to 0, which denotes a
+;  _conventional_  nodeset. If a negative number, this signals that all
+;  ancestors should be remembered in the context.
 ;
-; Returns: (lambda (nodeset position+size var-binding) ...)
-; position+size - the same to what was called 'context' in TXPath-1
+; Returns: (lambda (node-or-nodeset . var-binding) ...)
 ; var-binding - XPath variable bindings (an optional argument)
 ;  var-binding = (listof (var-name . value))
 ;  var-name - (a symbol) a name of a variable
 ;  value - its value. The value can have the following type: boolean, number,
-;  string, nodeset. NOTE: a node must be represented as a singleton nodeset
+;  string, nodeset. NOTE: a node must be represented as a singleton nodeset.
+;
+; The result of applying the latter lambda to an SXML node or nodeset is the
+; result of evaluating the query / location-path for that node / nodeset.
 
 ; Helper for constructing several highest-level API functions
+; ns+na - can contain 'ns-binding' and/or 'num-ancestors' and/or none of them
 (define (ddo:api-helper grammar-parser ast-parser)
   (lambda (xpath-string . ns+na)
     (call-with-values
@@ -2193,6 +2204,4 @@
 
 (define ddo:txpath (ddo:api-helper txp:xpath->ast ddo:ast-location-path))
 (define ddo:xpath-expr (ddo:api-helper txp:expr->ast ddo:ast-expr))
-
-; Support for native sxpath syntax
 (define ddo:sxpath (ddo:api-helper txp:sxpath->ast ddo:ast-expr))
