@@ -33,6 +33,41 @@
       (append (func (car lst))
               (srl:map-append func (cdr lst)))))
 
+; procedure srl:apply-string-append :: STR-LST -> STRING
+; str-lst ::= (listof string)
+; Concatenates `str-lst' members into a single string
+; (srl:apply-string-append str-lst) = (apply string-append str-lst)
+(cond-expand
+ (chicken
+  ; In Chicken, procedures are generally limited to 126 arguments
+  ; http://www.call-with-current-continuation.org/
+  ; Due to this Chicken limitation, we cannot apply `string-append' directly
+  ; for a potentially long `str-lst'
+  
+  ; Similar to R5RS 'list-tail' but returns the new list consisting of the
+  ; first 'k' members of 'lst'
+  (define (srl:list-head lst k)
+    (if (or (null? lst) (zero? k))
+        '()
+        (cons (car lst) (srl:list-head (cdr lst) (- k 1)))))
+
+  ; Because of Chicken 126-argument limitation, I do not care of intermediate
+  ; garbage produced in the following solution:
+  (define (srl:apply-string-append str-lst)
+    (cond
+      ((null? str-lst) "")
+      ((null? (cdr str-lst)) (car str-lst))
+      (else  ; at least two members
+       (let ((middle (inexact->exact (round (/ (length lst) 2)))))
+         (string-append
+          (srl:apply-string-append (srl:list-head lst middle))
+          (srl:apply-string-append (list-tail lst middle)))))))
+  )
+ (else
+  (define (srl:apply-string-append str-lst)
+    (apply string-append str-lst))
+  ))
+
 ; Analogue of `assoc'
 ; However, search is performed by `cdr' of each alist member and `string=?' is
 ; used for comparison
@@ -180,9 +215,23 @@
            (pair? (caddr elem)) (eq? (caaddr elem) '@@))))
 
 ;-------------------------------------------------
-; Accessors to SXML namespaces
+; Handling SXML namespaces
 ; <namespace-assoc> is defined in the SXML specification as
 ; <namespace-assoc> ::=  ( <namespace-id> "URI" original-prefix? ) 
+
+; Conventional namespace prefix referred to in XML-related specifications
+; These prefixes are used for serializing the corresponding namespace URIs by
+; default, unless a different prefix is supplied
+(define srl:conventional-ns-prefixes
+  '((dc . "http://purl.org/dc/elements/1.1/")
+    (fo . "http://www.w3.org/1999/XSL/Format")
+    (rdf . "http://www.w3.org/1999/02/22-rdf-syntax-ns#")
+    (rng . "http://relaxng.org/ns/structure/1.0")
+    (xlink . "http://www.w3.org/1999/xlink")
+    (xqx . "http://www.w3.org/2005/XQueryX")
+    (xsd . "http://www.w3.org/2001/XMLSchema")
+    (xsi . "http://www.w3.org/2001/XMLSchema-instance")
+    (xsl . "http://www.w3.org/1999/XSL/Transform")))
 
 ; Returns (listof <namespace-assoc>) for the given SXML element
 (define (srl:namespace-assoc-for-elem elem)
@@ -296,14 +345,14 @@
                               (adj-strs (list (car src))))
                  (cond
                    ((null? src)  ; source sequence is over
-                    (cons (apply string-append adj-strs) res))
+                    (cons (srl:apply-string-append adj-strs) res))
                    ((string? (car src))
                     (adjacent (cdr src)
                               (cons (car src) (cons " " adj-strs))))
                    (else
                     (loop (cdr src)
                           (cons (car src)
-                                (cons (apply string-append adj-strs)
+                                (cons (srl:apply-string-append adj-strs)
                                       res)))))))
               (else
                (loop (cdr src)
@@ -345,7 +394,7 @@
                                (adj-strs (list (car src))))
                   (cond
                     ((null? src)  ; source sequence is over
-                     (cons (apply string-append adj-strs) res))
+                     (cons (srl:apply-string-append adj-strs) res))
                     ((string? (car src))
                      ; If it is an empty string, the effect of its presense
                      ; will be removed by string concatenation
@@ -355,7 +404,8 @@
                      (loop (cdr src)
                            (cons (car src)
                                  (cons
-                                  (apply string-append adj-strs) res))))))))
+                                  (srl:apply-string-append adj-strs)
+                                  res))))))))
               (else
                (loop (cdr src)
                      (cons (car src) res)))))))
@@ -435,8 +485,8 @@
                (res '("")))
     (cond
       ((null? src)
-       (apply string-append
-              (reverse (flush-buffer buffer res))))
+       (srl:apply-string-append
+        (reverse (flush-buffer buffer res))))
       ((srl:xml-char-escaped (car src))
        => (lambda (charref)
             (loop (cdr src)
@@ -480,9 +530,9 @@
              (res '()))
     (cond
       ((null? src)
-       (apply string-append
-              (reverse (cons (list->string (reverse adj-chars))
-                             res))))
+       (srl:apply-string-append
+        (reverse (cons (list->string (reverse adj-chars))
+                       res))))
       ((assv (car src) escape-alist)  ; current character matches the alist
        => (lambda (pair)
             (if
@@ -712,7 +762,8 @@
        (values #f #f (cdr n-parts)  ; name as a string
                #f))
       ((string-ci=? (car n-parts) "xml")  ; reserved XML namespace
-       (values (car n-parts) "" (cdr n-parts) #f))
+       (values (car n-parts) "http://www.w3.org/XML/1998/namespace"
+               (cdr n-parts) #f))
       (else
        (call-with-values
         (lambda ()
@@ -1072,7 +1123,7 @@
 ; standalone ::= 'yes | 'no | 'omit
 ; version ::= string | number
 (define (srl:top->nested-str-lst doc
-                                 cdata-section-elements indentation
+                                 cdata-section-elements indent
                                  method ns-prefix-assig
                                  omit-xml-declaration? standalone version)
   (let* ((namespace-assoc (srl:ns-assoc-for-top doc))
@@ -1083,20 +1134,21 @@
          (serialized-content
           (map
            (if
-            indentation  ; => output each member from the newline
-            (lambda (kid)
-              (list
-               srl:newline
-               (srl:node->nested-str-lst-recursive
-                kid method
-                ns-prefix-assig namespace-assoc '()
-                indentation #f
-                cdata-section-elements srl:string->char-data)))
+            indent  ; => output each member from the newline
+            (let ((indentation (list indent)))  ; for nested elements
+              (lambda (kid)
+                (list
+                 srl:newline
+                 (srl:node->nested-str-lst-recursive
+                  kid method
+                  ns-prefix-assig namespace-assoc '()
+                  indentation #f
+                  cdata-section-elements srl:string->char-data))))
             (lambda (kid)
               (srl:node->nested-str-lst-recursive
                kid method
                ns-prefix-assig namespace-assoc '()
-               indentation #f
+               indent #f
                cdata-section-elements srl:string->char-data)))
            ((srl:select-kids  ; document node content
              (lambda (node)  ; TODO: support SXML entities
@@ -1104,15 +1156,17 @@
                      (pair? node) (memq (car node) '(@ @@ *ENTITY*))))))
             doc))))
     (if (or (eq? method 'html) omit-xml-declaration?)
-        (if (and indentation (not (null? serialized-content)))
+        (if (and indent (not (null? serialized-content)))
             ; Remove the starting newline
-            ; ATTENTION: beware of `Gambit cadar bug'
+            ; ATTENTION: beware of `Gambit cadar bug':
+            ; http://mailman.iro.umontreal.ca/pipermail/gambit-list/
+            ;   2005-July/000315.html
             (cons (cadar serialized-content) (cdr serialized-content))
             serialized-content)
         (list (srl:make-xml-decl version standalone) serialized-content))))
 
 (define (srl:display-top-out doc port
-                             cdata-section-elements indentation
+                             cdata-section-elements indent
                              method ns-prefix-assig
                              omit-xml-declaration? standalone version)  
   (let ((no-xml-decl?  ; no XML declaration was displayed?
@@ -1137,38 +1191,40 @@
       (cond
         ((null? content)  ; generally a rare practical situation
          #t)  ; nothing more to do
-        ((and indentation no-xml-decl?)
+        ((and indent no-xml-decl?)
          ; We'll not display newline before (car content)
-         (for-each
-          (lambda (kid put-newline?)
-            (begin
-              (if put-newline?
-                  (display srl:newline port))
-              (srl:display-node-out-recursive
-               kid port method
-               ns-prefix-assig namespace-assoc '()
-               indentation #f
-               cdata-section-elements srl:string->char-data)))
-          content
-          ; After sequence normalization, content does not contain #f
-          (cons #f (cdr content))))
+         (let ((indentation (list indent)))  ; for nested elements
+           (for-each
+            (lambda (kid put-newline?)
+              (begin
+                (if put-newline?
+                    (display srl:newline port))
+                (srl:display-node-out-recursive
+                 kid port method
+                 ns-prefix-assig namespace-assoc '()
+                 indentation #f
+                 cdata-section-elements srl:string->char-data)))
+            content
+            ; After sequence normalization, content does not contain #f
+            (cons #f (cdr content)))))
         (else
          (for-each
           (if
-           indentation  ; => output each member from the newline
-           (lambda (kid)
-             (begin
-               (display srl:newline port)
-               (srl:display-node-out-recursive
-                kid port method
-                ns-prefix-assig namespace-assoc '()
-                indentation #f
-                cdata-section-elements srl:string->char-data)))
+           indent  ; => output each member from the newline
+           (let ((indentation (list indent)))  ; for nested elements
+             (lambda (kid)
+               (begin
+                 (display srl:newline port)
+                 (srl:display-node-out-recursive
+                  kid port method
+                  ns-prefix-assig namespace-assoc '()
+                  indentation #f
+                  cdata-section-elements srl:string->char-data))))
            (lambda (kid)
              (srl:display-node-out-recursive
               kid port method
               ns-prefix-assig namespace-assoc '()
-              indentation #f
+              indent #f
               cdata-section-elements srl:string->char-data)))
           content))))))
 
@@ -1196,29 +1252,38 @@
                           cdata-section-elements indent
                           method ns-prefix-assig
                           omit-xml-declaration? standalone version)
-  (apply string-append
-         (srl:clean-fragments
-          (srl:top->nested-str-lst (srl:normalize-sequence sxml-obj)
-                                   cdata-section-elements
-                                   (if (boolean? indent)
-                                       (if indent '("  ") indent)
-                                       (list indent))
-                                   method ns-prefix-assig
-                                   omit-xml-declaration? standalone version))))
+  (srl:apply-string-append
+   (srl:clean-fragments
+    (srl:top->nested-str-lst (srl:normalize-sequence sxml-obj)
+                             cdata-section-elements
+                             (if (and indent (not (string? indent)))
+                                 "  " indent)
+                             method ns-prefix-assig
+                             omit-xml-declaration? standalone version))))
 
 ; Writes the serialized representation of the `sxml-obj' to an output port
 ; `port'. The result returned by the function is unspecified.
-(define (srl:display-sxml sxml-obj port
+(define (srl:display-sxml sxml-obj port-or-filename
                           cdata-section-elements indent
                           method ns-prefix-assig
                           omit-xml-declaration? standalone version)
-  (srl:display-top-out (srl:normalize-sequence sxml-obj) port
-                       cdata-section-elements
-                       (if (boolean? indent)
-                           (if indent '("  ") indent)
-                           (list indent))
-                       method ns-prefix-assig
-                       omit-xml-declaration? standalone version))
+  (if
+   (string? port-or-filename)  ; a filename?
+   (let ((out (open-output-file port-or-filename)))
+     (begin
+       (srl:display-top-out (srl:normalize-sequence sxml-obj) out
+                            cdata-section-elements
+                            (if (and indent (not (string? indent)))
+                                "  " indent)
+                            method ns-prefix-assig
+                            omit-xml-declaration? standalone version)
+       (display srl:newline out)  ; newline at the end of file
+       (close-output-port out)))
+   (srl:display-top-out (srl:normalize-sequence sxml-obj) port-or-filename
+                        cdata-section-elements
+                        (if (and indent (not (string? indent))) "  " indent)
+                        method ns-prefix-assig
+                        omit-xml-declaration? standalone version)))
 
 ;-------------------------------------------------
 ; Generalized serialization procedure, parameterizable with all the
@@ -1267,25 +1332,27 @@
 ;   '(omit-xml-declaration . #f)  ; add XML declaration
 ;   '(standalone . yes)  ; denote a standalone XML document
 ;   '(version . "1.0"))  ; XML version
-(define (srl:parameterizable sxml-obj . port+params)
+(define (srl:parameterizable sxml-obj . port-or-filename+params)
   (call-with-values
    (lambda ()
-     (if (or (null? port+params) (not (port? (car port+params))))
-         (values #f port+params)
-         (values (car port+params) (cdr port+params))))
-   (lambda (port params)
+     (if (and (not (null? port-or-filename+params))
+              (or (port? (car port-or-filename+params))
+                  (string? (car port-or-filename+params))))
+         (values (car port-or-filename+params) (cdr port-or-filename+params))
+         (values #f port-or-filename+params)))
+   (lambda (port-or-filename params)
      (let loop ((params params)
                 (cdata-section-elements '())
                 (indent "  ")
                 (method 'xml)
-                (ns-prefix-assig '())
+                (ns-prefix-assig srl:conventional-ns-prefixes)
                 (omit-xml-declaration? #t)
                 (standalone 'omit)
                 (version "1.0"))
        (cond
          ((null? params)  ; all parameters parsed
-          (if port
-              (srl:display-sxml sxml-obj port
+          (if port-or-filename
+              (srl:display-sxml sxml-obj port-or-filename
                                 cdata-section-elements indent
                                 method ns-prefix-assig
                                 omit-xml-declaration? standalone version)
@@ -1333,7 +1400,8 @@
                               (not (srl:mem-pred  ; no non-pair members
                                     (lambda (x) (not (pair? x)))
                                     prm-value)))
-                         prm-value ns-prefix-assig)
+                         (append prm-value ns-prefix-assig)
+                         ns-prefix-assig)
                      omit-xml-declaration? standalone version))
               ((omit-xml-declaration)
                (loop (cdr params)
@@ -1377,50 +1445,63 @@
 ; For functions in this subsection, the description of their arguments is as
 ; follows:
 ; sxml-obj - an SXML object (a node or a nodeset) to be serialized
-; port - an output port, an optional argument
-; If `port' is not supplied, the functions return a string that contains the
-; serialized representation of the `sxml-obj'.
-; Otherwise the functions write the serialized representation of `sxml-obj'
-; into the `port' and return an unspecified result.
+; port-or-filename - an output port or an output file name, an optional
+;  argument
+; If `port-or-filename' is not supplied, the functions return a string that
+; contains the serialized representation of the `sxml-obj'.
+; If `port-or-filename' is supplied and is a port, the functions write the
+; serialized representation of `sxml-obj' to this port and return an
+; unspecified result.
+; If `port-or-filename' is supplied and is a string, this string is treated as
+; an output filename, the serialized representation of `sxml-obj' is written to
+; that filename and an unspecified result is returned.
 
-; procedure srl:sxml->xml :: SXML-OBJ [PORT] -> STRING|unspecified
+; procedure srl:sxml->xml :: SXML-OBJ [PORT-OR-FILENAME] -> STRING|unspecified
 ;
 ; Serializes the `sxml-obj' into XML, with indentation to facilitate
 ; readability by a human.
 ; The description of function arguments and result is given in the beginning
 ; of this subsection.
-(define (srl:sxml->xml sxml-obj . port)
-  (if (null? port)
-      (srl:sxml->string sxml-obj '() #t 'xml '() #t 'omit "1.0")
-      (srl:display-sxml sxml-obj (car port) '() #t 'xml '() #t 'omit "1.0")))
+(define (srl:sxml->xml sxml-obj . port-or-filename)
+  (if (null? port-or-filename)
+      (srl:sxml->string sxml-obj '() #t 'xml
+                        srl:conventional-ns-prefixes #t 'omit "1.0")
+      (srl:display-sxml sxml-obj (car port-or-filename) '() #t 'xml
+                        srl:conventional-ns-prefixes #t 'omit "1.0")))
 
-; procedure srl:sxml->xml-noindent :: SXML-OBJ [PORT] -> STRING|unspecified
+; procedure srl:sxml->xml-noindent :: SXML-OBJ [PORT-OR-FILENAME] ->
+;                                      -> STRING|unspecified
 ;
 ; Serializes the `sxml-obj' into XML, without indentation.
 ; The description of function arguments and result is given in the beginning
 ; of this subsection.
-(define (srl:sxml->xml-noindent sxml-obj . port)
-  (if (null? port)
-      (srl:sxml->string sxml-obj '() #f 'xml '() #t 'omit "1.0")
-      (srl:display-sxml sxml-obj (car port) '() #f 'xml '() #t 'omit "1.0")))
+(define (srl:sxml->xml-noindent sxml-obj . port-or-filename)
+  (if (null? port-or-filename)
+      (srl:sxml->string sxml-obj '() #f 'xml
+                        srl:conventional-ns-prefixes #t 'omit "1.0")
+      (srl:display-sxml sxml-obj (car port-or-filename) '() #f 'xml
+                        srl:conventional-ns-prefixes #t 'omit "1.0")))
 
-; procedure srl:sxml->html :: SXML-OBJ [PORT] -> STRING|unspecified
+; procedure srl:sxml->html :: SXML-OBJ [PORT-OR-FILENAME] -> STRING|unspecified
 ;
 ; Serializes the `sxml-obj' into HTML, with indentation to facilitate
 ; readability by a human.
 ; The description of function arguments and result is given in the beginning
 ; of this subsection.
-(define (srl:sxml->html sxml-obj . port)
-  (if (null? port)
+(define (srl:sxml->html sxml-obj . port-or-filename)
+  (if (null? port-or-filename)
       (srl:sxml->string sxml-obj '() #t 'html '() #t 'omit "4.0")
-      (srl:display-sxml sxml-obj (car port) '() #t 'html '() #t 'omit "4.0")))
+      (srl:display-sxml sxml-obj (car port-or-filename)
+                        '() #t 'html '() #t 'omit "4.0")))
 
-; procedure srl:sxml->html-noindent :: SXML-OBJ [PORT] -> STRING|unspecified
+; procedure srl:sxml->html-noindent :: SXML-OBJ [PORT-OR-FILENAME] ->
+;                                       -> STRING|unspecified
 ;
 ; Serializes the `sxml-obj' into HTML, without indentation.
 ; The description of function arguments and result is given in the beginning
 ; of this subsection.
-(define (srl:sxml->html-noindent sxml-obj . port)
-  (if (null? port)
+(define (srl:sxml->html-noindent sxml-obj . port-or-filename)
+  (if (null? port-or-filename)
       (srl:sxml->string sxml-obj '() #f 'html '() #t 'omit "4.0")
-      (srl:display-sxml sxml-obj (car port) '() #f 'html '() #t 'omit "4.0")))
+      (srl:display-sxml sxml-obj (car port-or-filename)
+                        '() #f 'html '() #t 'omit "4.0")))
