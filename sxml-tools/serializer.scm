@@ -923,11 +923,13 @@
    (text-node-handler (srl:atomic->string node))
    (case (car node)  ; node name
      ((*COMMENT*)
-      (srl:comment->str-lst node))
-     ((&)
-      (srl:shtml-entity->char-data node))
+      (srl:comment->str-lst node))     
      ((*PI*)
       (srl:processing-instruction->str-lst node method))
+     ((&)
+      (srl:shtml-entity->char-data node))
+     ((*DECL*)  ; recovering for non-SXML nodes
+      '())
      (else  ; otherwise - an element node
       (call-with-values
        (lambda ()
@@ -1018,12 +1020,14 @@
       (for-each
        (lambda (x) (display x port))
        (srl:comment->str-lst node)))
-     ((&)
-      (display (srl:shtml-entity->char-data node) port))
      ((*PI*)
       (for-each
        (lambda (x) (display x port))
        (srl:processing-instruction->str-lst node method)))
+     ((&)
+      (display (srl:shtml-entity->char-data node) port))
+     ((*DECL*)  ; recovering for non-SXML nodes
+      #f)
      (else  ; otherwise - an element node
       (call-with-values
        (lambda ()
