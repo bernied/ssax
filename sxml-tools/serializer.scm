@@ -15,6 +15,7 @@
 ; short for "serialization"
 
 ; Requires: function `filter' from SRFI-1
+;           syntax `cond-expand' from SRFI-0
 ; In particular, for PLT, `filter' can be acquired as follows: 
 ;(require (lib "filter.ss" "srfi/1"))
 
@@ -436,6 +437,12 @@
               `(*TOP*
                 (@ ,@(srl:map-append cdr aux-lists))
                 ,@body)))))))
+    ; TODO: According to [1], if the normalized sequence does not have exactly
+    ; one element node node child or has text node children, then the
+    ; serialized output should be an XML external general parsed entity.
+    ; However, external parsed entities are not currently handled by SSAX
+    ; parser. Should think of a compromise between conformance and practical
+    ; usability.
     (normaliz-step-7
      (normaliz-step-6
       (normaliz-step-5
@@ -1445,9 +1452,12 @@
 ; High-level functions for popular serialization use-cases
 ; These functions use only a subset of serializer functionality, however, this
 ; subset seems sufficient for most practical purposes.
+
+; procedure srl:sxml->xml :: SXML-OBJ [PORT-OR-FILENAME] -> STRING|unspecified
 ;
-; For functions in this subsection, the description of their arguments is as
-; follows:
+; Serializes the `sxml-obj' into XML, with indentation to facilitate
+; readability by a human.
+;
 ; sxml-obj - an SXML object (a node or a nodeset) to be serialized
 ; port-or-filename - an output port or an output file name, an optional
 ;  argument
@@ -1458,14 +1468,8 @@
 ; unspecified result.
 ; If `port-or-filename' is supplied and is a string, this string is treated as
 ; an output filename, the serialized representation of `sxml-obj' is written to
-; that filename and an unspecified result is returned.
-
-; procedure srl:sxml->xml :: SXML-OBJ [PORT-OR-FILENAME] -> STRING|unspecified
-;
-; Serializes the `sxml-obj' into XML, with indentation to facilitate
-; readability by a human.
-; The description of function arguments and result is given in the beginning
-; of this subsection.
+; that filename and an unspecified result is returned. If a file with the given
+; name already exists, the effect is unspecified.
 (define (srl:sxml->xml sxml-obj . port-or-filename)
   (if (null? port-or-filename)
       (srl:sxml->string sxml-obj '() #t 'xml
@@ -1477,8 +1481,6 @@
 ;                                      -> STRING|unspecified
 ;
 ; Serializes the `sxml-obj' into XML, without indentation.
-; The description of function arguments and result is given in the beginning
-; of this subsection.
 (define (srl:sxml->xml-noindent sxml-obj . port-or-filename)
   (if (null? port-or-filename)
       (srl:sxml->string sxml-obj '() #f 'xml
@@ -1490,8 +1492,19 @@
 ;
 ; Serializes the `sxml-obj' into HTML, with indentation to facilitate
 ; readability by a human.
-; The description of function arguments and result is given in the beginning
-; of this subsection.
+;
+; sxml-obj - an SXML object (a node or a nodeset) to be serialized
+; port-or-filename - an output port or an output file name, an optional
+;  argument
+; If `port-or-filename' is not supplied, the functions return a string that
+; contains the serialized representation of the `sxml-obj'.
+; If `port-or-filename' is supplied and is a port, the functions write the
+; serialized representation of `sxml-obj' to this port and return an
+; unspecified result.
+; If `port-or-filename' is supplied and is a string, this string is treated as
+; an output filename, the serialized representation of `sxml-obj' is written to
+; that filename and an unspecified result is returned. If a file with the given
+; name already exists, the effect is unspecified.
 (define (srl:sxml->html sxml-obj . port-or-filename)
   (if (null? port-or-filename)
       (srl:sxml->string sxml-obj '() #t 'html '() #t 'omit "4.0")
@@ -1502,8 +1515,6 @@
 ;                                       -> STRING|unspecified
 ;
 ; Serializes the `sxml-obj' into HTML, without indentation.
-; The description of function arguments and result is given in the beginning
-; of this subsection.
 (define (srl:sxml->html-noindent sxml-obj . port-or-filename)
   (if (null? port-or-filename)
       (srl:sxml->string sxml-obj '() #f 'html '() #t 'omit "4.0")
