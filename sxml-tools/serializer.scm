@@ -59,10 +59,10 @@
       ((null? str-lst) "")
       ((null? (cdr str-lst)) (car str-lst))
       (else  ; at least two members
-       (let ((middle (inexact->exact (round (/ (length lst) 2)))))
+       (let ((middle (inexact->exact (round (/ (length str-lst) 2)))))
          (string-append
-          (srl:apply-string-append (srl:list-head lst middle))
-          (srl:apply-string-append (list-tail lst middle)))))))
+          (srl:apply-string-append (srl:list-head str-lst middle))
+          (srl:apply-string-append (list-tail str-lst middle)))))))
   )
  (else
   (define (srl:apply-string-append str-lst)
