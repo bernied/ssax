@@ -22,9 +22,6 @@
 ;==========================================================================
 ; Basic
 
-; A string consisting of a single newline character
-(define srl:newline (string (integer->char 10)))
-
 ; `map' and `append' in a single pass:
 ; (srl:map-append func lst) = (apply append (map func lst))
 ; A simplified analogue of `map-union' from "sxpathlib.scm"
@@ -95,19 +92,20 @@
     (else (srl:mem-pred pred? (cdr lst)))))
 
 ;-------------------------------------------------
+; Borrowed from "char-encoding.scm"
+
+; The newline character
+(cond-expand
+ ((or scheme48 scsh)
+  (define srl:char-nl (ascii->char 10)))
+ (else
+  (define srl:char-nl (integer->char 10))))
+
+; A string consisting of a single newline character
+(define srl:newline (string srl:char-nl))
+
+;-------------------------------------------------
 ; Borrowed from "sxpathlib.scm"
-
-; Returns #t if given object is a nodelist
-(define (srl:nodeset? x)
-  (or (and (pair? x) (not (symbol? (car x)))) (null? x)))
-
-; Apply proc to each element of lst and return the list of results.
-; if proc returns a nodelist, splice it into the result
-(define (srl:map-union proc lst)
-  (if (null? lst) lst
-      (let ((proc-res (proc (car lst))))
-	((if (srl:nodeset? proc-res) append cons)
-	 proc-res (srl:map-union proc (cdr lst))))))
 
 ; A simplified implementation of `select-kids' is sufficienf for the serializer
 (define (srl:select-kids test-pred?)
@@ -117,7 +115,8 @@
      ((not (pair? node)) '())   ; No children
      ((symbol? (car node))
       (filter test-pred? (cdr node)))
-     (else (srl:map-union (srl:select-kids test-pred?) node)))))
+     (else
+      (srl:map-append (srl:select-kids test-pred?) node)))))
 
 ;-------------------------------------------------
 ; Borrowed from "modif.scm"
@@ -521,7 +520,7 @@
 (define srl:escape-alist-att-value
   (append `((#\' . "&apos;") (#\" . "&quot;")
             ; Escaping the newline character in attribute value
-            (,(integer->char 10) . "&#10;"))
+            (,srl:char-nl . "&#10;"))
           srl:escape-alist-char-data))
 (define srl:escape-alist-html-att
   '((#\& . "&amp;") (#\> . "&gt;") (#\' . "&apos;") (#\" . "&quot;")))
@@ -1347,7 +1346,7 @@
   (call-with-values
    (lambda ()
      (if (and (not (null? port-or-filename+params))
-              (or (port? (car port-or-filename+params))
+              (or (output-port? (car port-or-filename+params))
                   (string? (car port-or-filename+params))))
          (values (car port-or-filename+params) (cdr port-or-filename+params))
          (values #f port-or-filename+params)))
