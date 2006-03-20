@@ -115,10 +115,10 @@
   (files define-opt))
 
 (define-structure parser-errors-vanilla parser-errors-interface
-  (open scheme signals conditions formats)
+  (open scheme exceptions conditions formats)
   (begin
-    (define-condition-type 'parser-error '(error))
-    (define parser-error? (condition-predicate 'parser-error))
+    (define-condition-type &parser-error &error
+      parser-error?)
 
     (define (format-list list)
       (apply string-append (map format-x list)))
@@ -127,7 +127,13 @@
       (format #f "~A" thing))
     
     (define (parser-error port message . rest)
-      (signal 'parser-error port (format-list (cons message rest))))))
+      (raise
+       (condition
+	(&parser-error)
+	(&message
+	 (&message (format-list (cons message rest))))
+	(&irritants
+	 (values (list port ))))))))
 
 (define (make-input-parses parser-errors-structure)
   (structure input-parses-interface
