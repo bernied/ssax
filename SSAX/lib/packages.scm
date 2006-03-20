@@ -131,7 +131,7 @@
        (condition
 	(&parser-error)
 	(&message
-	 (&message (format-list (cons message rest))))
+	 (message (format-list (cons message rest))))
 	(&irritants
 	 (values (list port ))))))))
 
