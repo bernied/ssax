@@ -92,7 +92,7 @@
 	(subset srfi-13 (string-null?))
 	srfi-23 ; ERROR
 	coutputs
-	oleg-utilso
+	oleg-utils
 	oleg-string-ports
 	sxml-tree-trans
 	ssax-vanilla
