@@ -274,7 +274,7 @@ Dmitry Lizorkin")
      " includes the complete SSAX/SXML code, some
 documentation, validation tests, as well as several sample applications.")
   (p "You can "
-     (a (@ (href "http://cvs.sourceforge.net/cgi-bin/viewcvs.cgi/ssax"))
+     (a (@ (href "http://ssax.cvs.sourceforge.net/ssax"))
 	"browse the files in the CVS tree")
      " from any web browser.")
 
