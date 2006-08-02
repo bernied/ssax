@@ -247,7 +247,7 @@ and, in some cases, become part of the distribution for those systems:")
 
       (li "Gauche/SXML, SSAX version 4.9+"
 	(who "Shiro Kawai")
-	(URL "http://cvs.sourceforge.net/viewcvs.py/gauche/Gauche/ext/sxml/"))
+	(URL "http://gauche.cvs.sourceforge.net/gauche/"))
 
       (li "Bigloo SSAX-SXML library, version 4.9"
 	(who "Kirill Lisovsky and Dmitry Lizorkin, maintained by
@@ -263,8 +263,7 @@ Dmitry Lizorkin")
 	(URL "http://www.call-with-current-continuation.org/eggs/ssax.html"))
 
       (li "SISC, an extensible Java based interpreter, SSAX version 4.9"
-	(who "Noel Welsh")
-	(URL "http://sisc.sourceforge.net/wiki/wakka.php?wakka=SSAX"))
+	(who "Noel Welsh"))
       )
 
 
