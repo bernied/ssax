@@ -7,7 +7,7 @@
    (title "XML and Scheme")
    (description "Representing, authoring, querying and transforming
 markup data in Scheme; XML notation for a programming language")
-   (Date-Revision-yyyymmdd "20040916")
+   (Date-Revision-yyyymmdd "20060830")
    (Date-Creation-yyyymmdd "20010706")
    (keywords "XML, XML parsing, XML Infoset, XPath, XSLT, SAX, SXML, SXSLT, SXPath, Scheme, HTML composition, HTML authoring")
    (AuthorAddress "oleg-at-okmij.org")
@@ -92,7 +92,11 @@ languages internally rely on SXML as a representation of the XML Infoset.")
 ; Add the news section
 
    (Section 3 "Documentation" " and tutorials")
-   (p "Main SSAX/SXML page:"
+   
+    (p "SXML Tools Tutorial by Dmitry Lizorkin:"
+      (URL "http://modis.ispras.ru/Lizorkin/sxml-tutorial.html"))
+
+    (p "Main SSAX/SXML page:"
       (URL "http://pobox.com/~oleg/ftp/Scheme/xml.html"))
 
     (p "XML Matters: Investigating SXML and SSAX: "
