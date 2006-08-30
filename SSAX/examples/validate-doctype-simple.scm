@@ -187,10 +187,10 @@
 	     DOCTYPE
 	     (lambda (port docname systemid internal-subset? seed)
 	       (when internal-subset?
-		     (SSAX:warn port
+		     (ssax:warn port
 			   "Internal DTD subset is not currently handled ")
-		     (SSAX:skip-internal-dtd port))
-	       (SSAX:warn port "DOCTYPE DECL " docname " "
+		     (ssax:skip-internal-dtd port))
+	       (ssax:warn port "DOCTYPE DECL " docname " "
 		     systemid " found and skipped")
 	       (values #f '() namespaces seed))
 
