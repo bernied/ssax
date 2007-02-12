@@ -336,7 +336,7 @@
                 (cdr path)))
          ((string? (car path))
           (and-let*   ; only for the location path for the moment
-           ((txt-ast (txp:expr->ast (car path))))
+           ((txt-ast (txp:expr->ast (car path) ns-binding)))
            (loop (if (eq? (car txt-ast) 'relative-location-path)
                      (append (reverse (cdr txt-ast)) ast-steps)
                      (cons
