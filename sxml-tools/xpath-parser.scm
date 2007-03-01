@@ -53,7 +53,8 @@
 ; A warning message for grammar features which are not supported by this
 ; implementation
 (define (sxml:xpointer-parse-warning . text)
-  (apply cerr (append (list "XPointer parser warning: ") text (list nl))))
+  (apply cerr
+         (append (list "XPath/XPointer parser warning: ") text (list nl))))
 
 
 ;-------------------------------------------------
@@ -164,7 +165,7 @@
       ((null? lst) p)
       ((null? p) 
        (sxml:xpointer-parse-error 
-        "unexpected end of XPointer path. "
+        "unexpected end of XPath expression. "
         "Expected - \"" str "\", given - \"" (list->string path) "\""))
       ((char=? (car lst) (car p)) (loop (cdr lst) (cdr p)))
       (else
@@ -189,7 +190,7 @@
     (cond
       ((null? path) 
        (sxml:xpointer-parse-error
-        "unexpected end of XPointer path. Expected - NCName"))
+        "unexpected end of XPath expression. Expected - NCName"))
       ((sxml:non-first? (car path))
        (sxml:xpointer-parse-error
         "expected - NCName instead of " (car path)))
@@ -209,7 +210,7 @@
     (cond
       ((null? path)
        (sxml:xpointer-parse-error
-	 "unexpected end of XPointer path. Expected - Name"))
+	 "unexpected end of XPath expression. Expected - Name"))
       ((and (sxml:non-first? (car path))
 	    (not (char=? (car path) #\:)))
        (sxml:xpointer-parse-error "expected - Name instead of " (car path)))
@@ -255,7 +256,7 @@
     (cond
       ((null? path)
        (sxml:xpointer-parse-error
-        "unexpected end of XPointer path. Expected - number"))
+        "unexpected end of XPath expression. Expected - number"))
       ((or (char<? (car path) #\1) (char>? (car path) #\9))
        (sxml:xpointer-parse-error "expected - number instead of " (car path)))
       (else (let loop ((res (- (char->integer (car path))
@@ -301,10 +302,10 @@
       (cond
         ((and (null? path) (null? n-lst))
          (sxml:xpointer-parse-error 
-          "unexpected end of XPointer path. Expected - number"))
+          "unexpected end of XPath expression. Expected - number"))
         ((null? path) (list n-lst path))
         ((and (or (char<? (car path) #\0) (char>? (car path) #\9))
-              (null? n-lst))       
+              (null? n-lst))
          (sxml:xpointer-parse-error "expected - number instead of " (car path)))
         ((or (char<? (car path) #\0) (char>? (car path) #\9))
          (list n-lst path))
@@ -316,42 +317,57 @@
     (cond
       ((null? path)
        (sxml:xpointer-parse-error 
-        "unexpected end of XPointer path. Expected - number"))
+        "unexpected end of XPath expression. Expected - number"))
       ((char=? (car path) #\.)
-       (and-let* ((lst (digits (cdr path))))
-            (let rpt ((res 0)
-                      (n-lst (car lst))
-                      (path (cadr lst)))
-              (if(null? n-lst)
-                 (list (/ res 10) path)
-                 (rpt (+ (/ res 10) (car n-lst))
-                      (cdr n-lst) 
-                      path)))))
-      (else (and-let* ((lst (digits path)))
-		      (let loop ((num1 0)
-				 (n-lst (reverse (car lst)))
-				 (path (cadr lst)))
-			(if (null? n-lst)
-			  (cond
-			    ((null? path) (list num1 path))
-			    ((not (char=? (car path) #\.)) (list num1 path))
-			    (else
-			      (and-let* ((lst2 (digits (cdr path))))
-					(let rpt ((num2 0)
-						  (n-lst (car lst2))
-						  (path (cadr lst2)))
-					  (if (null? n-lst)
-					    (list (+ num1 (/ num2 10)) path)
-					    (rpt (+ (/ num2 10) (car n-lst))
-						 (cdr n-lst) 
-						 path))))))
-			  (loop (+ (* num1 10) (car n-lst))
-				(cdr n-lst) 
-				path))))))))
+       (and-let*
+        ((lst (digits (cdr path))))
+        (let rpt ((res 0)
+                  (n-lst (car lst))
+                  (path (cadr lst)))
+          (if (null? n-lst)
+              (list (/ res 10) path)
+              (rpt (+ (/ res 10) (car n-lst))
+                   (cdr n-lst) 
+                   path)))))
+      (else
+       (and-let*
+        ((lst (digits path)))
+        (let loop ((num1 0)
+                   (n-lst (reverse (car lst)))
+                   (path (cadr lst)))
+          (if (null? n-lst)
+              (cond
+                ((or (null? path) (not (char=? (car path) #\.)))
+                 (list num1 path))
+                ((or (null? (cdr path))
+                     (char<? (cadr path) #\0) (char>? (cadr path) #\9))
+                 (list (exact->inexact num1) (cdr path)))
+                (else
+                 (and-let* ((lst2 (digits (cdr path))))
+                           (let rpt ((num2 0)
+                                     (n-lst (car lst2))
+                                     (path (cadr lst2)))
+                             (if (null? n-lst)
+                                 (list (+ num1 (/ num2 10)) path)
+                                 (rpt (+ (/ num2 10) (car n-lst))
+                                      (cdr n-lst) 
+                                      path))))))
+              (loop (+ (* num1 10) (car n-lst))
+                    (cdr n-lst)
+                    path))))))))
 
 
 ;=========================================================================
 ; XPath/XPointer grammar parsing
+
+; Returns the corresponding namespace URI or #f
+; prefix - a symbol
+(define (txp:resolve-ns-prefix prefix ns-binding)
+  (cond
+    ((assq prefix ns-binding)
+     => cdr)
+    (else
+     (and (eq? prefix 'xml) "xml"))))
 
 ; Produces a parameterized parser
 ; txp-params - a long associative list of parameters which specify handlers
@@ -527,20 +543,20 @@
                    (list (qname-impl #f (car lst) add-on) path)
                    (let* ((name (string->symbol (car lst)))
                           (path (sxml:parse-assert ":" path))
-                          (pair (assq name ns-binding)))
+                          (uri  (txp:resolve-ns-prefix name ns-binding)))
                      (cond
-                       ((not pair)
+                       ((not uri)
                         (sxml:xpointer-parse-error
                          "unknown namespace prefix - " name))
                        ((and (not (null? path)) (char=? (car path) #\*))
                         (list
-                         (uri+star-impl (cdr pair) add-on)
+                         (uri+star-impl uri add-on)
                          (sxml:parse-assert "*" path)))
                        (else
                         (and-let*
                          ((lst (sxml:parse-ncname path)))
                          (list
-                          (qname-impl (cdr pair) (car lst) add-on)                      
+                          (qname-impl uri (car lst) add-on)
                           (cadr lst))))))))))))))
                 
        ; Parses a Step production 
