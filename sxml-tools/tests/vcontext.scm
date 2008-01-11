@@ -2665,12 +2665,12 @@ vcntxt:doc
 
 ; Validation Test harness
 (cond-expand
- (bigloo  ; Bigloo has specific 3-argument error procedure
-  (define (cntxt:error msg . args)
-    (error "myerror" msg args))
-  )
+ ;(bigloo  ; Bigloo has specific 3-argument error procedure
+ ; (define (cntxt:error msg . args)
+ ;   (error "myerror" msg args))
+ ; )
  (else
-  (define cntxt:error error)
+  (define cntxt:error myenv:error)
   ))
 
 (define-macro (vcntxt:run-test selector node expected-result)

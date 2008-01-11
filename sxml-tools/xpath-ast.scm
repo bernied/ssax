@@ -265,7 +265,7 @@
 ;
 ; The returned result:   abstract-syntax-tree   or   #f
 ;  abstract-syntax-tree - an S-expression
-;  #f - signals of a parse error (error message is printed as a side effect
+;  #f - signals of a parse error (an error message is printed as a side effect
 ; during parsing)
 
 (define (txp:ast-api-helper parse-proc)

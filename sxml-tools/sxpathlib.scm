@@ -439,11 +439,9 @@
 (define (sxml:attribute test-pred?)
   (let ((fltr (sxml:filter test-pred?)))
     (lambda (node)
-      (fltr
-	(apply append
-	       (map
-             sxml:attr-list
-		(as-nodeset node)))))))
+      (map-union
+       (lambda (node) (fltr (sxml:attr-list node)))
+       (as-nodeset node)))))
 
 ; Child axis
 ;  This function is similar to 'select-kids', but it returns an empty

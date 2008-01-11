@@ -43,12 +43,12 @@
 ; Validation Test harness
 
 (cond-expand
- (bigloo  ; Bigloo has specific 3-argument error procedure
-  (define (sxp:error msg . args)
-    (error "myerror" msg args))
-  )
+ ;(bigloo  ; Bigloo has specific 3-argument error procedure
+ ; (define (sxp:error msg . args)
+ ;   (error "myerror" msg args))
+ ; )
  (else
-  (define sxp:error error)
+  (define sxp:error myenv:error)
   ))
 
 ; The `sxp:' prefix added to prevent name collision with "SSAX-code.scm"

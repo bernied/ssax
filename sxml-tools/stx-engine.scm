@@ -26,7 +26,7 @@
 			   stx:templates current-root $))
     ((null? (cdr select))
     `(stx:apply-templates ,(car select) stx:templates current-root $))
-    (else (error "Invalid parameters for 'xsl:apply-template': " select))))
+    (else (myenv:error "Invalid parameters for 'xsl:apply-template': " select))))
 
 ;------------------------------------------------------------------------------
 ; These macros provide support for abbreviated stylesheets:
