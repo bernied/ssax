@@ -4,7 +4,7 @@
 ; IT IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
 ;
 ; Please send bug reports and comments to:
-;   lizorkin@hotbox.ru    Dmitry Lizorkin
+;   dmitry.lizorkin@gmail.com    Dmitry Lizorkin
 ;
 ; The basics of modification language design was inspired by Patrick Lehti
 ; and his data manipulation processor for XML Query Language:
@@ -665,6 +665,12 @@
 ;-------------------------------------------------
 ; Facilities for mutation
 
+(cond-expand
+ (plt
+  #f  ; set-cdr removed from plt
+  )
+ (else
+
 ; Destructively replaces the next list member for `prev' with the new `lst'
 (define (sxml:replace-next-with-lst! prev lst)
   (let ((next (cddr prev)))
@@ -838,3 +844,5 @@
       (sxml:nodes-to-mutate
        doc
        (sxml:lambdas-upd-specifiers->targets doc lambdas-upd-specifiers))))))
+
+))
