@@ -7,7 +7,7 @@
    (title "XML and Scheme")
    (description "Representing, authoring, querying and transforming
 markup data in Scheme; XML notation for a programming language")
-   (Date-Revision-yyyymmdd "20060830")
+   (Date-Revision-yyyymmdd "20080722")
    (Date-Creation-yyyymmdd "20010706")
    (keywords "XML, XML parsing, XML Infoset, XPath, XSLT, SAX, SXML, SXSLT, SXPath, Scheme, HTML composition, HTML authoring")
    (AuthorAddress "oleg-at-okmij.org")
@@ -105,7 +105,7 @@ languages internally rely on SXML as a representation of the XML Infoset.")
       "IBM developerWorks article"
       (URL "http://www-106.ibm.com/developerworks/library/x-matters31.html")
       (URL 
-	"http://www-6.ibm.com/jp/developerworks/xml/040402/j_x-matters31.html")
+	"http://www-6.ibm.com/jp/developerworks/library/j_x-matters31.html")
       "[Japanese]")
 
    (p
@@ -213,10 +213,6 @@ data from (parsed) Web pages"
 technical universities in the whole Russia) has been developed using
 STX:"
      (URL "http://ir.misis.ru/english/about/general.htm"))
-   (p
-     "A Metcast server and its front-end access tools extensively rely on SXML"
-     (URL "http://www.metnet.navy.mil/cgi-bin/oleg/get-advisories")
-     (URL "http://www.metnet.navy.mil/Metcast/Code/get-advisories.scm"))
    (p "This page and all SXML-related pages are authored in SXML.")
     (p
       "For more detailed explanation of these projects, see the talk
@@ -230,7 +226,7 @@ The whole SSAX code is in public domain.")
 
    "SSAX has been tested on the following Scheme systems:"
    (br)
-   "PLT Scheme, Bigloo, GambitC 3.0,
+   "PLT Scheme, Bigloo, GambitC 4.0,
 Chicken, Guile, SCM, MIT Scheme 7.5.2, Scheme48, SCSH, Gauche, SISC."
 
 
@@ -253,18 +249,13 @@ and, in some cases, become part of the distribution for those systems:")
 	(who "Shiro Kawai")
 	(URL "http://gauche.cvs.sourceforge.net/gauche/"))
 
-      (li "Bigloo SSAX-SXML library, version 4.9"
-	(who "Kirill Lisovsky and Dmitry Lizorkin, maintained by
-Dmitry Lizorkin")
-	(URL "http://pair.com/lisovsky/download/sxml/bigloo/"))
-
       (li "SCSH and Scheme48, version 4.9"
 	(who "Michael Sperber")
 	(URL "http://www.scsh.net/resources/markup.html"))
 
-      (li "Chicken ssax.egg, version 4.9.1"
+      (li "Chicken ssax.egg, version 4.9.7"
 	(who "Felix Winkelmann")
-	(URL "http://www.call-with-current-continuation.org/eggs/ssax.html"))
+	(URL "http://www.callcc.org/eggs/ssax.html"))
 
       (li "SISC, an extensible Java based interpreter, SSAX version 4.9"
 	(who "Noel Welsh"))
