@@ -851,7 +851,7 @@
                                 '("area" "base" "basefont" "br" "col"
                                   "frame" "hr" "img" "input" "isindex"
                                   "link" "meta" "param"))))
-                      '(">") '("/>")))
+                      '(">") '(" />")))
                     (ns-prefix-assig ns-prefix-assig)
                     (namespace-assoc namespace-assoc)
                     (declared-ns-prefixes
