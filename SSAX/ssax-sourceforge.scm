@@ -7,7 +7,7 @@
    (title "XML and Scheme")
    (description "Representing, authoring, querying and transforming
 markup data in Scheme; XML notation for a programming language")
-   (Date-Revision-yyyymmdd "20080722")
+   (Date-Revision-yyyymmdd "20081121")
    (Date-Creation-yyyymmdd "20010706")
    (keywords "XML, XML parsing, XML Infoset, XPath, XSLT, SAX, SXML, SXSLT, SXPath, Scheme, HTML composition, HTML authoring")
    (AuthorAddress "oleg-at-okmij.org")
@@ -107,6 +107,9 @@ languages internally rely on SXML as a representation of the XML Infoset.")
       (URL 
 	"http://www-6.ibm.com/jp/developerworks/library/j_x-matters31.html")
       "[Japanese]")
+    
+   (p "Authoring dynamic websites with SXML by Peter Bex:"
+     (URL "http://sjamaan.ath.cx/docs/scheme/sxslt.pdf"))
 
    (p
     "Detailed introduction, motivation and real-life case-studies of
