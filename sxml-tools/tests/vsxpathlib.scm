@@ -412,6 +412,13 @@
   (sxp:run-test (test-sxpath '((para 1))) tree expected)
 )
 
+; Node-pos for a negative index that is not present in a list
+; Test suggested by Peter Bex
+(sxp:run-test
+ (node-pos -6)
+ '((div "hi") (span "hello") (em "is this thing on?"))
+ '())
+
 ; Location path, full form: child::para[position()=last()] 
 ; Location path, abbreviated form: para[last()]
 ; selects the last para child of the context node

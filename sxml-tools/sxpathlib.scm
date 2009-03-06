@@ -205,7 +205,7 @@
      ((not (nodeset? nodelist)) '())
      ((null? nodelist) nodelist)
      ((eqv? n 1) (list (car nodelist)))
-     ((negative? n) ((node-pos (+ n 1 (length nodelist))) nodelist))
+     ((negative? n) ((node-pos (- n)) (reverse nodelist)))
      (else
       (assert (positive? n))
       ((node-pos (-- n)) (cdr nodelist))))))
