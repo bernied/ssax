@@ -7,7 +7,7 @@
    (title "XML and Scheme")
    (description "Representing, authoring, querying and transforming
 markup data in Scheme; XML notation for a programming language")
-   (Date-Revision-yyyymmdd "20081121")
+   (Date-Revision-yyyymmdd "20090310")
    (Date-Creation-yyyymmdd "20010706")
    (keywords "XML, XML parsing, XML Infoset, XPath, XSLT, SAX, SXML, SXSLT, SXPath, Scheme, HTML composition, HTML authoring")
    (AuthorAddress "oleg-at-okmij.org")
@@ -27,10 +27,12 @@ markup data in Scheme; XML notation for a programming language")
 
    (page-title)
 
-   (a (@ (href "http://sourceforge.net")) " "
-      (img (@ (src "http://sourceforge.net/sflogo.php?group_id=30687")
-	      (width "88") (height "31") (border "0")
-	      (alt "SourceForge Logo"))))
+   (a (@ (href "http://sourceforge.net/projects/ssax")) " "
+      (img (@ (src 
+	    "http://sflogo.sourceforge.net/sflogo.php?group_id=30687&type=9")
+	      (width "80") (height "15") (border "0")
+	      (alt "Get S-exp-based XML parsing/query/conversion at
+   SourceForge.net. Fast, secure and Free Open Source software downloads"))))
 
 ; Ref to Makoto Satoo
 
