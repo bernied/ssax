@@ -63,7 +63,7 @@
 
 (define-interface sxml-tree-trans-interface
   (export SRV:send-reply
-	  post-order pre-post-order replace-range))
+	  post-order pre-post-order pre-post-order-splice replace-range))
 
 (define-interface sxml-to-html-interface
   (export SXML->HTML

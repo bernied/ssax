@@ -4,7 +4,7 @@ parent-pointers-depend=assert.scm ppretty-prints.scm srfi-13-local.scm output.sc
 
 sxslt-advanced-depend=srfi-13-local.scm util.scm assert.scm SXML-tree-trans.scm output.scm SXML-to-HTML.scm lookup-def.scm SXML-to-HTML-ext.scm 
 
-sxml-to-sxml-depend=ppretty-prints.scm assert.scm 
+sxml-to-sxml-depend=ppretty-prints.scm assert.scm SXML-tree-trans.scm 
 
 sxml-nesting-depth-label-depend=ppretty-prints.scm assert.scm SXML-tree-trans.scm 
 

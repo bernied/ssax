@@ -55,6 +55,7 @@
 	ppretty-prints
 	assertions
 	crementing
+        sxml-tree-trans
 	srfi-23)
   (begin
     (define gensym
