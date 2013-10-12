@@ -1,0 +1,18 @@
+## generic files to ignore
+*~
+*.lock
+*.DS_Store
+*/.DS_Store
+*.swp
+*.out
+*.o
+
+## Gambit specific ignores
+*.obj
+*.manifest
+*.res
+*.ilk
+*.pdb
+*.dep
+*.idb
+*.gvm

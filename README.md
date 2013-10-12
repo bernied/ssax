@@ -117,7 +117,7 @@ You can also use [this github repository](http://github.com/bernied/ssax) to bro
 [ssax]: http://ssax.sourceforge.net/  "Sourceforge SSAX"
 [plt]: http://racket-lang.org/ "Racket"
 [bigloo]: http://www-sop.inria.fr/indes/fp/Bigloo/ "Bigloo"
-[gambit]: http://www.iro.umontreal.ca/~gambit/ "GambitC"
+[gambit]: http://gambitscheme.org/wiki/index.php/Main_Page "Gambit Scheme"
 [chicken]: http://www.call-cc.org/ "Chicken Scheme"
 [guile]: http://www.gnu.org/software/guile/ "GNU Guile"
 [scm]: http://people.csail.mit.edu/jaffer/SCM.html "SCM"
