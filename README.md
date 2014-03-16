@@ -2,6 +2,8 @@
 <p>
 > The following README is a slightly modified version of [Oleg Kiselyov's Sourceforge homepage for SSAX][ssax].
 > [Oleg Kiselyov](http://okmij.org/ftp/Scheme/xml.html#XML-parser) was the primary developer with contributions from [Dmitry Lizorkin](http://modis.ispras.ru/Lizorkin/xml-functional.html), [Kirill Lisovsky](http://metapaper.net/xml/ssax/) and [Mike Sperber](http://www.deinprogramm.de/sperber/software/).
+<p>
+To be clear: I have nothing to do with this software, other then I am a fan. I meerly copied their code from SourceForge to github.
 
 S-exp-based XML parsing/query/conversion
 ========================================
